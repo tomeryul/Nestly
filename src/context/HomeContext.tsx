@@ -44,7 +44,9 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     if (!user) {
       setHomes([]);
       setHomeId(null);
-      setLoading(false);
+      // Keep loading=true while we still have no user, so the router never sees
+      // a transient "logged in but no home" state and bounces to onboarding.
+      setLoading(true);
       return;
     }
     setLoading(true);
