@@ -453,6 +453,36 @@ export type Database = {
         }
         Relationships: []
       }
+      task_subtasks: {
+        Row: {
+          created_at: string
+          home_id: string
+          id: string
+          is_done: boolean
+          position: number
+          task_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          home_id: string
+          id?: string
+          is_done?: boolean
+          position?: number
+          task_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          home_id?: string
+          id?: string
+          is_done?: boolean
+          position?: number
+          task_id?: string
+          title?: string
+        }
+        Relationships: []
+      }
       weekly_meals: {
         Row: {
           added_to_list: boolean

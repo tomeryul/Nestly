@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2, ChevronRight, ChevronLeft, Check, Clock, Repeat, X, CalendarDays } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronLeft, Check, Clock, Repeat, X, CalendarDays, ListChecks } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -16,9 +16,11 @@ export default function Schedule() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [selected, setSelected] = useState(() => new Date());
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [subCounts, setSubCounts] = useState<Record<string, { done: number; total: number }>>({});
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
+  const [detailTask, setDetailTask] = useState<Task | null>(null);
 
   const days = weekDates(weekStart);
   const weekFrom = toISODate(weekStart);
@@ -28,7 +30,21 @@ export default function Schedule() {
   const load = useCallback(async () => {
     if (!homeId) return;
     const { data } = await supabase.from("schedule_tasks").select("*").eq("home_id", homeId).gte("scheduled_date", weekFrom).lte("scheduled_date", weekTo).order("start_time", { nullsFirst: true });
-    setTasks(data ?? []);
+    const list = data ?? [];
+    setTasks(list);
+    const ids = list.map((t) => t.id);
+    if (ids.length) {
+      const { data: subs } = await supabase.from("task_subtasks").select("task_id, is_done").in("task_id", ids);
+      const c: Record<string, { done: number; total: number }> = {};
+      (subs ?? []).forEach((s) => {
+        c[s.task_id] = c[s.task_id] ?? { done: 0, total: 0 };
+        c[s.task_id].total++;
+        if (s.is_done) c[s.task_id].done++;
+      });
+      setSubCounts(c);
+    } else {
+      setSubCounts({});
+    }
     setLoading(false);
   }, [homeId, weekFrom, weekTo]);
   useEffect(() => {
@@ -98,7 +114,10 @@ export default function Schedule() {
                 <button className={`nst-check ${t.is_done ? "on" : ""}`} onClick={() => toggle(t)}>
                   <Check size={14} />
                 </button>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <button
+                  onClick={() => setDetailTask(t)}
+                  style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", textAlign: "right", cursor: "pointer" }}
+                >
                   <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: t.is_done ? "line-through" : "none" }}>{t.title}</p>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11.5, color: "var(--text-muted)", fontWeight: 600, marginTop: 3, flexWrap: "wrap" }}>
                     {t.start_time && (
@@ -109,9 +128,15 @@ export default function Schedule() {
                       </span>
                     )}
                     <span className="nst-tag" style={{ color: cat.color, background: cat.color + "1f" }}>{cat.label}</span>
+                    {subCounts[t.id] && (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: subCounts[t.id].done === subCounts[t.id].total ? "var(--accent)" : "var(--text-muted)" }}>
+                        <ListChecks size={12} />
+                        {subCounts[t.id].done}/{subCounts[t.id].total}
+                      </span>
+                    )}
                     {who && <span>{who}</span>}
                   </div>
-                </div>
+                </button>
                 <button className="nst-del" onClick={() => remove(t.id)}>
                   <Trash2 />
                 </button>
@@ -123,7 +148,71 @@ export default function Schedule() {
 
       {adding && <TaskModal homeId={homeId!} dateIso={selectedIso} onClose={() => setAdding(false)} onSaved={() => { setAdding(false); load(); }} />}
       {showRecurring && <RecurringTaskModal homeId={homeId!} onClose={() => setShowRecurring(false)} />}
+      {detailTask && <TaskDetailModal task={detailTask} onClose={() => { setDetailTask(null); load(); }} />}
     </section>
+  );
+}
+
+function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => void }) {
+  const [subs, setSubs] = useState<Tables<"task_subtasks">[]>([]);
+  const [title, setTitle] = useState("");
+
+  const load = useCallback(async () => {
+    const { data } = await supabase.from("task_subtasks").select("*").eq("task_id", task.id).order("position").order("created_at");
+    setSubs(data ?? []);
+  }, [task.id]);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const add = async () => {
+    if (!title.trim()) return;
+    await supabase.from("task_subtasks").insert({ task_id: task.id, home_id: task.home_id, title: title.trim(), position: subs.length });
+    setTitle("");
+    load();
+  };
+  const toggle = async (s: Tables<"task_subtasks">) => {
+    await supabase.from("task_subtasks").update({ is_done: !s.is_done }).eq("id", s.id);
+    load();
+  };
+  const remove = async (id: string) => {
+    await supabase.from("task_subtasks").delete().eq("id", id);
+    load();
+  };
+
+  const done = subs.filter((s) => s.is_done).length;
+
+  return (
+    <Modal open onClose={onClose} title={task.title}>
+      <p className="section-sub" style={{ marginTop: "-0.4rem", marginBottom: "1rem" }}>
+        רשימת תת‑משימות להשלמת המשימה{subs.length ? ` · ${done}/${subs.length} הושלמו` : ""}
+      </p>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: "1rem" }}>
+        <input placeholder="הוספת תת‑משימה…" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
+        <button className="btn btn-primary" style={{ padding: "0 16px" }} onClick={add}>
+          <Plus size={18} />
+        </button>
+      </div>
+
+      {subs.length === 0 ? (
+        <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: "0.5rem 0" }}>אין תת‑משימות עדיין</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {subs.map((s) => (
+            <div className="nst-row" key={s.id} style={{ opacity: s.is_done ? 0.55 : 1 }}>
+              <button className={`nst-check ${s.is_done ? "on" : ""}`} onClick={() => toggle(s)}>
+                <Check size={14} />
+              </button>
+              <span style={{ flex: 1, font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: s.is_done ? "line-through" : "none" }}>{s.title}</span>
+              <button className="nst-del" onClick={() => remove(s.id)}>
+                <X size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
   );
 }
 
