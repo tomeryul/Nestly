@@ -2,6 +2,7 @@ export const AREAS = {
   shopping: "ניהול קניות",
   cooking: "ניהול בישולים",
   schedule: "ניהול לוז",
+  cleaning: "ניהול ניקיון",
 } as const;
 
 export type AreaKey = keyof typeof AREAS;

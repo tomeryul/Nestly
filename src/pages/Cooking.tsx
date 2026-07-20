@@ -176,8 +176,9 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
 }
 
 function WeekTab() {
-  const { homeId } = useHome();
+  const { homeId, members } = useHome();
   const { user } = useAuth();
+  const nameFor = (uid: string) => members.find((m) => m.user_id === uid)?.profile?.display_name ?? "";
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [meals, setMeals] = useState<Meal[]>([]);
   const [dishes, setDishes] = useState<Dish[]>([]);
@@ -248,8 +249,10 @@ function WeekTab() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)" }}>{meal.dishes?.name ?? "מאכל"}</p>
                 <p style={{ fontSize: 11.5, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
-                  {meal.day_of_week != null ? `יום ${DAYS_HE[meal.day_of_week]}` : ""}
+                  {meal.all_week ? "כל השבוע" : meal.day_of_week != null ? `יום ${DAYS_HE[meal.day_of_week]}` : "ללא יום"}
                   {meal.meal_type ? ` · ${MEAL_TYPES[meal.meal_type as keyof typeof MEAL_TYPES]}` : ""}
+                  {" · "}
+                  {meal.for_members && meal.for_members.length > 0 ? meal.for_members.map((id) => nameFor(id)).filter(Boolean).join(", ") : "כל הבית"}
                 </p>
               </div>
               {meal.added_to_list ? (
@@ -312,13 +315,27 @@ function AddMealModal({
   onClose: () => void;
   onAdded: () => void;
 }) {
+  const { members } = useHome();
   const [dishId, setDishId] = useState<string>(dishes[0]?.id ?? "");
   const [day, setDay] = useState<string>("");
   const [mealType, setMealType] = useState<string>("");
+  const [forMembers, setForMembers] = useState<string[]>([]);
+
+  const toggleMember = (uid: string) => setForMembers((r) => (r.includes(uid) ? r.filter((x) => x !== uid) : [...r, uid]));
 
   const save = async () => {
     if (!dishId) return;
-    await supabase.from("weekly_meals").insert({ home_id: homeId, dish_id: dishId, week_start: weekIso, day_of_week: day === "" ? null : Number(day), meal_type: mealType || null, created_by: userId });
+    const allWeek = day === "all";
+    await supabase.from("weekly_meals").insert({
+      home_id: homeId,
+      dish_id: dishId,
+      week_start: weekIso,
+      all_week: allWeek,
+      day_of_week: day === "" || allWeek ? null : Number(day),
+      meal_type: mealType || null,
+      for_members: forMembers,
+      created_by: userId,
+    });
     onAdded();
   };
 
@@ -345,9 +362,10 @@ function AddMealModal({
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ flex: 1 }}>
-            <label>יום (רשות)</label>
+            <label>יום</label>
             <select value={day} onChange={(e) => setDay(e.target.value)}>
-              <option value="">ללא</option>
+              <option value="">ללא יום</option>
+              <option value="all">כל השבוע</option>
               {DAYS_HE.map((d, i) => (
                 <option key={i} value={i}>
                   {d}
@@ -365,6 +383,20 @@ function AddMealModal({
                 </option>
               ))}
             </select>
+          </div>
+        </div>
+        <div>
+          <label>עבור מי? (ריק = כל הבית)</label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+            {members.map((m) => (
+              <button
+                key={m.user_id}
+                className={`nst-chip ${forMembers.includes(m.user_id) ? "active" : ""}`}
+                onClick={() => toggleMember(m.user_id)}
+              >
+                {m.profile?.display_name ?? "חבר"}
+              </button>
+            ))}
           </div>
         </div>
         <p className="alert alert-info">

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2 } from "lucide-react";
+import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -23,6 +23,14 @@ export default function Shopping() {
   const [category, setCategory] = useState<string>(CATEGORIES[0]);
   const [showRecurring, setShowRecurring] = useState(false);
   const [showNewList, setShowNewList] = useState(false);
+  const [grouped, setGrouped] = useState(() => localStorage.getItem("nestly.shopGrouped") === "1");
+
+  const toggleGrouped = () => {
+    setGrouped((g) => {
+      localStorage.setItem("nestly.shopGrouped", g ? "0" : "1");
+      return !g;
+    });
+  };
 
   const loadLists = useCallback(async () => {
     if (!homeId) return;
@@ -87,13 +95,70 @@ export default function Shopping() {
   if (loading && !lists.length) return <FullPageSpinner />;
   const checkedCount = items.filter((i) => i.is_checked).length;
 
+  const renderRow = (item: Item) => (
+    <div className="nst-row" key={item.id} style={{ opacity: item.is_checked ? 0.55 : 1 }}>
+      <button className={`nst-check ${item.is_checked ? "on" : ""}`} onClick={() => toggle(item)}>
+        <Check size={14} />
+      </button>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: item.is_checked ? "line-through" : "none" }}>{item.name}</p>
+        <div style={{ display: "flex", gap: 7, alignItems: "center", marginTop: 3, flexWrap: "wrap" }}>
+          {item.category && !grouped && <span className="nst-tag">{item.category}</span>}
+          {item.source === "recipe" && (
+            <span className="nst-tag" style={{ background: "var(--cat-3-bg)", color: "var(--cat-3-fg)" }}>
+              <ChefHat /> ממתכון
+            </span>
+          )}
+          {item.source === "recurring" && (
+            <span className="nst-tag" style={{ background: "var(--accent-soft)", color: "var(--accent-ink)" }}>
+              <Repeat /> קבוע
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="nst-stepper">
+        <button onClick={() => changeQty(item, -1)}>
+          <Minus />
+        </button>
+        <span className="val">{item.quantity}</span>
+        <button onClick={() => changeQty(item, 1)}>
+          <Plus />
+        </button>
+      </div>
+      <button className="nst-del" onClick={() => remove(item.id)}>
+        <Trash2 />
+      </button>
+    </div>
+  );
+
+  // when grouped, order categories by the CATEGORIES list, with any others last
+  const groupedSections: [string, Item[]][] = (() => {
+    const map = new Map<string, Item[]>();
+    for (const it of items) {
+      const key = it.category || "אחר";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(it);
+    }
+    const order = [...CATEGORIES, "אחר"];
+    return [...map.entries()].sort((a, b) => {
+      const ai = order.indexOf(a[0]);
+      const bi = order.indexOf(b[0]);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+  })();
+
   return (
     <section className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <h1 className="page-title">קניות</h1>
-        <button className="btn btn-sm" onClick={() => setShowRecurring(true)}>
-          <Repeat size={15} /> פריטים קבועים
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className={`btn btn-sm ${grouped ? "btn-primary" : ""}`} onClick={toggleGrouped} title="מיון לפי קטגוריה">
+            <ListFilter size={15} /> קטגוריות
+          </button>
+          <button className="btn btn-sm" onClick={() => setShowRecurring(true)}>
+            <Repeat size={15} /> קבועים
+          </button>
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 3 }}>
@@ -134,43 +199,25 @@ export default function Shopping() {
 
       {items.length === 0 ? (
         <EmptyState icon={<ShoppingBasket size={42} />} title="הרשימה ריקה" hint="הוסיפו מצרך ראשון למעלה" />
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-          {items.map((item) => (
-            <div className="nst-row" key={item.id} style={{ opacity: item.is_checked ? 0.55 : 1 }}>
-              <button className={`nst-check ${item.is_checked ? "on" : ""}`} onClick={() => toggle(item)}>
-                <Check size={14} />
-              </button>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: item.is_checked ? "line-through" : "none" }}>{item.name}</p>
-                <div style={{ display: "flex", gap: 7, alignItems: "center", marginTop: 3, flexWrap: "wrap" }}>
-                  {item.category && <span className="nst-tag">{item.category}</span>}
-                  {item.source === "recipe" && (
-                    <span className="nst-tag" style={{ background: "var(--cat-3-bg)", color: "var(--cat-3-fg)" }}>
-                      <ChefHat /> ממתכון
-                    </span>
-                  )}
-                  {item.source === "recurring" && (
-                    <span className="nst-tag" style={{ background: "var(--accent-soft)", color: "var(--accent-ink)" }}>
-                      <Repeat /> קבוע
-                    </span>
-                  )}
-                </div>
+      ) : grouped ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {groupedSections.map(([cat, catItems]) => (
+            <div key={cat}>
+              <div style={{ margin: "0 4px 0.5rem", color: "var(--text-3)", font: "700 11.5px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                {cat} · {catItems.length}
               </div>
-              <div className="nst-stepper">
-                <button onClick={() => changeQty(item, -1)}>
-                  <Minus />
-                </button>
-                <span className="val">{item.quantity}</span>
-                <button onClick={() => changeQty(item, 1)}>
-                  <Plus />
-                </button>
-              </div>
-              <button className="nst-del" onClick={() => remove(item.id)}>
-                <Trash2 />
-              </button>
+              <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>{catItems.map(renderRow)}</div>
             </div>
           ))}
+          {checkedCount > 0 && (
+            <button className="btn btn-block" style={{ color: "var(--danger)" }} onClick={clearChecked}>
+              <Eraser size={16} /> מחיקת {checkedCount} פריטים מסומנים
+            </button>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+          {items.map(renderRow)}
           {checkedCount > 0 && (
             <button className="btn btn-block" style={{ color: "var(--danger)", marginTop: 4 }} onClick={clearChecked}>
               <Eraser size={16} /> מחיקת {checkedCount} פריטים מסומנים

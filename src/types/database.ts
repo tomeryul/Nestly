@@ -42,6 +42,69 @@ export type Database = {
         }
         Relationships: []
       }
+      cleaning_tasks: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          created_by: string | null
+          frequency: string
+          home_id: string
+          id: string
+          position: number
+          room: string | null
+          title: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string | null
+          frequency?: string
+          home_id: string
+          id?: string
+          position?: number
+          room?: string | null
+          title: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string | null
+          frequency?: string
+          home_id?: string
+          id?: string
+          position?: number
+          room?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
+      cleaning_completions: {
+        Row: {
+          cleaning_task_id: string
+          done_at: string
+          done_by: string | null
+          home_id: string
+          id: string
+          period_key: string
+        }
+        Insert: {
+          cleaning_task_id: string
+          done_at?: string
+          done_by?: string | null
+          home_id: string
+          id?: string
+          period_key: string
+        }
+        Update: {
+          cleaning_task_id?: string
+          done_at?: string
+          done_by?: string | null
+          home_id?: string
+          id?: string
+          period_key?: string
+        }
+        Relationships: []
+      }
       dishes: {
         Row: {
           created_at: string
@@ -486,10 +549,12 @@ export type Database = {
       weekly_meals: {
         Row: {
           added_to_list: boolean
+          all_week: boolean
           created_at: string
           created_by: string | null
           day_of_week: number | null
           dish_id: string
+          for_members: string[]
           home_id: string
           id: string
           meal_type: string | null
@@ -498,10 +563,12 @@ export type Database = {
         }
         Insert: {
           added_to_list?: boolean
+          all_week?: boolean
           created_at?: string
           created_by?: string | null
           day_of_week?: number | null
           dish_id: string
+          for_members?: string[]
           home_id: string
           id?: string
           meal_type?: string | null
@@ -510,10 +577,12 @@ export type Database = {
         }
         Update: {
           added_to_list?: boolean
+          all_week?: boolean
           created_at?: string
           created_by?: string | null
           day_of_week?: number | null
           dish_id?: string
+          for_members?: string[]
           home_id?: string
           id?: string
           meal_type?: string | null

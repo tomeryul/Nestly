@@ -298,10 +298,10 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
   .nst-main { margin-inline-end: 0; }
   .nst-content { padding: 1.3rem 1rem 6.5rem; }
   .nst-bottomnav { display: block; position: fixed; inset-inline: 0; bottom: 0; z-index: 80; background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); border-top: 1px solid var(--border); }
-  .nst-bn-grid { display: grid; grid-template-columns: repeat(5, 1fr); max-width: 600px; margin: 0 auto; }
-  .nst-bn { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 0 calc(9px + env(safe-area-inset-bottom)); border: none; background: transparent; color: var(--text-muted); font: 600 10.5px var(--font-body); cursor: pointer; }
+  .nst-bn-grid { display: grid; grid-template-columns: repeat(6, 1fr); max-width: 640px; margin: 0 auto; }
+  .nst-bn { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 0 calc(9px + env(safe-area-inset-bottom)); border: none; background: transparent; color: var(--text-muted); font: 600 10px var(--font-body); cursor: pointer; }
   .nst-bn.active { color: var(--accent-ink); }
-  .nst-bn svg { width: 22px; height: 22px; }
+  .nst-bn svg { width: 21px; height: 21px; }
 }
 @media (min-width: 600px) {
   .nst-modal-bg { align-items: center; }

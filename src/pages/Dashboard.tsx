@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { ShoppingCart, ChefHat, CalendarDays, Users, BellRing, Check, Clock } from "lucide-react";
+import { ShoppingCart, ChefHat, CalendarDays, Users, BellRing, Check, Clock, Sparkles } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { AREAS, DAYS_HE, TASK_CATEGORIES, type AreaKey, type TaskCategory } from "../lib/constants";
 import { formatTime, toISODate, startOfWeek } from "../lib/dates";
+import { periodKeyFor } from "./Cleaning";
 import { enablePush, pushEnabled, pushSupported } from "../lib/push";
 import type { Tables } from "../types/database";
 
@@ -18,6 +19,7 @@ export default function Dashboard() {
   const [todayTasks, setTodayTasks] = useState<Task[]>([]);
   const [shopCount, setShopCount] = useState(0);
   const [mealCount, setMealCount] = useState(0);
+  const [cleanLeft, setCleanLeft] = useState(0);
   const [pushOn, setPushOn] = useState<boolean | null>(null);
   const [pushBusy, setPushBusy] = useState(false);
 
@@ -36,6 +38,25 @@ export default function Dashboard() {
     setTodayTasks(t.data ?? []);
     setShopCount(s.count ?? 0);
     setMealCount(m.count ?? 0);
+
+    // cleaning: count tasks not yet completed for the current week/month
+    const { data: ct } = await supabase.from("cleaning_tasks").select("id, frequency").eq("home_id", homeId);
+    const all = ct ?? [];
+    if (all.length) {
+      const weekKey = periodKeyFor("weekly");
+      const monthKey = periodKeyFor("monthly");
+      const { data: comps } = await supabase
+        .from("cleaning_completions")
+        .select("cleaning_task_id, period_key")
+        .in("cleaning_task_id", all.map((x) => x.id))
+        .in("period_key", [weekKey, monthKey]);
+      const doneW = new Set((comps ?? []).filter((c) => c.period_key === weekKey).map((c) => c.cleaning_task_id));
+      const doneM = new Set((comps ?? []).filter((c) => c.period_key === monthKey).map((c) => c.cleaning_task_id));
+      const left = all.filter((x) => (x.frequency === "weekly" ? !doneW.has(x.id) : !doneM.has(x.id))).length;
+      setCleanLeft(left);
+    } else {
+      setCleanLeft(0);
+    }
   }, [homeId, todayIso, weekIso]);
 
   useEffect(() => {
@@ -68,6 +89,7 @@ export default function Dashboard() {
   const stats = [
     { label: "מצרכים לקנייה", value: shopCount, icon: ShoppingCart, to: "/shopping", bg: "var(--cat-1-bg)", fg: "var(--cat-1-fg)" },
     { label: "מאכלים השבוע", value: mealCount, icon: ChefHat, to: "/cooking", bg: "var(--cat-3-bg)", fg: "var(--cat-3-fg)" },
+    { label: "משימות ניקיון", value: cleanLeft, icon: Sparkles, to: "/cleaning", bg: "var(--cat-6-bg)", fg: "var(--cat-6-fg)" },
     { label: "משימות היום", value: todayTasks.length, icon: CalendarDays, to: "/schedule", bg: "var(--cat-5-bg)", fg: "var(--cat-5-fg)" },
     { label: "חברי הבית", value: members.length, icon: Users, to: "/settings", bg: "var(--cat-7-bg)", fg: "var(--cat-7-fg)" },
   ];
