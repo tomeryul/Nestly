@@ -209,7 +209,7 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 
 /* modal (bottom sheet) */
 .nst-modal-bg { position: fixed; inset: 0; background: rgba(30,25,30,.34); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 200; display: flex; align-items: flex-end; justify-content: center; animation: fadeIn .2s var(--ease-soft); }
-.nst-modal { background: var(--surface); border-radius: 26px 26px 0 0; padding: 1.5rem 1.4rem 2rem; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
+.nst-modal { background: var(--surface); border-radius: 26px 26px 0 0; padding: 1.5rem 1.4rem calc(1.5rem + env(safe-area-inset-bottom)); width: 100%; max-width: 520px; max-height: 92vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
 .nst-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; }
 .nst-modal-head h3 { font: 600 20px var(--font-display); color: var(--text-bright); letter-spacing: -0.018em; margin: 0; }
 .nst-fields { display: flex; flex-direction: column; gap: 12px; }

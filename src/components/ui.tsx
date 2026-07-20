@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 export function Spinner({ className = "" }: { className?: string }) {
@@ -47,8 +48,10 @@ export function Modal({
   }, [open, onClose]);
 
   if (!open) return null;
-  return (
-    <div className="nst-modal-bg" onClick={onClose}>
+  // Portal to <body> so the sheet escapes the app's stacking context and sits
+  // above the bottom nav (otherwise the last field / save button is hidden).
+  return createPortal(
+    <div className="nst-modal-bg" dir="rtl" onClick={onClose}>
       <div className="nst-modal" onClick={(e) => e.stopPropagation()}>
         <div className="nst-modal-head">
           <h3>{title}</h3>
@@ -58,6 +61,7 @@ export function Modal({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
