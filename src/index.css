@@ -56,6 +56,48 @@
   --font-body: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
+/* ---- Alternate skins (data-theme on <html>) ---- */
+/* Night — dark garden */
+[data-theme="garden-night"] {
+  color-scheme: dark;
+  --bg: #161412; --bg-deep: #0e0d0b; --surface: #1f1c19; --surface-2: #25221e; --surface-3: #2d2924; --surface-4: #3a352e;
+  --border: #2c2823; --border-2: #423d34; --hover: #25221e;
+  --text: #d6cfbf; --text-bright: #f0e7d2; --text-2: #b0a895; --text-3: #87806f; --text-muted: #6a6354; --text-faint: #463f35;
+  --accent: #8fbf86; --accent-hover: #a5d09a; --accent-soft: #2a3826; --accent-ink: #b8d8af;
+  --ok: #8fbf86; --ok-soft: #2a3826; --warn: #d4a85e; --warn-soft: #3a2d18; --danger: #e08778; --danger-soft: #3b1f1a; --info: #7fa9c8; --info-soft: #1b2c39;
+  --cat-1-bg: #314030; --cat-1-fg: #b9d6ad; --cat-2-bg: #443a1e; --cat-2-fg: #ead8a0; --cat-3-bg: #443122; --cat-3-fg: #e8c4a4; --cat-4-bg: #432a2a; --cat-4-fg: #ecbaba;
+  --cat-5-bg: #322a48; --cat-5-fg: #ccc0e8; --cat-6-bg: #243a34; --cat-6-fg: #b4dcc9; --cat-7-bg: #243343; --cat-7-fg: #b6cfe4; --cat-8-bg: #3a342a; --cat-8-fg: #d8cdb4;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3); --shadow: 0 2px 8px rgba(0,0,0,0.35), 0 8px 20px -10px rgba(0,0,0,0.4); --shadow-lg: 0 10px 32px -16px rgba(0,0,0,0.6);
+}
+/* Rose quartz */
+[data-theme="warm-dark"] {
+  --bg: #f7f4f5; --bg-deep: #ede5e8; --surface: #ffffff; --surface-2: #faf6f7; --surface-3: #f1e9ec; --surface-4: #e6d8de;
+  --border: #ede1e5; --border-2: #ddc9d0; --hover: #faf5f7;
+  --text: #3d3137; --text-bright: #2c2429; --text-2: #5f4d54; --text-3: #897078; --text-muted: #a995a0; --text-faint: #d4c4cc;
+  --accent: #c98a9b; --accent-hover: #b8718a; --accent-soft: #f4e3e9; --accent-ink: #884a5d;
+}
+/* Sky mist */
+[data-theme="warm-light"] {
+  --bg: #f2f5f7; --bg-deep: #e2eaef; --surface: #ffffff; --surface-2: #f6f9fb; --surface-3: #eaf0f4; --surface-4: #d4e0e8;
+  --border: #e5edf2; --border-2: #d1dde4; --hover: #f6f9fb;
+  --text: #34404a; --text-bright: #232a30; --text-2: #556270; --text-3: #7d8a96; --text-muted: #9eaab5; --text-faint: #c5d0d9;
+  --accent: #6fa3c0; --accent-hover: #538cab; --accent-soft: #def0f8; --accent-ink: #356b89;
+}
+/* Sage paper */
+[data-theme="cool-dark"] {
+  --bg: #f3f6f2; --bg-deep: #e4eae3; --surface: #ffffff; --surface-2: #f7faf6; --surface-3: #ebf0ea; --surface-4: #d6e0d5;
+  --border: #e6ede4; --border-2: #d2ddd0; --hover: #f7faf6;
+  --text: #364036; --text-bright: #262d26; --text-2: #586458; --text-3: #7f8b80; --text-muted: #a3ada4; --text-faint: #cad3cb;
+  --accent: #7faa84; --accent-hover: #6a9670; --accent-soft: #e6f0e7; --accent-ink: #4a7251;
+}
+/* Lavender */
+[data-theme="midnight"] {
+  --bg: #f5f4f8; --bg-deep: #e7e4ee; --surface: #ffffff; --surface-2: #f9f8fb; --surface-3: #eeebf3; --surface-4: #dad3e4;
+  --border: #e9e4ee; --border-2: #d6cee0; --hover: #f9f8fb;
+  --text: #383540; --text-bright: #28252e; --text-2: #5a5567; --text-3: #807a8d; --text-muted: #a39daf; --text-faint: #cac4d3;
+  --accent: #9a8fc4; --accent-hover: #8474b3; --accent-soft: #ece8f5; --accent-ink: #6a5b9c;
+}
+
 html, body, #root { height: 100%; }
 html {
   -webkit-text-size-adjust: 100%;

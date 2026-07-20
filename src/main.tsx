@@ -5,7 +5,9 @@ import App from "./App";
 import "./index.css";
 import { registerServiceWorker } from "./lib/push";
 import { installNoZoom } from "./lib/noZoom";
+import { initTheme } from "./lib/theme";
 
+initTheme();
 registerServiceWorker();
 installNoZoom();
 

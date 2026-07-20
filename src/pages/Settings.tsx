@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { Copy, LogOut, UserPlus, Bell, Check, Users, Pencil, Trash2, House } from "lucide-react";
+import { Copy, LogOut, UserPlus, Bell, Check, Users, Pencil, Trash2, House, Palette } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { AREAS, type AreaKey } from "../lib/constants";
 import { enablePush, disablePush, pushEnabled, pushSupported } from "../lib/push";
+import { THEMES, getTheme, setTheme, type ThemeKey } from "../lib/theme";
 import { Modal } from "../components/ui";
 import type { Tables } from "../types/database";
 
@@ -21,6 +22,7 @@ export default function Settings() {
   const [displayName, setDisplayName] = useState("");
   const [homeNameDraft, setHomeNameDraft] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
+  const [theme, setThemeState] = useState<ThemeKey>(getTheme());
 
   const loadInvites = useCallback(async () => {
     if (!homeId) return;
@@ -177,6 +179,35 @@ export default function Settings() {
                 })}
               </div>
             </div>
+          ))}
+        </div>
+      </div>
+
+      {/* appearance */}
+      <div className="nst-card">
+        <h2 className="nst-card-title" style={{ marginBottom: "1rem" }}>
+          <Palette /> מראה
+        </h2>
+        <div className="theme-picker">
+          {THEMES.map((t) => (
+            <button
+              key={t.key}
+              className={`theme-option ${theme === t.key ? "active" : ""}`}
+              onClick={() => {
+                setTheme(t.key);
+                setThemeState(t.key);
+              }}
+            >
+              <div className="theme-swatches">
+                {t.swatches.map((c, i) => (
+                  <span key={i} className="theme-swatch" style={{ background: c }} />
+                ))}
+              </div>
+              <div className="theme-name">
+                {t.name}
+                {theme === t.key && <Check size={13} style={{ verticalAlign: -2, marginInlineStart: 4, color: "var(--accent)" }} />}
+              </div>
+            </button>
           ))}
         </div>
       </div>
