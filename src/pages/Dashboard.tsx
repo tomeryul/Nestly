@@ -93,14 +93,14 @@ export default function Dashboard() {
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
             <ShoppingCart size={20} />
           </span>
-          <p className="text-2xl font-bold text-slate-800">{shopCount}</p>
+          <p className="font-display text-3xl font-semibold tabular-nums text-slate-900">{shopCount}</p>
           <p className="text-xs text-slate-400">מצרכים לקנייה</p>
         </Link>
         <Link to="/cooking" className="card flex flex-col gap-2">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-orange-500">
             <ChefHat size={20} />
           </span>
-          <p className="text-2xl font-bold text-slate-800">{mealCount}</p>
+          <p className="font-display text-3xl font-semibold tabular-nums text-slate-900">{mealCount}</p>
           <p className="text-xs text-slate-400">מאכלים השבוע</p>
         </Link>
       </div>

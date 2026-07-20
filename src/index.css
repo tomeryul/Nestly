@@ -2,8 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   Nestly — "Garden" skin (warm cream + sage), adapted from the
+   FlyLab Pro design system.
+   ============================================================ */
 :root {
   color-scheme: light;
+  --bg: #f5f1e6;
+  --bg-deep: #ece6d4;
+  --surface: #ffffff;
+  --surface-2: #faf7ed;
+  --surface-3: #f0ebdb;
+  --surface-4: #e2dac4;
+  --border: #ece6d4;
+  --border-2: #ddd4bd;
+  --hover: #f7f3e6;
+  --text: #2d2924;
+  --text-bright: #1a1714;
+  --text-2: #56504a;
+  --text-3: #847b6f;
+  --text-muted: #a89e8f;
+  --text-faint: #ccc3b2;
+  --accent: #5a8a5e;
+  --accent-hover: #487049;
+  --accent-soft: #d8e9d3;
+  --accent-ink: #2e5a32;
+  --danger: #b85544;
+  --danger-soft: #f3d8d1;
+  --radius: 22px;
+  --radius-sm: 16px;
+  --radius-lg: 28px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --font-display: "Spectral", Georgia, serif;
+  --font-body: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
 html,
@@ -12,38 +43,101 @@ body,
   height: 100%;
 }
 
-body {
-  margin: 0;
-  background: #f8fafc;
-  color: #0f172a;
-  -webkit-font-smoothing: antialiased;
+html {
+  /* stop iOS from resizing text and from double-tap-to-zoom */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
 }
 
-/* keep content clear of the iOS home indicator / notch */
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  letter-spacing: -0.006em;
+  -webkit-font-smoothing: antialiased;
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
+/* Serif display for headings */
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.018em;
+}
+
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition active:scale-[0.98] disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50;
+    font-family: var(--font-body);
+    letter-spacing: -0.01em;
   }
   .btn-primary {
-    @apply btn bg-brand-600 text-white hover:bg-brand-700;
+    @apply btn text-white;
+    background: var(--accent);
+    box-shadow: 0 1px 2px rgba(80, 70, 40, 0.06);
+  }
+  .btn-primary:hover {
+    background: var(--accent-hover);
   }
   .btn-ghost {
-    @apply btn bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50;
+    @apply btn;
+    background: var(--surface-3);
+    color: var(--text-2);
+  }
+  .btn-ghost:hover {
+    background: var(--surface-4);
   }
   .btn-danger {
-    @apply btn bg-red-50 text-red-600 hover:bg-red-100;
+    @apply btn text-white;
+    background: var(--danger);
   }
+
+  /* 16px min font-size prevents iOS auto-zoom on focus */
   .input {
-    @apply w-full rounded-xl border-0 bg-slate-100 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500;
+    @apply w-full rounded-xl px-3.5 py-3;
+    font-family: var(--font-body);
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-bright);
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--border-2);
+    border: 1px solid transparent;
   }
+  .input::placeholder {
+    color: var(--text-faint);
+    font-weight: 400;
+  }
+  .input:focus {
+    outline: none;
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 4px var(--accent-soft);
+  }
+
   .card {
-    @apply rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100;
+    @apply rounded-2xl p-4;
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: 0 2px 8px rgba(80, 70, 40, 0.06), 0 8px 20px -10px rgba(80, 70, 40, 0.08);
   }
+
   .chip {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium;
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold;
   }
+}
+
+/* Native date/time controls: keep them tidy in RTL */
+input[type="date"],
+input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 48px;
 }
