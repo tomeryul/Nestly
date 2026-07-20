@@ -82,6 +82,7 @@ Deno.serve(async (req) => {
   }
 
   let sent = 0;
+  const results: Array<Record<string, unknown>> = [];
   for (const n of notifs) {
     const userSubs = subsByUser.get(n.user_id) ?? [];
     for (const s of userSubs) {
@@ -95,10 +96,14 @@ Deno.serve(async (req) => {
           {},
         );
         sent++;
+        results.push({ sub: s.id, ok: true });
       } catch (err) {
-        const msg = String(err);
+        const msg = err instanceof Error ? err.message : String(err);
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        console.error("push failed", { sub: s.id, status, msg });
+        results.push({ sub: s.id, ok: false, status, error: msg });
         // expired / gone subscription -> remove it
-        if (msg.includes("404") || msg.includes("410")) {
+        if (msg.includes("404") || msg.includes("410") || status === 404 || status === 410) {
           await admin.from("push_subscriptions").delete().eq("id", s.id);
         }
       }
@@ -107,5 +112,5 @@ Deno.serve(async (req) => {
 
   await admin.from("notifications").update({ push_sent: true }).in("id", notifs.map((n) => n.id));
 
-  return new Response(JSON.stringify({ sent, notifications: notifs.length }), { headers: cors });
+  return new Response(JSON.stringify({ sent, notifications: notifs.length, results }), { headers: cors });
 });
