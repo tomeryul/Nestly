@@ -1,89 +1,126 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Home, ShoppingCart, ChefHat, CalendarDays, Settings, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { useHome } from "../context/HomeContext";
+import { useAuth } from "../context/AuthContext";
 import NotificationBell from "./NotificationBell";
 
 const NAV = [
-  { to: "/", label: "בית", icon: Home, end: true },
-  { to: "/shopping", label: "קניות", icon: ShoppingCart, end: false },
-  { to: "/cooking", label: "בישולים", icon: ChefHat, end: false },
-  { to: "/schedule", label: "לוז", icon: CalendarDays, end: false },
-  { to: "/settings", label: "הגדרות", icon: Settings, end: false },
+  { to: "/", label: "בית", icon: Home, end: true, title: "בית" },
+  { to: "/shopping", label: "קניות", icon: ShoppingCart, end: false, title: "קניות" },
+  { to: "/cooking", label: "בישולים", icon: ChefHat, end: false, title: "בישולים" },
+  { to: "/schedule", label: "לוז", icon: CalendarDays, end: false, title: "לוז שבועי" },
+  { to: "/settings", label: "הגדרות", icon: Settings, end: false, title: "הגדרות" },
 ];
 
 export default function Layout() {
-  const { homeName, homes, selectHome, homeId } = useHome();
+  const { homeName, homes, selectHome, homeId, members } = useHome();
+  const { user } = useAuth();
   const [switcher, setSwitcher] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const current = NAV.find((n) => (n.end ? location.pathname === "/" : location.pathname.startsWith(n.to)));
+  const me = members.find((m) => m.user_id === user?.id);
+  const meName = me?.profile?.display_name ?? "אני";
+  const initial = (meName || "?").charAt(0);
 
   return (
-    <div className="mx-auto flex min-h-full max-w-2xl flex-col">
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-100 bg-white/90 px-4 py-3 backdrop-blur">
-        <div className="relative">
-          <button
-            onClick={() => homes.length > 1 && setSwitcher((s) => !s)}
-            className="flex items-center gap-1.5"
-          >
-            <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="h-8 w-8 rounded-lg" />
-            <div className="text-right leading-tight">
-              <p className="text-[11px] text-slate-400">Nestly</p>
-              <p className="flex items-center gap-1 text-sm font-semibold text-slate-800">
-                {homeName ?? "הבית שלי"}
-                {homes.length > 1 && <ChevronDown size={14} className="text-slate-400" />}
-              </p>
-            </div>
-          </button>
-          {switcher && (
-            <div className="absolute right-0 z-50 mt-2 w-52 overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-100">
-              {homes.map((h) => (
-                <button
-                  key={h.id}
-                  onClick={() => {
-                    selectHome(h.id);
-                    setSwitcher(false);
-                  }}
-                  className={`block w-full px-4 py-2.5 text-right text-sm hover:bg-slate-50 ${
-                    h.id === homeId ? "font-semibold text-brand-700" : "text-slate-700"
-                  }`}
-                >
-                  {h.name}
-                </button>
-              ))}
-              <button
-                onClick={() => {
-                  setSwitcher(false);
-                  navigate("/onboarding");
+    <div className="nst-root" dir="rtl">
+      <div className="nst-shell">
+        {/* sidebar (desktop) */}
+        <aside className="nst-sidebar">
+          <div className="nst-side-head">
+            <span className="nst-logo-tile">
+              <Home size={21} />
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ font: "600 18px var(--font-display)", color: "var(--text-bright)" }}>Nestly</div>
+              <div
+                style={{
+                  font: "700 9.5px var(--font-body)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.14em",
+                  color: "var(--text-muted)",
+                  marginTop: 1,
                 }}
-                className="block w-full border-t border-slate-100 px-4 py-2.5 text-right text-sm text-brand-600 hover:bg-slate-50"
               >
-                + בית חדש
-              </button>
+                משק בית משותף
+              </div>
             </div>
-          )}
+          </div>
+          <nav className="nst-nav">
+            {NAV.map(({ to, label, icon: Icon, end }) => (
+              <NavLink key={to} to={to} end={end} className={({ isActive }) => `nst-nav-item ${isActive ? "active" : ""}`}>
+                <Icon /> <span>{label}</span>
+              </NavLink>
+            ))}
+          </nav>
+          <div className="nst-side-foot">
+            <button className="user-chip" onClick={() => navigate("/settings")}>
+              <span className="nst-avatar" style={{ width: 34, height: 34, fontSize: 14 }}>
+                {initial}
+              </span>
+              <span style={{ textAlign: "right", flex: 1, minWidth: 0 }}>
+                <strong>{meName}</strong>
+                <span className="sub">{homeName}</span>
+              </span>
+            </button>
+          </div>
+        </aside>
+
+        {/* main */}
+        <div className="nst-main">
+          <header className="nst-topbar">
+            <div className="nst-topbar-title">{current?.title ?? "Nestly"}</div>
+            <div style={{ flex: 1 }} />
+            <div style={{ position: "relative" }}>
+              <button className="nst-chip" onClick={() => homes.length > 1 && setSwitcher((s) => !s)}>
+                {homes.length > 1 && <ChevronDown size={14} />}
+                {homeName ?? "הבית שלי"}
+              </button>
+              {switcher && (
+                <div className="nst-dropdown">
+                  {homes.map((h) => (
+                    <button
+                      key={h.id}
+                      className={h.id === homeId ? "on" : ""}
+                      onClick={() => {
+                        selectHome(h.id);
+                        setSwitcher(false);
+                      }}
+                    >
+                      {h.name}
+                    </button>
+                  ))}
+                  <button
+                    style={{ borderTop: "1px solid var(--border)", color: "var(--accent)", fontWeight: 700 }}
+                    onClick={() => {
+                      setSwitcher(false);
+                      navigate("/onboarding");
+                    }}
+                  >
+                    + בית חדש
+                  </button>
+                </div>
+              )}
+            </div>
+            <NotificationBell />
+          </header>
+
+          <main className="nst-content">
+            <Outlet />
+          </main>
         </div>
-        <NotificationBell />
-      </header>
+      </div>
 
-      <main className="flex-1 px-4 pb-28 pt-4">
-        <Outlet />
-      </main>
-
-      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto max-w-2xl border-t border-slate-100 bg-white/95 backdrop-blur">
-        <div className="grid grid-cols-5">
+      {/* bottom nav (mobile) */}
+      <nav className="nst-bottomnav">
+        <div className="nst-bn-grid">
           {NAV.map(({ to, label, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) =>
-                `flex flex-col items-center gap-1 py-2.5 text-[11px] ${
-                  isActive ? "text-brand-600" : "text-slate-400"
-                }`
-              }
-            >
-              <Icon size={22} />
-              {label}
+            <NavLink key={to} to={to} end={end} className={({ isActive }) => `nst-bn ${isActive ? "active" : ""}`}>
+              <Icon />
+              <span>{label}</span>
             </NavLink>
           ))}
         </div>

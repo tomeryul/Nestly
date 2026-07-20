@@ -1,15 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  Plus,
-  Trash2,
-  ChefHat,
-  ChevronRight,
-  ChevronLeft,
-  ShoppingCart,
-  Check,
-  X,
-  CalendarPlus,
-} from "lucide-react";
+import { Plus, Minus, Trash2, ChevronRight, ChevronLeft, ShoppingCart, Check, X, CalendarPlus, ChefHat, UtensilsCrossed, Info } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -24,56 +14,47 @@ type Meal = Tables<"weekly_meals"> & { dishes?: { name: string } | null };
 type List = Tables<"shopping_lists">;
 
 export default function Cooking() {
-  const [tab, setTab] = useState<"dishes" | "week">("week");
+  const [tab, setTab] = useState<"week" | "dishes">("week");
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-slate-800">בישולים</h1>
-      </div>
-      <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
-        <button
-          onClick={() => setTab("week")}
-          className={`rounded-xl py-2 text-sm font-medium ${
-            tab === "week" ? "bg-white text-brand-700 shadow-sm" : "text-slate-500"
-          }`}
-        >
+    <section className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+      <h1 className="page-title">בישולים</h1>
+      <div className="nst-seg">
+        <button className={tab === "week" ? "active" : ""} onClick={() => setTab("week")}>
           התפריט השבועי
         </button>
-        <button
-          onClick={() => setTab("dishes")}
-          className={`rounded-xl py-2 text-sm font-medium ${
-            tab === "dishes" ? "bg-white text-brand-700 shadow-sm" : "text-slate-500"
-          }`}
-        >
+        <button className={tab === "dishes" ? "active" : ""} onClick={() => setTab("dishes")}>
           מאכלים קבועים
         </button>
       </div>
-      {tab === "dishes" ? <DishesTab /> : <WeekTab />}
-    </div>
+      {tab === "week" ? <WeekTab /> : <DishesTab />}
+    </section>
   );
 }
 
-/* ------------------------------- Dishes ---------------------------------- */
 function DishesTab() {
   const { homeId } = useHome();
   const { user } = useAuth();
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
+  const [counts, setCounts] = useState<Record<string, number>>({});
   const [editing, setEditing] = useState<Dish | null>(null);
 
   const load = useCallback(async () => {
     if (!homeId) return;
     const { data } = await supabase.from("dishes").select("*").eq("home_id", homeId).order("name");
     setDishes(data ?? []);
+    const { data: ings } = await supabase.from("dish_ingredients").select("dish_id").eq("home_id", homeId);
+    const c: Record<string, number> = {};
+    (ings ?? []).forEach((i) => (c[i.dish_id] = (c[i.dish_id] ?? 0) + 1));
+    setCounts(c);
     setLoading(false);
   }, [homeId]);
   useEffect(() => {
     load();
   }, [load]);
 
-  const add = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const add = async () => {
     if (!name.trim() || !homeId) return;
     await supabase.from("dishes").insert({ home_id: homeId, name: name.trim(), created_by: user?.id ?? null });
     setName("");
@@ -87,45 +68,38 @@ function DishesTab() {
   if (loading) return <FullPageSpinner />;
 
   return (
-    <div className="space-y-3">
-      <form onSubmit={add} className="card flex gap-2">
-        <input
-          className="input flex-1"
-          placeholder="שם מאכל חדש…"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <button className="btn-primary !px-4">
+    <>
+      <div className="nst-card" style={{ padding: "1rem 1.1rem", display: "flex", gap: 8 }}>
+        <input style={{ flex: 1 }} placeholder="שם מאכל חדש…" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
+        <button className="btn btn-primary" style={{ padding: "0 16px" }} onClick={add}>
           <Plus size={18} />
         </button>
-      </form>
-
+      </div>
       {dishes.length === 0 ? (
-        <EmptyState icon={<ChefHat size={40} />} title="אין מאכלים עדיין" hint="הוסיפו מאכל וקבעו לו מצרכים" />
+        <EmptyState icon={<ChefHat size={42} />} title="אין מאכלים עדיין" hint="הוסיפו מאכל וקבעו לו מצרכים" />
       ) : (
-        <div className="space-y-2">
+        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
           {dishes.map((d) => (
-            <div key={d.id} className="card flex items-center gap-3 !py-3">
-              <button onClick={() => setEditing(d)} className="flex min-w-0 flex-1 items-center gap-3 text-right">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-orange-500">
+            <div className="nst-row" key={d.id}>
+              <button style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, border: "none", background: "transparent", textAlign: "right", cursor: "pointer" }} onClick={() => setEditing(d)}>
+                <span style={{ width: 42, height: 42, borderRadius: 13, background: "var(--cat-3-bg)", color: "var(--cat-3-fg)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
                   <ChefHat size={20} />
                 </span>
-                <span className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-slate-800">{d.name}</p>
-                  <p className="text-xs text-slate-400">הקשה לעריכת מצרכים</p>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: "block", font: "600 14px var(--font-body)", color: "var(--text-bright)" }}>{d.name}</span>
+                  <span style={{ display: "block", fontSize: 11.5, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>{counts[d.id] ?? 0} מצרכים · הקשה לעריכה</span>
                 </span>
-                <ChevronLeft size={18} className="text-slate-300" />
+                <ChevronLeft size={18} style={{ color: "var(--text-faint)" }} />
               </button>
-              <button onClick={() => remove(d.id)} className="p-1 text-slate-300 hover:text-red-500">
-                <Trash2 size={17} />
+              <button className="nst-del" onClick={() => remove(d.id)}>
+                <Trash2 />
               </button>
             </div>
           ))}
         </div>
       )}
-
-      {editing && <IngredientsModal dish={editing} onClose={() => setEditing(null)} />}
-    </div>
+      {editing && <IngredientsModal dish={editing} onClose={() => { setEditing(null); load(); }} />}
+    </>
   );
 }
 
@@ -146,14 +120,7 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
 
   const add = async () => {
     if (!name.trim()) return;
-    await supabase.from("dish_ingredients").insert({
-      dish_id: dish.id,
-      home_id: dish.home_id,
-      name: name.trim(),
-      quantity: qty,
-      unit: unit || null,
-      category,
-    });
+    await supabase.from("dish_ingredients").insert({ dish_id: dish.id, home_id: dish.home_id, name: name.trim(), quantity: qty, unit: unit || null, category });
     setName("");
     setQty(1);
     setUnit("");
@@ -166,24 +133,20 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
 
   return (
     <Modal open onClose={onClose} title={`מצרכים · ${dish.name}`}>
-      <div className="mb-4 space-y-2 rounded-2xl bg-white p-3 ring-1 ring-slate-100">
-        <input className="input" placeholder="שם המצרך" value={name} onChange={(e) => setName(e.target.value)} />
-        <div className="flex gap-2">
-          <input
-            className="input w-20"
-            type="number"
-            min={0}
-            step="0.5"
-            value={qty}
-            onChange={(e) => setQty(Number(e.target.value))}
-          />
-          <input
-            className="input w-24"
-            placeholder="יחידה"
-            value={unit}
-            onChange={(e) => setUnit(e.target.value)}
-          />
-          <select className="input flex-1" value={category} onChange={(e) => setCategory(e.target.value)}>
+      <div style={{ background: "var(--surface-2)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 10, marginBottom: "1rem" }}>
+        <input placeholder="שם המצרך" value={name} onChange={(e) => setName(e.target.value)} />
+        <div style={{ display: "flex", gap: 8 }}>
+          <div className="nst-stepper">
+            <button onClick={() => setQty((q) => Math.max(1, q - 1))}>
+              <Minus />
+            </button>
+            <span className="val">{qty}</span>
+            <button onClick={() => setQty((q) => q + 1)}>
+              <Plus />
+            </button>
+          </div>
+          <input style={{ width: 90 }} placeholder="יחידה" value={unit} onChange={(e) => setUnit(e.target.value)} />
+          <select style={{ flex: 1 }} value={category} onChange={(e) => setCategory(e.target.value)}>
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -191,18 +154,18 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
             ))}
           </select>
         </div>
-        <button onClick={add} className="btn-primary w-full">
+        <button className="btn btn-primary btn-block" style={{ padding: 11 }} onClick={add}>
           <Plus size={16} /> הוספת מצרך
         </button>
       </div>
-      <div className="space-y-2">
-        {rows.length === 0 && <p className="py-4 text-center text-sm text-slate-400">אין מצרכים עדיין</p>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {rows.length === 0 && <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: "0.5rem 0" }}>אין מצרכים עדיין</p>}
         {rows.map((r) => (
-          <div key={r.id} className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 ring-1 ring-slate-100">
-            <span className="flex-1 text-sm text-slate-700">
+          <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface)", borderRadius: 12, padding: "9px 12px", boxShadow: "var(--shadow-sm)" }}>
+            <span style={{ flex: 1, fontSize: 13.5, color: "var(--text-2)", fontWeight: 500 }}>
               {r.name} · {r.quantity} {r.unit ?? ""}
             </span>
-            <button onClick={() => remove(r.id)} className="text-slate-300 hover:text-red-500">
+            <button className="nst-del" onClick={() => remove(r.id)}>
               <X size={16} />
             </button>
           </div>
@@ -212,7 +175,6 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
   );
 }
 
-/* ------------------------------- Week ------------------------------------ */
 function WeekTab() {
   const { homeId } = useHome();
   const { user } = useAuth();
@@ -223,18 +185,12 @@ function WeekTab() {
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [listPickerFor, setListPickerFor] = useState<Meal | null>(null);
-
   const weekIso = toISODate(weekStart);
 
   const load = useCallback(async () => {
     if (!homeId) return;
     const [m, d, l] = await Promise.all([
-      supabase
-        .from("weekly_meals")
-        .select("*, dishes(name)")
-        .eq("home_id", homeId)
-        .eq("week_start", weekIso)
-        .order("day_of_week", { nullsFirst: true }),
+      supabase.from("weekly_meals").select("*, dishes(name)").eq("home_id", homeId).eq("week_start", weekIso).order("day_of_week", { nullsFirst: true }),
       supabase.from("dishes").select("*").eq("home_id", homeId).order("name"),
       supabase.from("shopping_lists").select("*").eq("home_id", homeId).order("is_default", { ascending: false }),
     ]);
@@ -251,7 +207,6 @@ function WeekTab() {
     await supabase.from("weekly_meals").delete().eq("id", id);
     load();
   };
-
   const addToList = async (meal: Meal, listId: string) => {
     await supabase.rpc("add_meal_to_list", { meal_id: meal.id, list_id: listId });
     setListPickerFor(null);
@@ -261,57 +216,53 @@ function WeekTab() {
   if (loading) return <FullPageSpinner />;
 
   return (
-    <div className="space-y-3">
-      {/* week navigator */}
-      <div className="card flex items-center justify-between !py-2.5">
-        <button onClick={() => setWeekStart((w) => addDays(w, -7))} className="p-1.5 text-slate-500">
-          <ChevronRight size={20} />
+    <>
+      <div className="nst-card" style={{ padding: "0.7rem 0.9rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <button className="nst-iconbtn plain" onClick={() => setWeekStart((w) => addDays(w, -7))}>
+          <ChevronRight />
         </button>
-        <div className="text-center">
-          <p className="text-sm font-semibold text-slate-800">
+        <div style={{ textAlign: "center" }}>
+          <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)" }}>
             {formatDayMonth(weekStart)} – {formatDayMonth(addDays(weekStart, 6))}
           </p>
-          <p className="text-[11px] text-slate-400">שבוע</p>
+          <p style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600 }}>שבוע</p>
         </div>
-        <button onClick={() => setWeekStart((w) => addDays(w, 7))} className="p-1.5 text-slate-500">
-          <ChevronLeft size={20} />
+        <button className="nst-iconbtn plain" onClick={() => setWeekStart((w) => addDays(w, 7))}>
+          <ChevronLeft />
         </button>
       </div>
 
-      <button onClick={() => setAdding(true)} className="btn-primary w-full">
+      <button className="btn btn-primary btn-block" style={{ padding: 13 }} onClick={() => setAdding(true)}>
         <CalendarPlus size={18} /> הוספת מאכל לשבוע
       </button>
 
       {meals.length === 0 ? (
-        <EmptyState icon={<ChefHat size={40} />} title="לא נבחרו מאכלים לשבוע זה" />
+        <EmptyState icon={<ChefHat size={42} />} title="לא נבחרו מאכלים לשבוע זה" />
       ) : (
-        <div className="space-y-2">
+        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
           {meals.map((meal) => (
-            <div key={meal.id} className="card flex items-center gap-3 !py-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-orange-500">
-                <ChefHat size={20} />
+            <div className="nst-row" key={meal.id}>
+              <span style={{ width: 42, height: 42, borderRadius: 13, background: "var(--cat-3-bg)", color: "var(--cat-3-fg)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+                <UtensilsCrossed size={20} />
               </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-slate-800">{meal.dishes?.name ?? "מאכל"}</p>
-                <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                  {meal.day_of_week != null && <span>יום {DAYS_HE[meal.day_of_week]}</span>}
-                  {meal.meal_type && <span>· {MEAL_TYPES[meal.meal_type as keyof typeof MEAL_TYPES]}</span>}
-                </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)" }}>{meal.dishes?.name ?? "מאכל"}</p>
+                <p style={{ fontSize: 11.5, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
+                  {meal.day_of_week != null ? `יום ${DAYS_HE[meal.day_of_week]}` : ""}
+                  {meal.meal_type ? ` · ${MEAL_TYPES[meal.meal_type as keyof typeof MEAL_TYPES]}` : ""}
+                </p>
               </div>
               {meal.added_to_list ? (
-                <span className="chip bg-brand-50 text-brand-700">
-                  <Check size={13} /> נוסף
+                <span className="badge b-active" style={{ borderRadius: 30 }}>
+                  <Check size={12} style={{ verticalAlign: -2 }} /> נוסף
                 </span>
               ) : (
-                <button
-                  onClick={() => setListPickerFor(meal)}
-                  className="btn-ghost !px-2.5 !py-1.5 text-xs text-brand-600"
-                >
-                  <ShoppingCart size={14} /> לרשימה
+                <button className="nst-chip" style={{ color: "var(--accent)", boxShadow: "inset 0 0 0 1px var(--accent-soft)" }} onClick={() => setListPickerFor(meal)}>
+                  <ShoppingCart /> לרשימה
                 </button>
               )}
-              <button onClick={() => removeMeal(meal.id)} className="p-1 text-slate-300 hover:text-red-500">
-                <Trash2 size={17} />
+              <button className="nst-del" onClick={() => removeMeal(meal.id)}>
+                <Trash2 />
               </button>
             </div>
           ))}
@@ -331,23 +282,18 @@ function WeekTab() {
           }}
         />
       )}
-
       {listPickerFor && (
         <Modal open onClose={() => setListPickerFor(null)} title="לאיזו רשימה להוסיף?">
-          <div className="space-y-2">
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {lists.map((l) => (
-              <button
-                key={l.id}
-                onClick={() => addToList(listPickerFor, l.id)}
-                className="btn-ghost w-full justify-start"
-              >
+              <button key={l.id} className="btn btn-block" style={{ justifyContent: "flex-start" }} onClick={() => addToList(listPickerFor, l.id)}>
                 <ShoppingCart size={16} /> {l.name}
               </button>
             ))}
           </div>
         </Modal>
       )}
-    </div>
+    </>
   );
 }
 
@@ -372,33 +318,24 @@ function AddMealModal({
 
   const save = async () => {
     if (!dishId) return;
-    await supabase.from("weekly_meals").insert({
-      home_id: homeId,
-      dish_id: dishId,
-      week_start: weekIso,
-      day_of_week: day === "" ? null : Number(day),
-      meal_type: mealType || null,
-      created_by: userId,
-    });
+    await supabase.from("weekly_meals").insert({ home_id: homeId, dish_id: dishId, week_start: weekIso, day_of_week: day === "" ? null : Number(day), meal_type: mealType || null, created_by: userId });
     onAdded();
   };
 
   if (dishes.length === 0) {
     return (
       <Modal open onClose={onClose} title="הוספת מאכל">
-        <p className="text-sm text-slate-500">
-          קודם הוסיפו מאכלים בלשונית "מאכלים קבועים", ואז תוכלו לשבץ אותם לשבוע.
-        </p>
+        <p className="section-sub">קודם הוסיפו מאכלים בלשונית "מאכלים קבועים", ואז תוכלו לשבץ אותם לשבוע.</p>
       </Modal>
     );
   }
 
   return (
     <Modal open onClose={onClose} title="הוספת מאכל לשבוע">
-      <div className="space-y-3">
+      <div className="nst-fields">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">מאכל</label>
-          <select className="input" value={dishId} onChange={(e) => setDishId(e.target.value)}>
+          <label>מאכל</label>
+          <select value={dishId} onChange={(e) => setDishId(e.target.value)}>
             {dishes.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
@@ -406,10 +343,10 @@ function AddMealModal({
             ))}
           </select>
         </div>
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <label className="mb-1 block text-sm font-medium text-slate-600">יום (רשות)</label>
-            <select className="input" value={day} onChange={(e) => setDay(e.target.value)}>
+        <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <label>יום (רשות)</label>
+            <select value={day} onChange={(e) => setDay(e.target.value)}>
               <option value="">ללא</option>
               {DAYS_HE.map((d, i) => (
                 <option key={i} value={i}>
@@ -418,9 +355,9 @@ function AddMealModal({
               ))}
             </select>
           </div>
-          <div className="flex-1">
-            <label className="mb-1 block text-sm font-medium text-slate-600">ארוחה (רשות)</label>
-            <select className="input" value={mealType} onChange={(e) => setMealType(e.target.value)}>
+          <div style={{ flex: 1 }}>
+            <label>ארוחה (רשות)</label>
+            <select value={mealType} onChange={(e) => setMealType(e.target.value)}>
               <option value="">ללא</option>
               {Object.entries(MEAL_TYPES).map(([k, v]) => (
                 <option key={k} value={k}>
@@ -430,10 +367,10 @@ function AddMealModal({
             </select>
           </div>
         </div>
-        <p className="rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-700">
-          שיבוץ מאכל ישלח התראה לאחראי הקניות לקבוע יום ושעה לקנייה.
+        <p className="alert alert-info">
+          <Info /> שיבוץ מאכל ישלח התראה לאחראי הקניות לקבוע יום ושעה לקנייה.
         </p>
-        <button onClick={save} className="btn-primary w-full">
+        <button className="btn btn-primary btn-block" style={{ padding: 12 }} onClick={save}>
           הוספה לשבוע
         </button>
       </div>

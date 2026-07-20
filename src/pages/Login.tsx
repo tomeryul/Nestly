@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Home } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { Spinner } from "../components/ui";
 
@@ -49,71 +50,95 @@ export default function Login() {
   };
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
-      <div className="mb-8 text-center">
-        <img
-          src={`${import.meta.env.BASE_URL}favicon.svg`}
-          alt="Nestly"
-          className="mx-auto mb-4 h-16 w-16 rounded-2xl shadow-lg"
-        />
-        <h1 className="text-2xl font-bold text-slate-800">Nestly</h1>
-        <p className="mt-1 text-sm text-slate-500">מסדרים את הבית ביחד — קניות, בישולים ולוז</p>
+    <div className="nst-root" dir="rtl">
+      <div className="login-screen" style={{ minHeight: "100vh", position: "relative", zIndex: 1 }}>
+        <div className="login-box">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginBottom: "1.5rem" }}>
+            <span className="nst-logo-tile" style={{ width: 46, height: 46 }}>
+              <Home size={23} />
+            </span>
+            <div style={{ textAlign: "right" }}>
+              <h1 style={{ font: "600 25px var(--font-display)", color: "var(--text-bright)", margin: 0 }}>Nestly</h1>
+              <p
+                style={{
+                  font: "700 10px var(--font-body)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.14em",
+                  color: "var(--text-muted)",
+                  marginTop: 2,
+                }}
+              >
+                ניהול משק הבית
+              </p>
+            </div>
+          </div>
+
+          <div className="login-tabs">
+            <button
+              className={`login-tab ${mode === "signin" ? "active" : ""}`}
+              onClick={() => {
+                setMode("signin");
+                setErr(null);
+                setMsg(null);
+              }}
+            >
+              כניסה
+            </button>
+            <button
+              className={`login-tab ${mode === "signup" ? "active" : ""}`}
+              onClick={() => {
+                setMode("signup");
+                setErr(null);
+                setMsg(null);
+              }}
+            >
+              הרשמה
+            </button>
+          </div>
+
+          <form className="nst-fields" onSubmit={submit}>
+            {mode === "signup" && (
+              <div>
+                <label>שם לתצוגה</label>
+                <input placeholder="השם שלך" value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+            )}
+            <div>
+              <label>כתובת מייל</label>
+              <input type="email" placeholder="you@example.com" value={email} autoComplete="email" onChange={(e) => setEmail(e.target.value)} required />
+            </div>
+            <div>
+              <label>סיסמה</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+              />
+            </div>
+
+            {err && <p style={{ color: "var(--danger)", fontSize: 13, fontWeight: 600 }}>{err}</p>}
+            {msg && <p style={{ color: "var(--accent-ink)", fontSize: 13, fontWeight: 600 }}>{msg}</p>}
+
+            <button type="submit" className="btn btn-primary btn-block" style={{ padding: 13 }} disabled={loading}>
+              {loading ? <Spinner className="!border-white/40 !border-t-white" /> : mode === "signup" ? "הרשמה" : "כניסה"}
+            </button>
+          </form>
+
+          <p style={{ textAlign: "center", marginTop: "1rem", fontSize: 12.5, color: "var(--text-muted)", fontWeight: 500 }}>
+            או{" "}
+            <button type="button" onClick={magicLink} style={{ color: "var(--accent)", fontWeight: 700, background: "none", border: "none", cursor: "pointer" }}>
+              קישור קסם למייל
+            </button>
+          </p>
+          <p style={{ textAlign: "center", marginTop: "0.6rem", fontSize: 11, color: "var(--text-faint)" }}>
+            חשבונות חדשים נפתחים כמשתמש רגיל. אפשר להזמין שותפים בהמשך.
+          </p>
+        </div>
       </div>
-
-      <form onSubmit={submit} className="card space-y-3">
-        {mode === "signup" && (
-          <input
-            className="input"
-            placeholder="שם לתצוגה"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        )}
-        <input
-          className="input"
-          type="email"
-          placeholder="מייל"
-          value={email}
-          autoComplete="email"
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <input
-          className="input"
-          type="password"
-          placeholder="סיסמה"
-          value={password}
-          autoComplete={mode === "signup" ? "new-password" : "current-password"}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          minLength={6}
-        />
-
-        {err && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{err}</p>}
-        {msg && <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">{msg}</p>}
-
-        <button type="submit" className="btn-primary w-full" disabled={loading}>
-          {loading ? <Spinner className="border-white/40 border-t-white" /> : mode === "signup" ? "הרשמה" : "כניסה"}
-        </button>
-      </form>
-
-      <button onClick={magicLink} className="mt-3 text-center text-sm text-brand-600" disabled={loading}>
-        שליחת קישור כניסה למייל
-      </button>
-
-      <p className="mt-6 text-center text-sm text-slate-500">
-        {mode === "signup" ? "כבר יש לכם חשבון?" : "אין לכם חשבון עדיין?"}{" "}
-        <button
-          onClick={() => {
-            setMode(mode === "signup" ? "signin" : "signup");
-            setErr(null);
-            setMsg(null);
-          }}
-          className="font-semibold text-brand-600"
-        >
-          {mode === "signup" ? "התחברו" : "הרשמו"}
-        </button>
-      </p>
     </div>
   );
 }

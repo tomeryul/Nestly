@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { ShoppingCart, ChefHat, CalendarDays, Bell, Check, Clock, ChevronLeft } from "lucide-react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useNavigate } from "react-router-dom";
+import { ShoppingCart, ChefHat, CalendarDays, Users, BellRing, Check, Clock } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -9,10 +9,13 @@ import { formatTime, toISODate, startOfWeek } from "../lib/dates";
 import { enablePush, pushEnabled, pushSupported } from "../lib/push";
 import type { Tables } from "../types/database";
 
+type Task = Tables<"schedule_tasks">;
+
 export default function Dashboard() {
-  const { homeId, homeName, myResponsibilities } = useHome();
+  const { homeId, myResponsibilities, members } = useHome();
   const { user } = useAuth();
-  const [todayTasks, setTodayTasks] = useState<Tables<"schedule_tasks">[]>([]);
+  const navigate = useNavigate();
+  const [todayTasks, setTodayTasks] = useState<Task[]>([]);
   const [shopCount, setShopCount] = useState(0);
   const [mealCount, setMealCount] = useState(0);
   const [pushOn, setPushOn] = useState<boolean | null>(null);
@@ -20,26 +23,15 @@ export default function Dashboard() {
 
   const todayIso = toISODate(new Date());
   const weekIso = toISODate(startOfWeek(new Date()));
+  const me = members.find((m) => m.user_id === user?.id);
+  const meFirst = (me?.profile?.display_name ?? "").split(" ")[0] || "בבית";
 
   const load = useCallback(async () => {
     if (!homeId) return;
     const [t, s, m] = await Promise.all([
-      supabase
-        .from("schedule_tasks")
-        .select("*")
-        .eq("home_id", homeId)
-        .eq("scheduled_date", todayIso)
-        .order("start_time", { nullsFirst: true }),
-      supabase
-        .from("shopping_items")
-        .select("id", { count: "exact", head: true })
-        .eq("home_id", homeId)
-        .eq("is_checked", false),
-      supabase
-        .from("weekly_meals")
-        .select("id", { count: "exact", head: true })
-        .eq("home_id", homeId)
-        .eq("week_start", weekIso),
+      supabase.from("schedule_tasks").select("*").eq("home_id", homeId).eq("scheduled_date", todayIso).order("start_time", { nullsFirst: true }),
+      supabase.from("shopping_items").select("id", { count: "exact", head: true }).eq("home_id", homeId).eq("is_checked", false),
+      supabase.from("weekly_meals").select("id", { count: "exact", head: true }).eq("home_id", homeId).eq("week_start", weekIso),
     ]);
     setTodayTasks(t.data ?? []);
     setShopCount(s.count ?? 0);
@@ -64,77 +56,112 @@ export default function Dashboard() {
   };
 
   const dow = new Date().getDay();
+  const toggle = async (t: Task) => {
+    await supabase.from("schedule_tasks").update({ is_done: !t.is_done }).eq("id", t.id);
+    load();
+  };
+  const nameFor = (uid: string | null) => members.find((m) => m.user_id === uid)?.profile?.display_name ?? "";
+
+  const nextTask = todayTasks.find((t) => !t.is_done);
+
+  const tile = (bg: string, fg: string): CSSProperties => ({ ["--cat-bg" as string]: bg, ["--cat-fg" as string]: fg });
+  const stats = [
+    { label: "מצרכים לקנייה", value: shopCount, icon: ShoppingCart, to: "/shopping", bg: "var(--cat-1-bg)", fg: "var(--cat-1-fg)" },
+    { label: "מאכלים השבוע", value: mealCount, icon: ChefHat, to: "/cooking", bg: "var(--cat-3-bg)", fg: "var(--cat-3-fg)" },
+    { label: "משימות היום", value: todayTasks.length, icon: CalendarDays, to: "/schedule", bg: "var(--cat-5-bg)", fg: "var(--cat-5-fg)" },
+    { label: "חברי הבית", value: members.length, icon: Users, to: "/settings", bg: "var(--cat-7-bg)", fg: "var(--cat-7-fg)" },
+  ];
 
   return (
-    <div className="space-y-5">
+    <section className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       <div>
-        <p className="text-sm text-slate-400">יום {DAYS_HE[dow]}</p>
-        <h1 className="text-2xl font-bold text-slate-800">{homeName ?? "הבית שלי"}</h1>
+        <p style={{ font: "700 11.5px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-3)" }}>
+          יום {DAYS_HE[dow]}
+        </p>
+        <h1 style={{ font: "600 30px var(--font-display)", color: "var(--text-bright)", letterSpacing: "-0.022em", marginTop: 2 }}>
+          שלום, {meFirst} 👋
+        </h1>
       </div>
 
       {pushOn === false && pushSupported() && (
-        <button
-          onClick={turnOnPush}
-          disabled={pushBusy}
-          className="flex w-full items-center gap-3 rounded-2xl bg-brand-600 p-4 text-right text-white"
-        >
-          <Bell size={22} />
-          <div className="flex-1">
-            <p className="font-semibold">הפעלת התראות</p>
-            <p className="text-xs text-white/80">קבלו תזכורות למשימות ולקניות</p>
+        <div className="next-action">
+          <span className="next-action-ico">
+            <BellRing />
+          </span>
+          <div className="next-action-body">
+            <div className="next-action-kicker">התראות</div>
+            <div className="next-action-title">קבלו תזכורות למשימות ולקניות</div>
           </div>
-          <ChevronLeft size={20} />
-        </button>
+          <button className="next-action-cta" onClick={turnOnPush} disabled={pushBusy}>
+            הפעלה
+          </button>
+        </div>
       )}
 
-      {/* stat cards */}
-      <div className="grid grid-cols-2 gap-3">
-        <Link to="/shopping" className="card flex flex-col gap-2">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-            <ShoppingCart size={20} />
+      {nextTask && (
+        <div className="next-action is-calm">
+          <span className="next-action-ico">
+            <CalendarDays />
           </span>
-          <p className="font-display text-3xl font-semibold tabular-nums text-slate-900">{shopCount}</p>
-          <p className="text-xs text-slate-400">מצרכים לקנייה</p>
-        </Link>
-        <Link to="/cooking" className="card flex flex-col gap-2">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-orange-500">
-            <ChefHat size={20} />
-          </span>
-          <p className="font-display text-3xl font-semibold tabular-nums text-slate-900">{mealCount}</p>
-          <p className="text-xs text-slate-400">מאכלים השבוע</p>
-        </Link>
+          <div className="next-action-body">
+            <div className="next-action-kicker">המשימה הבאה</div>
+            <div className="next-action-title">
+              {nextTask.title}
+              {nextTask.start_time ? ` · ${formatTime(nextTask.start_time)}` : ""}
+            </div>
+          </div>
+          <button className="next-action-cta" onClick={() => navigate("/schedule")}>
+            ללוז
+          </button>
+        </div>
+      )}
+
+      <div className="section-overview">
+        {stats.map((s) => (
+          <button key={s.label} className="sec-tile" style={tile(s.bg, s.fg)} onClick={() => navigate(s.to)}>
+            <span className="sec-tile-ico">
+              <s.icon />
+            </span>
+            <span className="sec-tile-count">{s.value}</span>
+            <span className="sec-tile-label">{s.label}</span>
+          </button>
+        ))}
       </div>
 
-      {/* today */}
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="flex items-center gap-1.5 font-semibold text-slate-700">
-            <CalendarDays size={18} /> המשימות של היום
+      <div className="nst-card">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+          <h2 className="nst-card-title">
+            <CalendarDays /> המשימות של היום
           </h2>
-          <Link to="/schedule" className="text-xs text-brand-600">
+          <button className="nst-chip" style={{ boxShadow: "none", background: "transparent", color: "var(--accent)", padding: "4px 6px" }} onClick={() => navigate("/schedule")}>
             כל הלוז
-          </Link>
+          </button>
         </div>
         {todayTasks.length === 0 ? (
-          <div className="card text-center text-sm text-slate-400">אין משימות להיום 🎉</div>
+          <p style={{ color: "var(--text-muted)", fontSize: 13, textAlign: "center", padding: "0.5rem 0" }}>אין משימות להיום 🎉</p>
         ) : (
-          <div className="space-y-2">
+          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
             {todayTasks.map((t) => {
               const cat = TASK_CATEGORIES[t.category as TaskCategory] ?? TASK_CATEGORIES.general;
               return (
-                <div key={t.id} className={`card flex items-center gap-3 !py-3 ${t.is_done ? "opacity-50" : ""}`}>
-                  <span className="h-8 w-1.5 rounded-full" style={{ background: t.color ?? cat.color }} />
-                  <div className="min-w-0 flex-1">
-                    <p className={`truncate font-medium text-slate-800 ${t.is_done ? "line-through" : ""}`}>
-                      {t.title}
-                    </p>
-                    {t.start_time && (
-                      <p className="flex items-center gap-0.5 text-xs text-slate-400">
-                        <Clock size={12} /> {formatTime(t.start_time)}
-                      </p>
-                    )}
+                <div className="task-item" key={t.id} style={{ opacity: t.is_done ? 0.55 : 1 }}>
+                  <span style={{ width: 5, height: 34, borderRadius: 5, background: t.color ?? cat.color, flex: "none" }} />
+                  <button className={`nst-check ${t.is_done ? "on" : ""}`} onClick={() => toggle(t)}>
+                    <Check size={14} />
+                  </button>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: t.is_done ? "line-through" : "none" }}>{t.title}</p>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11.5, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
+                      {t.start_time && (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                          <Clock size={12} />
+                          {formatTime(t.start_time)}
+                        </span>
+                      )}
+                      <span className="nst-tag" style={{ color: cat.color, background: cat.color + "1f" }}>{cat.label}</span>
+                      {nameFor(t.assigned_to) && <span>{nameFor(t.assigned_to)}</span>}
+                    </div>
                   </div>
-                  {t.is_done && <Check size={18} className="text-brand-500" />}
                 </div>
               );
             })}
@@ -143,17 +170,19 @@ export default function Dashboard() {
       </div>
 
       {myResponsibilities.length > 0 && (
-        <div>
-          <h2 className="mb-2 font-semibold text-slate-700">התחומים שלי</h2>
-          <div className="flex flex-wrap gap-2">
+        <div className="nst-card">
+          <h2 className="nst-card-title" style={{ marginBottom: "0.9rem" }}>
+            <Check /> התחומים שלי
+          </h2>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {myResponsibilities.map((r) => (
-              <span key={r} className="chip bg-brand-50 text-brand-700">
+              <span key={r} className="badge b-wt" style={{ padding: "7px 14px", borderRadius: 30, fontSize: 12 }}>
                 {AREAS[r as AreaKey] ?? r}
               </span>
             ))}
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

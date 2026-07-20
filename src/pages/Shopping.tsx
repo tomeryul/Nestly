@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser } from "lucide-react";
+import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -26,12 +26,7 @@ export default function Shopping() {
 
   const loadLists = useCallback(async () => {
     if (!homeId) return;
-    const { data } = await supabase
-      .from("shopping_lists")
-      .select("*")
-      .eq("home_id", homeId)
-      .order("is_default", { ascending: false })
-      .order("created_at");
+    const { data } = await supabase.from("shopping_lists").select("*").eq("home_id", homeId).order("is_default", { ascending: false }).order("created_at");
     setLists(data ?? []);
     setActiveList((prev) => prev ?? data?.[0]?.id ?? null);
   }, [homeId]);
@@ -42,12 +37,7 @@ export default function Shopping() {
       setLoading(false);
       return;
     }
-    const { data } = await supabase
-      .from("shopping_items")
-      .select("*")
-      .eq("list_id", activeList)
-      .order("is_checked")
-      .order("created_at");
+    const { data } = await supabase.from("shopping_items").select("*").eq("list_id", activeList).order("is_checked").order("created_at");
     setItems(data ?? []);
     setLoading(false);
   }, [activeList]);
@@ -58,46 +48,30 @@ export default function Shopping() {
   useEffect(() => {
     loadItems();
   }, [loadItems]);
-
   useEffect(() => {
     if (!activeList) return;
     const ch = supabase
       .channel("shop-items-" + activeList)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "shopping_items", filter: `list_id=eq.${activeList}` },
-        () => loadItems(),
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "shopping_items", filter: `list_id=eq.${activeList}` }, () => loadItems())
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
     };
   }, [activeList, loadItems]);
 
-  const addItem = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const addItem = async () => {
     if (!name.trim() || !homeId || !activeList) return;
-    await supabase.from("shopping_items").insert({
-      list_id: activeList,
-      home_id: homeId,
-      name: name.trim(),
-      quantity: qty,
-      category,
-      source: "manual",
-      created_by: user?.id ?? null,
-    });
+    await supabase.from("shopping_items").insert({ list_id: activeList, home_id: homeId, name: name.trim(), quantity: qty, category, source: "manual", created_by: user?.id ?? null });
     setName("");
     setQty(1);
     loadItems();
   };
-
   const toggle = async (item: Item) => {
     await supabase.from("shopping_items").update({ is_checked: !item.is_checked }).eq("id", item.id);
     loadItems();
   };
   const changeQty = async (item: Item, delta: number) => {
-    const q = Math.max(1, item.quantity + delta);
-    await supabase.from("shopping_items").update({ quantity: q }).eq("id", item.id);
+    await supabase.from("shopping_items").update({ quantity: Math.max(1, item.quantity + delta) }).eq("id", item.id);
     loadItems();
   };
   const remove = async (id: string) => {
@@ -111,127 +85,98 @@ export default function Shopping() {
   };
 
   if (loading && !lists.length) return <FullPageSpinner />;
-
   const checkedCount = items.filter((i) => i.is_checked).length;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-slate-800">קניות</h1>
-        <button onClick={() => setShowRecurring(true)} className="btn-ghost !px-3 !py-2 text-xs">
+    <section className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <h1 className="page-title">קניות</h1>
+        <button className="btn btn-sm" onClick={() => setShowRecurring(true)}>
           <Repeat size={15} /> פריטים קבועים
         </button>
       </div>
 
-      {/* list tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 3 }}>
         {lists.map((l) => (
-          <button
-            key={l.id}
-            onClick={() => setActiveList(l.id)}
-            className={`chip whitespace-nowrap ${
-              activeList === l.id ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200"
-            }`}
-          >
+          <button key={l.id} className={`nst-chip ${activeList === l.id ? "active" : ""}`} onClick={() => setActiveList(l.id)}>
             {l.name}
           </button>
         ))}
-        <button
-          onClick={() => setShowNewList(true)}
-          className="chip whitespace-nowrap bg-white text-brand-600 ring-1 ring-slate-200"
-        >
+        <button className="nst-chip" style={{ color: "var(--accent)" }} onClick={() => setShowNewList(true)}>
           <ListPlus size={14} /> רשימה
         </button>
       </div>
 
-      {/* quick add */}
-      <form onSubmit={addItem} className="card space-y-2.5">
-        <input
-          className="input"
-          placeholder="הוספת מצרך…"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 rounded-xl bg-slate-100 px-1">
-            <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} className="p-2 text-slate-500">
-              <Minus size={16} />
+      <div className="nst-card" style={{ padding: "1rem 1.1rem", display: "flex", flexDirection: "column", gap: 10 }}>
+        <input placeholder="הוספת מצרך…" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addItem()} />
+        <div style={{ display: "flex", gap: 8 }}>
+          <div className="nst-stepper">
+            <button onClick={() => setQty((q) => Math.max(1, q - 1))}>
+              <Minus />
             </button>
-            <span className="w-6 text-center text-sm font-semibold">{qty}</span>
-            <button type="button" onClick={() => setQty((q) => q + 1)} className="p-2 text-slate-500">
-              <Plus size={16} />
+            <span className="val">{qty}</span>
+            <button onClick={() => setQty((q) => q + 1)}>
+              <Plus />
             </button>
           </div>
-          <select className="input flex-1" value={category} onChange={(e) => setCategory(e.target.value)}>
+          <select style={{ flex: 1 }} value={category} onChange={(e) => setCategory(e.target.value)}>
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
             ))}
           </select>
-          <button className="btn-primary !px-4" type="submit">
+          <button className="btn btn-primary" style={{ padding: "0 16px" }} onClick={addItem}>
             <Plus size={18} />
           </button>
         </div>
-      </form>
+      </div>
 
-      {/* items */}
       {items.length === 0 ? (
-        <EmptyState title="הרשימה ריקה" hint="הוסיפו מצרך ראשון למעלה" />
+        <EmptyState icon={<ShoppingBasket size={42} />} title="הרשימה ריקה" hint="הוסיפו מצרך ראשון למעלה" />
       ) : (
-        <div className="space-y-2">
+        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
           {items.map((item) => (
-            <div
-              key={item.id}
-              className={`card flex items-center gap-3 !py-3 ${item.is_checked ? "opacity-60" : ""}`}
-            >
-              <button
-                onClick={() => toggle(item)}
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
-                  item.is_checked ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300"
-                }`}
-              >
-                {item.is_checked && <Check size={14} />}
+            <div className="nst-row" key={item.id} style={{ opacity: item.is_checked ? 0.55 : 1 }}>
+              <button className={`nst-check ${item.is_checked ? "on" : ""}`} onClick={() => toggle(item)}>
+                <Check size={14} />
               </button>
-              <div className="min-w-0 flex-1">
-                <p className={`truncate font-medium text-slate-800 ${item.is_checked ? "line-through" : ""}`}>
-                  {item.name}
-                </p>
-                <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                  {item.category && <span>{item.category}</span>}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: item.is_checked ? "line-through" : "none" }}>{item.name}</p>
+                <div style={{ display: "flex", gap: 7, alignItems: "center", marginTop: 3, flexWrap: "wrap" }}>
+                  {item.category && <span className="nst-tag">{item.category}</span>}
                   {item.source === "recipe" && (
-                    <span className="flex items-center gap-0.5 text-orange-500">
-                      <ChefHat size={12} /> ממתכון
+                    <span className="nst-tag" style={{ background: "var(--cat-3-bg)", color: "var(--cat-3-fg)" }}>
+                      <ChefHat /> ממתכון
                     </span>
                   )}
                   {item.source === "recurring" && (
-                    <span className="flex items-center gap-0.5 text-brand-500">
-                      <Repeat size={12} /> קבוע
+                    <span className="nst-tag" style={{ background: "var(--accent-soft)", color: "var(--accent-ink)" }}>
+                      <Repeat /> קבוע
                     </span>
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-1 rounded-lg bg-slate-100 px-1">
-                <button onClick={() => changeQty(item, -1)} className="p-1.5 text-slate-500">
-                  <Minus size={14} />
+              <div className="nst-stepper">
+                <button onClick={() => changeQty(item, -1)}>
+                  <Minus />
                 </button>
-                <span className="w-5 text-center text-sm font-semibold">{item.quantity}</span>
-                <button onClick={() => changeQty(item, 1)} className="p-1.5 text-slate-500">
-                  <Plus size={14} />
+                <span className="val">{item.quantity}</span>
+                <button onClick={() => changeQty(item, 1)}>
+                  <Plus />
                 </button>
               </div>
-              <button onClick={() => remove(item.id)} className="p-1 text-slate-300 hover:text-red-500">
-                <Trash2 size={17} />
+              <button className="nst-del" onClick={() => remove(item.id)}>
+                <Trash2 />
               </button>
             </div>
           ))}
+          {checkedCount > 0 && (
+            <button className="btn btn-block" style={{ color: "var(--danger)", marginTop: 4 }} onClick={clearChecked}>
+              <Eraser size={16} /> מחיקת {checkedCount} פריטים מסומנים
+            </button>
+          )}
         </div>
-      )}
-
-      {checkedCount > 0 && (
-        <button onClick={clearChecked} className="btn-ghost w-full text-red-500">
-          <Eraser size={16} /> מחיקת {checkedCount} פריטים מסומנים
-        </button>
       )}
 
       {showNewList && (
@@ -245,39 +190,27 @@ export default function Shopping() {
           }}
         />
       )}
-
-      {showRecurring && (
-        <RecurringModal homeId={homeId!} lists={lists} onClose={() => setShowRecurring(false)} />
-      )}
-    </div>
+      {showRecurring && <RecurringModal homeId={homeId!} lists={lists} onClose={() => setShowRecurring(false)} />}
+    </section>
   );
 }
 
-function NewListModal({
-  homeId,
-  onClose,
-  onCreated,
-}: {
-  homeId: string;
-  onClose: () => void;
-  onCreated: (id: string) => void;
-}) {
+function NewListModal({ homeId, onClose, onCreated }: { homeId: string; onClose: () => void; onCreated: (id: string) => void }) {
   const { user } = useAuth();
   const [name, setName] = useState("");
   const create = async () => {
     if (!name.trim()) return;
-    const { data } = await supabase
-      .from("shopping_lists")
-      .insert({ home_id: homeId, name: name.trim(), created_by: user?.id ?? null })
-      .select("id")
-      .single();
+    const { data } = await supabase.from("shopping_lists").insert({ home_id: homeId, name: name.trim(), created_by: user?.id ?? null }).select("id").single();
     if (data) onCreated(data.id);
   };
   return (
     <Modal open onClose={onClose} title="רשימה חדשה">
-      <div className="space-y-3">
-        <input className="input" placeholder="שם הרשימה" value={name} onChange={(e) => setName(e.target.value)} />
-        <button onClick={create} className="btn-primary w-full">
+      <div className="nst-fields">
+        <div>
+          <label>שם הרשימה</label>
+          <input placeholder="למשל: פארם" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <button className="btn btn-primary btn-block" style={{ padding: 12 }} onClick={create}>
           יצירה
         </button>
       </div>
@@ -285,15 +218,7 @@ function NewListModal({
   );
 }
 
-function RecurringModal({
-  homeId,
-  lists,
-  onClose,
-}: {
-  homeId: string;
-  lists: List[];
-  onClose: () => void;
-}) {
+function RecurringModal({ homeId, lists, onClose }: { homeId: string; lists: List[]; onClose: () => void }) {
   const { user } = useAuth();
   const [rows, setRows] = useState<Recurring[]>([]);
   const [name, setName] = useState("");
@@ -302,28 +227,16 @@ function RecurringModal({
   const [listId, setListId] = useState<string>(lists[0]?.id ?? "");
 
   const load = useCallback(async () => {
-    const { data } = await supabase
-      .from("recurring_shopping_items")
-      .select("*")
-      .eq("home_id", homeId)
-      .order("day_of_week");
+    const { data } = await supabase.from("recurring_shopping_items").select("*").eq("home_id", homeId).order("day_of_week");
     setRows(data ?? []);
   }, [homeId]);
-
   useEffect(() => {
     load();
   }, [load]);
 
   const add = async () => {
     if (!name.trim()) return;
-    await supabase.from("recurring_shopping_items").insert({
-      home_id: homeId,
-      name: name.trim(),
-      quantity: qty,
-      day_of_week: day,
-      target_list_id: listId || null,
-      created_by: user?.id ?? null,
-    });
+    await supabase.from("recurring_shopping_items").insert({ home_id: homeId, name: name.trim(), quantity: qty, day_of_week: day, target_list_id: listId || null, created_by: user?.id ?? null });
     setName("");
     setQty(1);
     load();
@@ -335,20 +248,20 @@ function RecurringModal({
 
   return (
     <Modal open onClose={onClose} title="פריטים אוטומטיים">
-      <p className="mb-3 text-sm text-slate-500">
-        פריטים שיתווספו אוטומטית לרשימה ביום שבחרתם, בכל שבוע.
-      </p>
-      <div className="mb-4 space-y-2 rounded-2xl bg-white p-3 ring-1 ring-slate-100">
-        <input className="input" placeholder="שם המצרך" value={name} onChange={(e) => setName(e.target.value)} />
-        <div className="flex gap-2">
-          <input
-            className="input w-20"
-            type="number"
-            min={1}
-            value={qty}
-            onChange={(e) => setQty(Math.max(1, Number(e.target.value)))}
-          />
-          <select className="input flex-1" value={day} onChange={(e) => setDay(Number(e.target.value))}>
+      <p className="section-sub" style={{ marginTop: "-0.3rem", marginBottom: "1rem" }}>פריטים שיתווספו אוטומטית לרשימה ביום שבחרתם, בכל שבוע.</p>
+      <div style={{ background: "var(--surface-2)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 10, marginBottom: "1rem" }}>
+        <input placeholder="שם המצרך" value={name} onChange={(e) => setName(e.target.value)} />
+        <div style={{ display: "flex", gap: 8 }}>
+          <div className="nst-stepper">
+            <button onClick={() => setQty((q) => Math.max(1, q - 1))}>
+              <Minus />
+            </button>
+            <span className="val">{qty}</span>
+            <button onClick={() => setQty((q) => q + 1)}>
+              <Plus />
+            </button>
+          </div>
+          <select style={{ flex: 1 }} value={day} onChange={(e) => setDay(Number(e.target.value))}>
             {DAYS_HE.map((d, i) => (
               <option key={i} value={i}>
                 יום {d}
@@ -356,27 +269,28 @@ function RecurringModal({
             ))}
           </select>
         </div>
-        <select className="input" value={listId} onChange={(e) => setListId(e.target.value)}>
-          {lists.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.name}
-            </option>
-          ))}
-        </select>
-        <button onClick={add} className="btn-primary w-full">
+        {lists.length > 1 && (
+          <select value={listId} onChange={(e) => setListId(e.target.value)}>
+            {lists.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+        )}
+        <button className="btn btn-primary btn-block" style={{ padding: 11 }} onClick={add}>
           <Plus size={16} /> הוספה
         </button>
       </div>
-
-      <div className="space-y-2">
-        {rows.length === 0 && <p className="py-4 text-center text-sm text-slate-400">אין פריטים אוטומטיים</p>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {rows.length === 0 && <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: "0.5rem 0" }}>אין פריטים אוטומטיים</p>}
         {rows.map((r) => (
-          <div key={r.id} className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 ring-1 ring-slate-100">
-            <span className="flex-1 text-sm text-slate-700">
+          <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface)", borderRadius: 12, padding: "9px 12px", boxShadow: "var(--shadow-sm)" }}>
+            <span style={{ flex: 1, fontSize: 13.5, color: "var(--text-2)", fontWeight: 500 }}>
               {r.name} × {r.quantity}
             </span>
-            <span className="chip bg-brand-50 text-brand-700">יום {DAYS_HE[r.day_of_week]}</span>
-            <button onClick={() => remove(r.id)} className="text-slate-300 hover:text-red-500">
+            <span className="badge b-wt">יום {DAYS_HE[r.day_of_week]}</span>
+            <button className="nst-del" onClick={() => remove(r.id)}>
               <X size={16} />
             </button>
           </div>

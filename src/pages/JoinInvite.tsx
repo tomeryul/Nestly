@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Home } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
@@ -43,34 +44,38 @@ export default function JoinInvite() {
   if (!session) return <FullPageSpinner />;
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 text-center">
-      <img
-        src={`${import.meta.env.BASE_URL}favicon.svg`}
-        alt="Nestly"
-        className="mx-auto mb-4 h-14 w-14 rounded-2xl shadow"
-      />
-      {preview === null ? (
-        <p className="text-slate-500">בודק את ההזמנה…</p>
-      ) : !preview.valid ? (
-        <>
-          <h1 className="text-lg font-bold text-slate-800">ההזמנה אינה תקפה</h1>
-          <p className="mt-1 text-sm text-slate-500">הקוד שגוי או שפג תוקפו.</p>
-          <button onClick={() => navigate("/")} className="btn-ghost mx-auto mt-5">
-            חזרה
-          </button>
-        </>
-      ) : (
-        <>
-          <h1 className="text-lg font-bold text-slate-800">הוזמנתם להצטרף</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            לבית <span className="font-semibold text-brand-700">{preview.home_name}</span>
-          </p>
-          {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{err}</p>}
-          <button onClick={accept} className="btn-primary mx-auto mt-5 w-full max-w-xs" disabled={loading}>
-            {loading ? <Spinner className="border-white/40 border-t-white" /> : "הצטרפות לבית"}
-          </button>
-        </>
-      )}
+    <div className="nst-root" dir="rtl">
+      <div className="login-screen" style={{ minHeight: "100vh", position: "relative", zIndex: 1 }}>
+        <div className="login-box" style={{ textAlign: "center" }}>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
+            <span className="nst-logo-tile" style={{ width: 46, height: 46 }}>
+              <Home size={23} />
+            </span>
+          </div>
+          {preview === null ? (
+            <p className="section-sub">בודק את ההזמנה…</p>
+          ) : !preview.valid ? (
+            <>
+              <h3 style={{ font: "600 20px var(--font-display)", color: "var(--text-bright)" }}>ההזמנה אינה תקפה</h3>
+              <p className="section-sub" style={{ marginTop: 4 }}>הקוד שגוי או שפג תוקפו.</p>
+              <button onClick={() => navigate("/")} className="btn" style={{ margin: "1.25rem auto 0" }}>
+                חזרה
+              </button>
+            </>
+          ) : (
+            <>
+              <h3 style={{ font: "600 20px var(--font-display)", color: "var(--text-bright)" }}>הוזמנתם להצטרף</h3>
+              <p className="section-sub" style={{ marginTop: 4 }}>
+                לבית <span style={{ fontWeight: 700, color: "var(--accent-ink)" }}>{preview.home_name}</span>
+              </p>
+              {err && <p style={{ color: "var(--danger)", fontSize: 13, fontWeight: 600, marginTop: 12 }}>{err}</p>}
+              <button onClick={accept} className="btn btn-primary btn-block" style={{ marginTop: "1.25rem", padding: 13 }} disabled={loading}>
+                {loading ? <Spinner className="!border-white/40 !border-t-white" /> : "הצטרפות לבית"}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
