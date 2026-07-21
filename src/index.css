@@ -201,6 +201,9 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .nst-del { border: none; background: transparent; color: var(--text-faint); cursor: pointer; padding: 6px; border-radius: 9px; flex: none; }
 .nst-del:hover { color: var(--danger); background: var(--danger-soft); }
 .nst-del svg { width: 17px; height: 17px; }
+.reorder-btn { border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 0 2px; line-height: 0; display: flex; }
+.reorder-btn:hover { color: var(--text-bright); }
+.reorder-btn:disabled { opacity: 0.3; cursor: default; }
 .nst-tag { display: inline-flex; align-items: center; gap: 4px; font: 700 10px var(--font-body); text-transform: uppercase; letter-spacing: 0.04em; padding: 3px 8px; border-radius: 7px; background: var(--surface-3); color: var(--text-3); }
 .nst-tag svg { width: 11px; height: 11px; }
 .nst-seg { display: flex; gap: 4px; background: var(--surface-2); padding: 5px; border-radius: 13px; box-shadow: inset 0 0 0 1px var(--border); }
@@ -298,8 +301,9 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
   .nst-main { margin-inline-end: 0; }
   .nst-content { padding: 1.3rem 1rem 6.5rem; }
   .nst-bottomnav { display: block; position: fixed; inset-inline: 0; bottom: 0; z-index: 80; background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); border-top: 1px solid var(--border); }
-  .nst-bn-grid { display: grid; grid-template-columns: repeat(6, 1fr); max-width: 640px; margin: 0 auto; }
-  .nst-bn { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 0 calc(9px + env(safe-area-inset-bottom)); border: none; background: transparent; color: var(--text-muted); font: 600 10px var(--font-body); cursor: pointer; }
+  .nst-bn-grid { display: flex; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; max-width: 760px; margin: 0 auto; }
+  .nst-bn-grid::-webkit-scrollbar { display: none; }
+  .nst-bn { flex: 1 0 62px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 4px calc(9px + env(safe-area-inset-bottom)); border: none; background: transparent; color: var(--text-muted); font: 600 10px var(--font-body); cursor: pointer; white-space: nowrap; }
   .nst-bn.active { color: var(--accent-ink); }
   .nst-bn svg { width: 21px; height: 21px; }
 }

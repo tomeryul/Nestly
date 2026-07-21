@@ -12,6 +12,8 @@ import Dashboard from "./pages/Dashboard";
 import Shopping from "./pages/Shopping";
 import Cooking from "./pages/Cooking";
 import Cleaning from "./pages/Cleaning";
+import Laundry from "./pages/Laundry";
+import Personal from "./pages/Personal";
 import Schedule from "./pages/Schedule";
 import Settings from "./pages/Settings";
 
@@ -50,6 +52,8 @@ function AuthedRoutes() {
           <Route path="shopping" element={<Shopping />} />
           <Route path="cooking" element={<Cooking />} />
           <Route path="cleaning" element={<Cleaning />} />
+          <Route path="laundry" element={<Laundry />} />
+          <Route path="personal" element={<Personal />} />
           <Route path="schedule" element={<Schedule />} />
           <Route path="settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />

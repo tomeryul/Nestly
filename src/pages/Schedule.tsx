@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2, ChevronRight, ChevronLeft, Check, Clock, Repeat, X, CalendarDays, ListChecks } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronLeft, Check, Clock, Repeat, X, CalendarDays, ListChecks, Pencil } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -21,6 +21,7 @@ export default function Schedule() {
   const [adding, setAdding] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
   const [detailTask, setDetailTask] = useState<Task | null>(null);
+  const [editTask, setEditTask] = useState<Task | null>(null);
 
   const days = weekDates(weekStart);
   const weekFrom = toISODate(weekStart);
@@ -146,14 +147,41 @@ export default function Schedule() {
         </div>
       )}
 
-      {adding && <TaskModal homeId={homeId!} dateIso={selectedIso} onClose={() => setAdding(false)} onSaved={() => { setAdding(false); load(); }} />}
+      {(adding || editTask) && (
+        <TaskModal
+          homeId={homeId!}
+          dateIso={selectedIso}
+          initial={editTask}
+          onClose={() => {
+            setAdding(false);
+            setEditTask(null);
+          }}
+          onSaved={() => {
+            setAdding(false);
+            setEditTask(null);
+            load();
+          }}
+        />
+      )}
       {showRecurring && <RecurringTaskModal homeId={homeId!} onClose={() => setShowRecurring(false)} />}
-      {detailTask && <TaskDetailModal task={detailTask} onClose={() => { setDetailTask(null); load(); }} />}
+      {detailTask && (
+        <TaskDetailModal
+          task={detailTask}
+          onEdit={(t) => {
+            setDetailTask(null);
+            setEditTask(t);
+          }}
+          onClose={() => {
+            setDetailTask(null);
+            load();
+          }}
+        />
+      )}
     </section>
   );
 }
 
-function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => void }) {
+function TaskDetailModal({ task, onEdit, onClose }: { task: Task; onEdit: (t: Task) => void; onClose: () => void }) {
   const [subs, setSubs] = useState<Tables<"task_subtasks">[]>([]);
   const [title, setTitle] = useState("");
 
@@ -184,7 +212,10 @@ function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => void })
 
   return (
     <Modal open onClose={onClose} title={task.title}>
-      <p className="section-sub" style={{ marginTop: "-0.4rem", marginBottom: "1rem" }}>
+      <button className="btn btn-block" style={{ marginBottom: "1rem" }} onClick={() => onEdit(task)}>
+        <Pencil size={15} /> עריכת המשימה
+      </button>
+      <p className="section-sub" style={{ marginBottom: "1rem" }}>
         רשימת תת‑משימות להשלמת המשימה{subs.length ? ` · ${done}/${subs.length} הושלמו` : ""}
       </p>
 
@@ -230,22 +261,26 @@ function MemberSelect({ value, onChange }: { value: string; onChange: (v: string
   );
 }
 
-function TaskModal({ homeId, dateIso, onClose, onSaved }: { homeId: string; dateIso: string; onClose: () => void; onSaved: () => void }) {
+function TaskModal({ homeId, dateIso, initial, onClose, onSaved }: { homeId: string; dateIso: string; initial?: Task | null; onClose: () => void; onSaved: () => void }) {
   const { user } = useAuth();
-  const [title, setTitle] = useState("");
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
-  const [category, setCategory] = useState<TaskCategory>("general");
-  const [assigned, setAssigned] = useState("");
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [start, setStart] = useState(initial?.start_time ? initial.start_time.slice(0, 5) : "");
+  const [end, setEnd] = useState(initial?.end_time ? initial.end_time.slice(0, 5) : "");
+  const [category, setCategory] = useState<TaskCategory>((initial?.category as TaskCategory) ?? "general");
+  const [assigned, setAssigned] = useState(initial?.assigned_to ?? "");
 
   const save = async () => {
     if (!title.trim()) return;
-    await supabase.from("schedule_tasks").insert({ home_id: homeId, title: title.trim(), scheduled_date: dateIso, start_time: start || null, end_time: end || null, category, assigned_to: assigned || null, created_by: user?.id ?? null });
+    if (initial) {
+      await supabase.from("schedule_tasks").update({ title: title.trim(), start_time: start || null, end_time: end || null, category, assigned_to: assigned || null }).eq("id", initial.id);
+    } else {
+      await supabase.from("schedule_tasks").insert({ home_id: homeId, title: title.trim(), scheduled_date: dateIso, start_time: start || null, end_time: end || null, category, assigned_to: assigned || null, created_by: user?.id ?? null });
+    }
     onSaved();
   };
 
   return (
-    <Modal open onClose={onClose} title="משימה חדשה">
+    <Modal open onClose={onClose} title={initial ? "עריכת משימה" : "משימה חדשה"}>
       <div className="nst-fields">
         <div>
           <label>כותרת המשימה</label>
@@ -296,6 +331,9 @@ function RecurringTaskModal({ homeId, onClose }: { homeId: string; onClose: () =
   const [start, setStart] = useState("");
   const [category, setCategory] = useState<TaskCategory>("general");
   const [assigned, setAssigned] = useState("");
+  const [intervalWeeks, setIntervalWeeks] = useState(1);
+
+  const intervalLabel = (n: number) => (n === 1 ? "כל שבוע" : n === 2 ? "כל שבועיים" : "כל 4 שבועות");
 
   const load = useCallback(async () => {
     const { data } = await supabase.from("recurring_tasks").select("*").eq("home_id", homeId).order("day_of_week");
@@ -307,7 +345,7 @@ function RecurringTaskModal({ homeId, onClose }: { homeId: string; onClose: () =
 
   const add = async () => {
     if (!title.trim()) return;
-    await supabase.from("recurring_tasks").insert({ home_id: homeId, title: title.trim(), day_of_week: day, start_time: start || null, category, assigned_to: assigned || null, created_by: user?.id ?? null });
+    await supabase.from("recurring_tasks").insert({ home_id: homeId, title: title.trim(), day_of_week: day, start_time: start || null, category, assigned_to: assigned || null, interval_weeks: intervalWeeks, created_by: user?.id ?? null });
     setTitle("");
     setStart("");
     load();
@@ -332,14 +370,23 @@ function RecurringTaskModal({ homeId, onClose }: { homeId: string; onClose: () =
           </select>
           <input type="time" style={{ width: 120 }} value={start} onChange={(e) => setStart(e.target.value)} />
         </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <select style={{ flex: 1 }} value={intervalWeeks} onChange={(e) => setIntervalWeeks(Number(e.target.value))}>
+            {[1, 2, 4].map((n) => (
+              <option key={n} value={n}>
+                {intervalLabel(n)}
+              </option>
+            ))}
+          </select>
+          <select style={{ flex: 1 }} value={category} onChange={(e) => setCategory(e.target.value as TaskCategory)}>
+            {(Object.keys(TASK_CATEGORIES) as TaskCategory[]).map((k) => (
+              <option key={k} value={k}>
+                {TASK_CATEGORIES[k].label}
+              </option>
+            ))}
+          </select>
+        </div>
         <MemberSelect value={assigned} onChange={setAssigned} />
-        <select value={category} onChange={(e) => setCategory(e.target.value as TaskCategory)}>
-          {(Object.keys(TASK_CATEGORIES) as TaskCategory[]).map((k) => (
-            <option key={k} value={k}>
-              {TASK_CATEGORIES[k].label}
-            </option>
-          ))}
-        </select>
         <button className="btn btn-primary btn-block" style={{ padding: 11 }} onClick={add}>
           <Plus size={16} /> הוספה
         </button>
@@ -350,7 +397,7 @@ function RecurringTaskModal({ homeId, onClose }: { homeId: string; onClose: () =
           <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface)", borderRadius: 12, padding: "9px 12px", boxShadow: "var(--shadow-sm)" }}>
             <span style={{ flex: 1, fontSize: 13.5, color: "var(--text-2)", fontWeight: 500 }}>{r.title}</span>
             <span className="badge b-wt">
-              {DAYS_HE[r.day_of_week]} {formatTime(r.start_time)}
+              {intervalLabel(r.interval_weeks)} · {DAYS_HE[r.day_of_week]} {formatTime(r.start_time)}
             </span>
             <button className="nst-del" onClick={() => remove(r.id)}>
               <X size={16} />

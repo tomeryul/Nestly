@@ -18,6 +18,7 @@ export type Database = {
           dish_id: string
           home_id: string
           id: string
+          is_spice: boolean
           name: string
           quantity: number
           unit: string | null
@@ -27,6 +28,7 @@ export type Database = {
           dish_id: string
           home_id: string
           id?: string
+          is_spice?: boolean
           name: string
           quantity?: number
           unit?: string | null
@@ -36,9 +38,91 @@ export type Database = {
           dish_id?: string
           home_id?: string
           id?: string
+          is_spice?: boolean
           name?: string
           quantity?: number
           unit?: string | null
+        }
+        Relationships: []
+      }
+      laundry_types: {
+        Row: { created_at: string; home_id: string; id: string; name: string; position: number }
+        Insert: { created_at?: string; home_id: string; id?: string; name: string; position?: number }
+        Update: { created_at?: string; home_id?: string; id?: string; name?: string; position?: number }
+        Relationships: []
+      }
+      laundry_tasks: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          created_by: string | null
+          home_id: string
+          id: string
+          name: string
+          position: number
+          stage: number
+          week_start: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string | null
+          home_id: string
+          id?: string
+          name: string
+          position?: number
+          stage?: number
+          week_start: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string | null
+          home_id?: string
+          id?: string
+          name?: string
+          position?: number
+          stage?: number
+          week_start?: string
+        }
+        Relationships: []
+      }
+      personal_tasks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          due_date: string | null
+          home_id: string
+          id: string
+          is_done: boolean
+          owner_id: string | null
+          position: number
+          scope: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          due_date?: string | null
+          home_id: string
+          id?: string
+          is_done?: boolean
+          owner_id?: string | null
+          position?: number
+          scope?: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          due_date?: string | null
+          home_id?: string
+          id?: string
+          is_done?: boolean
+          owner_id?: string | null
+          position?: number
+          scope?: string
+          title?: string
         }
         Relationships: []
       }
@@ -355,6 +439,7 @@ export type Database = {
           end_time: string | null
           home_id: string
           id: string
+          interval_weeks: number
           last_generated_on: string | null
           start_time: string | null
           title: string
@@ -371,6 +456,7 @@ export type Database = {
           end_time?: string | null
           home_id: string
           id?: string
+          interval_weeks?: number
           last_generated_on?: string | null
           start_time?: string | null
           title: string
@@ -387,6 +473,7 @@ export type Database = {
           end_time?: string | null
           home_id?: string
           id?: string
+          interval_weeks?: number
           last_generated_on?: string | null
           start_time?: string | null
           title?: string

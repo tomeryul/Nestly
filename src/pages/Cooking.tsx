@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Minus, Trash2, ChevronRight, ChevronLeft, ShoppingCart, Check, X, CalendarPlus, ChefHat, UtensilsCrossed, Info } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronLeft, ShoppingCart, Check, X, CalendarPlus, ChefHat, UtensilsCrossed, Info } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -109,6 +109,7 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
   const [qty, setQty] = useState(1);
   const [unit, setUnit] = useState("");
   const [category, setCategory] = useState<string>(CATEGORIES[0]);
+  const [isSpice, setIsSpice] = useState(false);
 
   const load = useCallback(async () => {
     const { data } = await supabase.from("dish_ingredients").select("*").eq("dish_id", dish.id).order("name");
@@ -120,7 +121,7 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
 
   const add = async () => {
     if (!name.trim()) return;
-    await supabase.from("dish_ingredients").insert({ dish_id: dish.id, home_id: dish.home_id, name: name.trim(), quantity: qty, unit: unit || null, category });
+    await supabase.from("dish_ingredients").insert({ dish_id: dish.id, home_id: dish.home_id, name: name.trim(), quantity: qty, unit: unit || null, category, is_spice: isSpice });
     setName("");
     setQty(1);
     setUnit("");
@@ -131,21 +132,36 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
     load();
   };
 
+  const ingredients = rows.filter((r) => !r.is_spice);
+  const spices = rows.filter((r) => r.is_spice);
+  const fmt = (n: number) => (Number.isInteger(n) ? `${n}` : n.toString());
+
+  const rowView = (r: Ingredient) => (
+    <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface)", borderRadius: 12, padding: "9px 12px", boxShadow: "var(--shadow-sm)" }}>
+      <span style={{ flex: 1, fontSize: 13.5, color: "var(--text-2)", fontWeight: 500 }}>
+        {r.name} · {fmt(r.quantity)} {r.unit ?? ""}
+      </span>
+      <button className="nst-del" onClick={() => remove(r.id)}>
+        <X size={16} />
+      </button>
+    </div>
+  );
+
   return (
     <Modal open onClose={onClose} title={`מצרכים · ${dish.name}`}>
       <div style={{ background: "var(--surface-2)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 10, marginBottom: "1rem" }}>
-        <input placeholder="שם המצרך" value={name} onChange={(e) => setName(e.target.value)} />
+        <div className="nst-seg">
+          <button className={!isSpice ? "active" : ""} onClick={() => setIsSpice(false)}>
+            מצרך
+          </button>
+          <button className={isSpice ? "active" : ""} onClick={() => setIsSpice(true)}>
+            תבלין
+          </button>
+        </div>
+        <input placeholder={isSpice ? "שם התבלין" : "שם המצרך"} value={name} onChange={(e) => setName(e.target.value)} />
         <div style={{ display: "flex", gap: 8 }}>
-          <div className="nst-stepper">
-            <button onClick={() => setQty((q) => Math.max(1, q - 1))}>
-              <Minus />
-            </button>
-            <span className="val">{qty}</span>
-            <button onClick={() => setQty((q) => q + 1)}>
-              <Plus />
-            </button>
-          </div>
-          <input style={{ width: 90 }} placeholder="יחידה" value={unit} onChange={(e) => setUnit(e.target.value)} />
+          <input style={{ width: 84 }} type="number" min={0} step={0.25} value={qty} onChange={(e) => setQty(Number(e.target.value))} title="כמות (אפשר רבע/חצי)" />
+          <input style={{ width: 84 }} placeholder="יחידה" value={unit} onChange={(e) => setUnit(e.target.value)} />
           <select style={{ flex: 1 }} value={category} onChange={(e) => setCategory(e.target.value)}>
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>
@@ -154,23 +170,20 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
             ))}
           </select>
         </div>
+        {isSpice && <p style={{ fontSize: 11, color: "var(--text-muted)" }}>תבלינים לא נכנסים לרשימת הקניות.</p>}
         <button className="btn btn-primary btn-block" style={{ padding: 11 }} onClick={add}>
-          <Plus size={16} /> הוספת מצרך
+          <Plus size={16} /> {isSpice ? "הוספת תבלין" : "הוספת מצרך"}
         </button>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {rows.length === 0 && <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: "0.5rem 0" }}>אין מצרכים עדיין</p>}
-        {rows.map((r) => (
-          <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface)", borderRadius: 12, padding: "9px 12px", boxShadow: "var(--shadow-sm)" }}>
-            <span style={{ flex: 1, fontSize: 13.5, color: "var(--text-2)", fontWeight: 500 }}>
-              {r.name} · {r.quantity} {r.unit ?? ""}
-            </span>
-            <button className="nst-del" onClick={() => remove(r.id)}>
-              <X size={16} />
-            </button>
-          </div>
-        ))}
-      </div>
+
+      {rows.length === 0 && <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: "0.5rem 0" }}>אין מצרכים עדיין</p>}
+      {ingredients.length > 0 && <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: spices.length ? 14 : 0 }}>{ingredients.map(rowView)}</div>}
+      {spices.length > 0 && (
+        <>
+          <div style={{ margin: "0 4px 8px", color: "var(--text-3)", font: "700 11.5px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>תבלינים</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{spices.map(rowView)}</div>
+        </>
+      )}
     </Modal>
   );
 }

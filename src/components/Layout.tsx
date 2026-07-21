@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Home, ShoppingCart, ChefHat, Sparkles, CalendarDays, Settings, ChevronDown } from "lucide-react";
+import { Home, ShoppingCart, ChefHat, Sparkles, WashingMachine, CalendarDays, ListTodo, Settings, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -10,7 +10,9 @@ const NAV = [
   { to: "/shopping", label: "קניות", icon: ShoppingCart, end: false, title: "קניות" },
   { to: "/cooking", label: "בישולים", icon: ChefHat, end: false, title: "בישולים" },
   { to: "/cleaning", label: "ניקיון", icon: Sparkles, end: false, title: "ניקיון" },
+  { to: "/laundry", label: "כביסות", icon: WashingMachine, end: false, title: "כביסות" },
   { to: "/schedule", label: "לוז", icon: CalendarDays, end: false, title: "לוז שבועי" },
+  { to: "/personal", label: "משימות", icon: ListTodo, end: false, title: "משימות אישיות" },
   { to: "/settings", label: "הגדרות", icon: Settings, end: false, title: "הגדרות" },
 ];
 
