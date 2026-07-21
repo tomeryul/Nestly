@@ -43,9 +43,9 @@ export type Database = {
         Relationships: []
       }
       cleaning_rooms: {
-        Row: { created_at: string; home_id: string; id: string; name: string; position: number }
-        Insert: { created_at?: string; home_id: string; id?: string; name: string; position?: number }
-        Update: { created_at?: string; home_id?: string; id?: string; name?: string; position?: number }
+        Row: { created_at: string; frequency: string; home_id: string; id: string; name: string; position: number }
+        Insert: { created_at?: string; frequency?: string; home_id: string; id?: string; name: string; position?: number }
+        Update: { created_at?: string; frequency?: string; home_id?: string; id?: string; name?: string; position?: number }
         Relationships: []
       }
       cleaning_tasks: {

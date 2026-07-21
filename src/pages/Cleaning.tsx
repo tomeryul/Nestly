@@ -31,7 +31,7 @@ export default function Cleaning() {
   const load = useCallback(async () => {
     if (!homeId) return;
     const [r, t] = await Promise.all([
-      supabase.from("cleaning_rooms").select("*").eq("home_id", homeId).order("position").order("created_at"),
+      supabase.from("cleaning_rooms").select("*").eq("home_id", homeId).eq("frequency", tab).order("position").order("created_at"),
       supabase.from("cleaning_tasks").select("*").eq("home_id", homeId).eq("frequency", tab).order("position").order("created_at"),
     ]);
     setRooms(r.data ?? []);
@@ -52,7 +52,7 @@ export default function Cleaning() {
 
   const addRoom = async () => {
     if (!newRoom.trim() || !homeId) return;
-    await supabase.from("cleaning_rooms").insert({ home_id: homeId, name: newRoom.trim(), position: rooms.length });
+    await supabase.from("cleaning_rooms").insert({ home_id: homeId, name: newRoom.trim(), frequency: tab, position: rooms.length });
     setNewRoom("");
     load();
   };
