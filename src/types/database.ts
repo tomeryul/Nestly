@@ -42,6 +42,12 @@ export type Database = {
         }
         Relationships: []
       }
+      cleaning_rooms: {
+        Row: { created_at: string; home_id: string; id: string; name: string; position: number }
+        Insert: { created_at?: string; home_id: string; id?: string; name: string; position?: number }
+        Update: { created_at?: string; home_id?: string; id?: string; name?: string; position?: number }
+        Relationships: []
+      }
       cleaning_tasks: {
         Row: {
           assigned_to: string | null
@@ -52,6 +58,7 @@ export type Database = {
           id: string
           position: number
           room: string | null
+          room_id: string | null
           title: string
         }
         Insert: {
@@ -63,6 +70,7 @@ export type Database = {
           id?: string
           position?: number
           room?: string | null
+          room_id?: string | null
           title: string
         }
         Update: {
@@ -74,6 +82,7 @@ export type Database = {
           id?: string
           position?: number
           room?: string | null
+          room_id?: string | null
           title?: string
         }
         Relationships: []

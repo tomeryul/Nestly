@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
@@ -31,6 +31,32 @@ export default function Shopping() {
       return !g;
     });
   };
+
+  // product memory: distinct products the home has ever added (for autocomplete)
+  const [catalog, setCatalog] = useState<{ name: string; category: string | null; quantity: number }[]>([]);
+  const [focused, setFocused] = useState(false);
+  const loadCatalog = useCallback(async () => {
+    if (!homeId) return;
+    const { data } = await supabase.from("shopping_items").select("name, category, quantity, created_at").eq("home_id", homeId).order("created_at", { ascending: false }).limit(500);
+    const seen = new Set<string>();
+    const out: { name: string; category: string | null; quantity: number }[] = [];
+    for (const it of data ?? []) {
+      const k = it.name.trim().toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push({ name: it.name, category: it.category, quantity: it.quantity });
+    }
+    setCatalog(out);
+  }, [homeId]);
+  useEffect(() => {
+    loadCatalog();
+  }, [loadCatalog]);
+
+  const suggestions = useMemo(() => {
+    const q = name.trim().toLowerCase();
+    if (!q) return [];
+    return catalog.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 6);
+  }, [name, catalog]);
 
   const loadLists = useCallback(async () => {
     if (!homeId) return;
@@ -72,7 +98,9 @@ export default function Shopping() {
     await supabase.from("shopping_items").insert({ list_id: activeList, home_id: homeId, name: name.trim(), quantity: qty, category, source: "manual", created_by: user?.id ?? null });
     setName("");
     setQty(1);
+    setFocused(false);
     loadItems();
+    loadCatalog();
   };
   const toggle = async (item: Item) => {
     await supabase.from("shopping_items").update({ is_checked: !item.is_checked }).eq("id", item.id);
@@ -173,7 +201,45 @@ export default function Shopping() {
       </div>
 
       <div className="nst-card" style={{ padding: "1rem 1.1rem", display: "flex", flexDirection: "column", gap: 10 }}>
-        <input placeholder="הוספת מצרך…" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addItem()} />
+        <input
+          placeholder="הוספת מצרך…"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setTimeout(() => setFocused(false), 150)}
+          onKeyDown={(e) => e.key === "Enter" && addItem()}
+        />
+        {focused && suggestions.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {suggestions.map((s) => {
+              const cur = items.find((i) => i.name.trim().toLowerCase() === s.name.trim().toLowerCase());
+              return (
+                <button
+                  key={s.name}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setName(s.name);
+                    setQty(s.quantity);
+                    if (s.category) setCategory(s.category);
+                    setFocused(false);
+                  }}
+                  style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--surface-2)", border: "none", borderRadius: 10, padding: "9px 12px", cursor: "pointer", textAlign: "right" }}
+                >
+                  <span style={{ flex: 1, font: "600 13.5px var(--font-body)", color: "var(--text-bright)", textDecoration: cur?.is_checked ? "line-through" : "none" }}>{s.name}</span>
+                  {s.category && <span className="nst-tag">{s.category}</span>}
+                  <span className="nst-tag">×{s.quantity}</span>
+                  {cur &&
+                    (cur.is_checked ? (
+                      <span className="nst-tag" style={{ background: "var(--ok-soft)", color: "var(--ok)" }}>נקנה</span>
+                    ) : (
+                      <span className="nst-tag" style={{ background: "var(--accent-soft)", color: "var(--accent-ink)" }}>ברשימה</span>
+                    ))}
+                </button>
+              );
+            })}
+          </div>
+        )}
         <div style={{ display: "flex", gap: 8 }}>
           <div className="nst-stepper">
             <button onClick={() => setQty((q) => Math.max(1, q - 1))}>
