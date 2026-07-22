@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2, ChevronRight, ChevronLeft, ShoppingCart, Check, X, CalendarPlus, ChefHat, UtensilsCrossed, Info } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronLeft, ShoppingCart, Check, X, CalendarPlus, ChefHat, UtensilsCrossed, Info, ArrowDownAZ, Clock, Repeat } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -110,6 +110,7 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
   const [unit, setUnit] = useState("");
   const [category, setCategory] = useState<string>(CATEGORIES[0]);
   const [isSpice, setIsSpice] = useState(false);
+  const [sortMode, setSortMode] = useState<"added" | "alpha">("added");
 
   const load = useCallback(async () => {
     const { data } = await supabase.from("dish_ingredients").select("*").eq("dish_id", dish.id).order("name");
@@ -132,8 +133,14 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
     load();
   };
 
-  const ingredients = rows.filter((r) => !r.is_spice);
-  const spices = rows.filter((r) => r.is_spice);
+  const sortRows = (arr: Ingredient[]) => {
+    const a = [...arr];
+    if (sortMode === "alpha") a.sort((x, y) => x.name.localeCompare(y.name, "he"));
+    else a.sort((x, y) => (x.created_at ?? "").localeCompare(y.created_at ?? ""));
+    return a;
+  };
+  const ingredients = sortRows(rows.filter((r) => !r.is_spice));
+  const spices = sortRows(rows.filter((r) => r.is_spice));
   const fmt = (n: number) => (Number.isInteger(n) ? `${n}` : n.toString());
 
   const rowView = (r: Ingredient) => (
@@ -177,6 +184,21 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
       </div>
 
       {rows.length === 0 && <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: "0.5rem 0" }}>אין מצרכים עדיין</p>}
+      {rows.length > 1 && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+          <button className="btn btn-sm" onClick={() => setSortMode((m) => (m === "added" ? "alpha" : "added"))} title="שינוי סדר תצוגה">
+            {sortMode === "added" ? (
+              <>
+                <Clock size={14} /> לפי סדר הוספה
+              </>
+            ) : (
+              <>
+                <ArrowDownAZ size={14} /> לפי א־ב
+              </>
+            )}
+          </button>
+        </div>
+      )}
       {ingredients.length > 0 && <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: spices.length ? 14 : 0 }}>{ingredients.map(rowView)}</div>}
       {spices.length > 0 && (
         <>
@@ -198,6 +220,7 @@ function WeekTab() {
   const [lists, setLists] = useState<List[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const [showRecurring, setShowRecurring] = useState(false);
   const [listPickerFor, setListPickerFor] = useState<Meal | null>(null);
   const weekIso = toISODate(weekStart);
 
@@ -246,9 +269,14 @@ function WeekTab() {
         </button>
       </div>
 
-      <button className="btn btn-primary btn-block" style={{ padding: 13 }} onClick={() => setAdding(true)}>
-        <CalendarPlus size={18} /> הוספת מאכל לשבוע
-      </button>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="btn btn-primary" style={{ flex: 1, justifyContent: "center", padding: 13 }} onClick={() => setAdding(true)}>
+          <CalendarPlus size={18} /> הוספת מאכל לשבוע
+        </button>
+        <button className="btn" style={{ padding: "0 14px" }} onClick={() => setShowRecurring(true)} title="ארוחות קבועות">
+          <Repeat size={16} /> קבועות
+        </button>
+      </div>
 
       {meals.length === 0 ? (
         <EmptyState icon={<ChefHat size={42} />} title="לא נבחרו מאכלים לשבוע זה" />
@@ -309,7 +337,141 @@ function WeekTab() {
           </div>
         </Modal>
       )}
+      {showRecurring && (
+        <RecurringMealsModal
+          homeId={homeId!}
+          dishes={dishes}
+          userId={user?.id ?? null}
+          onClose={() => {
+            setShowRecurring(false);
+            load();
+          }}
+        />
+      )}
     </>
+  );
+}
+
+const INTERVAL_LABELS: Record<number, string> = { 1: "כל שבוע", 2: "כל שבועיים", 4: "כל 4 שבועות" };
+
+function RecurringMealsModal({ homeId, dishes, userId, onClose }: { homeId: string; dishes: Dish[]; userId: string | null; onClose: () => void }) {
+  const { members } = useHome();
+  const nameFor = (uid: string) => members.find((m) => m.user_id === uid)?.profile?.display_name ?? "";
+  const [rows, setRows] = useState<(Tables<"recurring_meals"> & { dishes?: { name: string } | null })[]>([]);
+  const [dishId, setDishId] = useState<string>(dishes[0]?.id ?? "");
+  const [day, setDay] = useState<string>("");
+  const [mealType, setMealType] = useState<string>("");
+  const [interval, setInterval] = useState(1);
+  const [forMembers, setForMembers] = useState<string[]>([]);
+
+  const load = useCallback(async () => {
+    const { data } = await supabase.from("recurring_meals").select("*, dishes(name)").eq("home_id", homeId).order("created_at");
+    setRows((data as unknown as (Tables<"recurring_meals"> & { dishes?: { name: string } | null })[]) ?? []);
+  }, [homeId]);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const toggleMember = (uid: string) => setForMembers((r) => (r.includes(uid) ? r.filter((x) => x !== uid) : [...r, uid]));
+
+  const add = async () => {
+    if (!dishId) return;
+    const allWeek = day === "all";
+    await supabase.from("recurring_meals").insert({
+      home_id: homeId,
+      dish_id: dishId,
+      all_week: allWeek,
+      day_of_week: day === "" || allWeek ? null : Number(day),
+      meal_type: mealType || null,
+      interval_weeks: interval,
+      for_members: forMembers,
+      created_by: userId,
+    });
+    setForMembers([]);
+    load();
+  };
+  const remove = async (id: string) => {
+    await supabase.from("recurring_meals").delete().eq("id", id);
+    load();
+  };
+
+  if (dishes.length === 0) {
+    return (
+      <Modal open onClose={onClose} title="ארוחות קבועות">
+        <p className="section-sub">קודם הוסיפו מאכלים בלשונית "מאכלים קבועים", ואז תוכלו להגדיר ארוחות שנכנסות אוטומטית לכל שבוע.</p>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal open onClose={onClose} title="ארוחות קבועות">
+      <p className="section-sub" style={{ marginTop: "-0.3rem", marginBottom: "1rem" }}>מאכלים שייכנסו אוטומטית לתפריט השבועי — כל שבוע, שבועיים או 4 שבועות.</p>
+      <div style={{ background: "var(--surface-2)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 10, marginBottom: "1rem" }}>
+        <select value={dishId} onChange={(e) => setDishId(e.target.value)}>
+          {dishes.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+            </option>
+          ))}
+        </select>
+        <div style={{ display: "flex", gap: 8 }}>
+          <select style={{ flex: 1 }} value={day} onChange={(e) => setDay(e.target.value)}>
+            <option value="">ללא יום</option>
+            <option value="all">כל השבוע</option>
+            {DAYS_HE.map((d, i) => (
+              <option key={i} value={i}>
+                {d}
+              </option>
+            ))}
+          </select>
+          <select style={{ flex: 1 }} value={interval} onChange={(e) => setInterval(Number(e.target.value))}>
+            {[1, 2, 4].map((n) => (
+              <option key={n} value={n}>
+                {INTERVAL_LABELS[n]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <select value={mealType} onChange={(e) => setMealType(e.target.value)}>
+          <option value="">ללא ארוחה</option>
+          {Object.entries(MEAL_TYPES).map(([k, v]) => (
+            <option key={k} value={k}>
+              {v}
+            </option>
+          ))}
+        </select>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+          {members.map((m) => (
+            <button key={m.user_id} className={`nst-chip ${forMembers.includes(m.user_id) ? "active" : ""}`} onClick={() => toggleMember(m.user_id)}>
+              {m.profile?.display_name ?? "חבר"}
+            </button>
+          ))}
+        </div>
+        <button className="btn btn-primary btn-block" style={{ padding: 11 }} onClick={add}>
+          <Plus size={16} /> הוספת ארוחה קבועה
+        </button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {rows.length === 0 && <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: "0.5rem 0" }}>אין ארוחות קבועות עדיין</p>}
+        {rows.map((r) => (
+          <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface)", borderRadius: 12, padding: "9px 12px", boxShadow: "var(--shadow-sm)" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ font: "600 13.5px var(--font-body)", color: "var(--text-bright)" }}>{r.dishes?.name ?? "מאכל"}</p>
+              <p style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
+                {INTERVAL_LABELS[r.interval_weeks] ?? "כל שבוע"}
+                {" · "}
+                {r.all_week ? "כל השבוע" : r.day_of_week != null ? `יום ${DAYS_HE[r.day_of_week]}` : "ללא יום"}
+                {r.meal_type ? ` · ${MEAL_TYPES[r.meal_type as keyof typeof MEAL_TYPES]}` : ""}
+                {r.for_members && r.for_members.length > 0 ? ` · ${r.for_members.map((id) => nameFor(id)).filter(Boolean).join(", ")}` : ""}
+              </p>
+            </div>
+            <button className="nst-del" onClick={() => remove(r.id)}>
+              <X size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </Modal>
   );
 }
 

@@ -15,6 +15,7 @@ export type Database = {
       dish_ingredients: {
         Row: {
           category: string | null
+          created_at: string
           dish_id: string
           home_id: string
           id: string
@@ -25,6 +26,7 @@ export type Database = {
         }
         Insert: {
           category?: string | null
+          created_at?: string
           dish_id: string
           home_id: string
           id?: string
@@ -35,6 +37,7 @@ export type Database = {
         }
         Update: {
           category?: string | null
+          created_at?: string
           dish_id?: string
           home_id?: string
           id?: string
@@ -42,6 +45,51 @@ export type Database = {
           name?: string
           quantity?: number
           unit?: string | null
+        }
+        Relationships: []
+      }
+      recurring_meals: {
+        Row: {
+          active: boolean
+          all_week: boolean
+          created_at: string
+          created_by: string | null
+          day_of_week: number | null
+          dish_id: string
+          for_members: string[]
+          home_id: string
+          id: string
+          interval_weeks: number
+          last_generated_on: string | null
+          meal_type: string | null
+        }
+        Insert: {
+          active?: boolean
+          all_week?: boolean
+          created_at?: string
+          created_by?: string | null
+          day_of_week?: number | null
+          dish_id: string
+          for_members?: string[]
+          home_id: string
+          id?: string
+          interval_weeks?: number
+          last_generated_on?: string | null
+          meal_type?: string | null
+        }
+        Update: {
+          active?: boolean
+          all_week?: boolean
+          created_at?: string
+          created_by?: string | null
+          day_of_week?: number | null
+          dish_id?: string
+          for_members?: string[]
+          home_id?: string
+          id?: string
+          interval_weeks?: number
+          last_generated_on?: string | null
+          meal_type?: string | null
         }
         Relationships: []
       }
@@ -546,6 +594,7 @@ export type Database = {
           list_id: string
           name: string
           note: string | null
+          position: number
           quantity: number
           source: string
           unit: string | null
@@ -561,6 +610,7 @@ export type Database = {
           list_id: string
           name: string
           note?: string | null
+          position?: number
           quantity?: number
           source?: string
           unit?: string | null
@@ -576,10 +626,17 @@ export type Database = {
           list_id?: string
           name?: string
           note?: string | null
+          position?: number
           quantity?: number
           source?: string
           unit?: string | null
         }
+        Relationships: []
+      }
+      shopping_categories: {
+        Row: { created_at: string; home_id: string; id: string; name: string; position: number }
+        Insert: { created_at?: string; home_id: string; id?: string; name: string; position?: number }
+        Update: { created_at?: string; home_id?: string; id?: string; name?: string; position?: number }
         Relationships: []
       }
       shopping_lists: {

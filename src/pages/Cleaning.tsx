@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Check, Sparkles, DoorOpen, X, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Trash2, Check, Sparkles, DoorOpen, X, GripVertical } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { EmptyState, FullPageSpinner } from "../components/ui";
 import { startOfWeek, toISODate } from "../lib/dates";
+import { useDragReorder } from "../lib/dragReorder";
 import type { Tables } from "../types/database";
 
 type CleaningTask = Tables<"cleaning_tasks">;
@@ -77,15 +78,13 @@ export default function Cleaning() {
     await supabase.from("cleaning_tasks").delete().eq("id", id);
     load();
   };
-  const moveTask = async (roomTasks: CleaningTask[], id: string, dir: "up" | "down") => {
-    const idx = roomTasks.findIndex((t) => t.id === id);
-    const j = dir === "up" ? idx - 1 : idx + 1;
-    if (idx < 0 || j < 0 || j >= roomTasks.length) return;
-    const arr = [...roomTasks];
-    [arr[idx], arr[j]] = [arr[j], arr[idx]];
-    await Promise.all(arr.map((t, i) => supabase.from("cleaning_tasks").update({ position: i }).eq("id", t.id)));
-    load();
-  };
+  const reorderTasks = useCallback(
+    async (ids: string[]) => {
+      await Promise.all(ids.map((id, i) => supabase.from("cleaning_tasks").update({ position: i }).eq("id", id)));
+      load();
+    },
+    [load]
+  );
 
   const tasksByRoom = useMemo(() => {
     const m = new Map<string, CleaningTask[]>();
@@ -151,12 +150,12 @@ export default function Cleaning() {
               onAddTask={(title) => addTask(room.id, title)}
               onToggle={toggle}
               onRemoveTask={removeTask}
-              onMove={(id, dir) => moveTask(tasksByRoom.get(room.id) ?? [], id, dir)}
+              onReorder={reorderTasks}
               onRemoveRoom={() => removeRoom(room.id)}
             />
           ))}
           {noRoomTasks.length > 0 && (
-            <RoomSection name="ללא חדר" tasks={noRoomTasks} doneIds={doneIds} onAddTask={(title) => addTask(null, title)} onToggle={toggle} onRemoveTask={removeTask} onMove={(id, dir) => moveTask(noRoomTasks, id, dir)} />
+            <RoomSection name="ללא חדר" tasks={noRoomTasks} doneIds={doneIds} onAddTask={(title) => addTask(null, title)} onToggle={toggle} onRemoveTask={removeTask} onReorder={reorderTasks} />
           )}
         </>
       )}
@@ -171,7 +170,7 @@ function RoomSection({
   onAddTask,
   onToggle,
   onRemoveTask,
-  onMove,
+  onReorder,
   onRemoveRoom,
 }: {
   name: string;
@@ -180,10 +179,12 @@ function RoomSection({
   onAddTask: (title: string) => void;
   onToggle: (t: CleaningTask) => void;
   onRemoveTask: (id: string) => void;
-  onMove: (id: string, dir: "up" | "down") => void;
+  onReorder: (ids: string[]) => void;
   onRemoveRoom?: () => void;
 }) {
   const [title, setTitle] = useState("");
+  const dr = useDragReorder(tasks, onReorder);
+  const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   const submit = () => {
     onAddTask(title);
     setTitle("");
@@ -207,24 +208,21 @@ function RoomSection({
         )}
       </div>
 
-      {tasks.map((t, i) => {
+      {dr.order.map((id) => {
+        const t = byId.get(id);
+        if (!t) return null;
         const isDone = doneIds.has(t.id);
         return (
-          <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, opacity: isDone ? 0.55 : 1 }}>
+          <div key={t.id} ref={dr.setItemRef(t.id)} style={{ display: "flex", alignItems: "center", gap: 8, opacity: isDone ? 0.55 : 1, ...dr.itemStyle(t.id) }}>
+            {tasks.length > 1 && (
+              <span className="nst-grip" {...dr.handleProps(t.id)} title="גרירה לסידור">
+                <GripVertical size={17} />
+              </span>
+            )}
             <button className={`nst-check ${isDone ? "on" : ""}`} onClick={() => onToggle(t)}>
               <Check size={14} />
             </button>
             <span style={{ flex: 1, font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: isDone ? "line-through" : "none" }}>{t.title}</span>
-            {tasks.length > 1 && (
-              <span style={{ display: "flex", flexDirection: "column" }}>
-                <button className="reorder-btn" disabled={i === 0} onClick={() => onMove(t.id, "up")}>
-                  <ChevronUp size={14} />
-                </button>
-                <button className="reorder-btn" disabled={i === tasks.length - 1} onClick={() => onMove(t.id, "down")}>
-                  <ChevronDown size={14} />
-                </button>
-              </span>
-            )}
             <button className="nst-del" onClick={() => onRemoveTask(t.id)}>
               <X size={16} />
             </button>

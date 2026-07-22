@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
-import { Plus, Check, X, User, Globe, ChevronUp, ChevronDown } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Plus, Check, X, User, Globe, GripVertical } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { EmptyState, FullPageSpinner } from "../components/ui";
+import { useDragReorder } from "../lib/dragReorder";
 import type { Tables } from "../types/database";
 
 type PTask = Tables<"personal_tasks">;
 
 export default function Personal() {
-  const { homeId } = useHome();
+  const { homeId, members } = useHome();
   const { user } = useAuth();
   const [tasks, setTasks] = useState<PTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,14 +25,15 @@ export default function Personal() {
     load();
   }, [load]);
 
-  const add = async (scope: "personal" | "general", title: string) => {
+  const add = async (scope: "personal" | "general", ownerId: string | null, title: string) => {
     if (!title.trim() || !homeId) return;
+    const siblings = tasks.filter((t) => t.scope === scope && (scope === "general" || t.owner_id === ownerId));
     await supabase.from("personal_tasks").insert({
       home_id: homeId,
       scope,
-      owner_id: scope === "personal" ? user?.id ?? null : null,
+      owner_id: scope === "personal" ? ownerId : null,
       title: title.trim(),
-      position: tasks.length,
+      position: siblings.length,
       created_by: user?.id ?? null,
     });
     load();
@@ -44,27 +46,54 @@ export default function Personal() {
     await supabase.from("personal_tasks").delete().eq("id", id);
     load();
   };
-  const move = async (list: PTask[], id: string, dir: "up" | "down") => {
-    const idx = list.findIndex((t) => t.id === id);
-    const j = dir === "up" ? idx - 1 : idx + 1;
-    if (idx < 0 || j < 0 || j >= list.length) return;
-    const arr = [...list];
-    [arr[idx], arr[j]] = [arr[j], arr[idx]];
-    await Promise.all(arr.map((t, i) => supabase.from("personal_tasks").update({ position: i }).eq("id", t.id)));
-    load();
-  };
+  const reorder = useCallback(
+    async (ids: string[]) => {
+      await Promise.all(ids.map((id, i) => supabase.from("personal_tasks").update({ position: i }).eq("id", id)));
+      load();
+    },
+    [load]
+  );
 
   if (loading) return <FullPageSpinner />;
 
-  const personal = tasks.filter((t) => t.scope === "personal");
   const general = tasks.filter((t) => t.scope === "general");
+  // Members sorted with me first.
+  const ordered = [...members].sort((a, b) => (a.user_id === user?.id ? -1 : b.user_id === user?.id ? 1 : 0));
 
   return (
     <section className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
       <h1 className="page-title">משימות</h1>
 
-      <Section title="המשימות שלי" icon={<User />} hint="משימות אישיות — רק אתה רואה אותן." tasks={personal} onAdd={(v) => add("personal", v)} onToggle={toggle} onRemove={remove} onMove={(id, dir) => move(personal, id, dir)} />
-      <Section title="משימות כלליות" icon={<Globe />} hint="משותפות לכל הבית — לא בהכרח קשורות לבית." tasks={general} onAdd={(v) => add("general", v)} onToggle={toggle} onRemove={remove} onMove={(id, dir) => move(general, id, dir)} />
+      {ordered.map((m) => {
+        const mine = m.user_id === user?.id;
+        const name = m.profile?.display_name ?? "בן הבית";
+        return (
+          <Section
+            key={m.user_id}
+            title={mine ? `המשימות שלי · ${name}` : `המשימות של ${name}`}
+            icon={<User />}
+            hint={mine ? "כל בני הבית יכולים להוסיף לך משימות. רק אתה יכול למחוק." : "אפשר להוסיף כאן משימה — אך רק בעל הרשימה יכול למחוק."}
+            tasks={tasks.filter((t) => t.scope === "personal" && t.owner_id === m.user_id)}
+            canDelete={mine}
+            onAdd={(v) => add("personal", m.user_id, v)}
+            onToggle={toggle}
+            onRemove={remove}
+            onReorder={reorder}
+          />
+        );
+      })}
+
+      <Section
+        title="משימות כלליות"
+        icon={<Globe />}
+        hint="משותפות לכל הבית — לא בהכרח קשורות לבית."
+        tasks={general}
+        canDelete
+        onAdd={(v) => add("general", null, v)}
+        onToggle={toggle}
+        onRemove={remove}
+        onReorder={reorder}
+      />
     </section>
   );
 }
@@ -74,21 +103,25 @@ function Section({
   icon,
   hint,
   tasks,
+  canDelete,
   onAdd,
   onToggle,
   onRemove,
-  onMove,
+  onReorder,
 }: {
   title: string;
   icon: React.ReactNode;
   hint: string;
   tasks: PTask[];
+  canDelete: boolean;
   onAdd: (v: string) => void;
   onToggle: (t: PTask) => void;
   onRemove: (id: string) => void;
-  onMove: (id: string, dir: "up" | "down") => void;
+  onReorder: (ids: string[]) => void;
 }) {
   const [v, setV] = useState("");
+  const dr = useDragReorder(tasks, onReorder);
+  const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   const submit = () => {
     onAdd(v);
     setV("");
@@ -109,27 +142,28 @@ function Section({
         <EmptyState title="אין משימות עדיין" />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-          {tasks.map((t, i) => (
-            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, opacity: t.is_done ? 0.55 : 1 }}>
-              <button className={`nst-check ${t.is_done ? "on" : ""}`} onClick={() => onToggle(t)}>
-                <Check size={14} />
-              </button>
-              <span style={{ flex: 1, font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: t.is_done ? "line-through" : "none" }}>{t.title}</span>
-              {tasks.length > 1 && (
-                <span style={{ display: "flex", flexDirection: "column" }}>
-                  <button className="reorder-btn" disabled={i === 0} onClick={() => onMove(t.id, "up")}>
-                    <ChevronUp size={14} />
+          {dr.order.map((id) => {
+            const t = byId.get(id);
+            if (!t) return null;
+            return (
+              <div key={t.id} ref={dr.setItemRef(t.id)} style={{ display: "flex", alignItems: "center", gap: 8, opacity: t.is_done ? 0.55 : 1, ...dr.itemStyle(t.id) }}>
+                {tasks.length > 1 && (
+                  <span className="nst-grip" {...dr.handleProps(t.id)} title="גרירה לסידור">
+                    <GripVertical size={17} />
+                  </span>
+                )}
+                <button className={`nst-check ${t.is_done ? "on" : ""}`} onClick={() => onToggle(t)}>
+                  <Check size={14} />
+                </button>
+                <span style={{ flex: 1, font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: t.is_done ? "line-through" : "none" }}>{t.title}</span>
+                {canDelete && (
+                  <button className="nst-del" onClick={() => onRemove(t.id)}>
+                    <X size={16} />
                   </button>
-                  <button className="reorder-btn" disabled={i === tasks.length - 1} onClick={() => onMove(t.id, "down")}>
-                    <ChevronDown size={14} />
-                  </button>
-                </span>
-              )}
-              <button className="nst-del" onClick={() => onRemove(t.id)}>
-                <X size={16} />
-              </button>
-            </div>
-          ))}
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

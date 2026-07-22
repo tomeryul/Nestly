@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2, Check, WashingMachine, Wind, Shirt, ArrowLeft, X, Settings2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Plus, Trash2, Check, WashingMachine, Wind, Shirt, ArrowLeft, X, Settings2, PackageOpen, GripVertical } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
 import { startOfWeek, toISODate } from "../lib/dates";
+import { useDragReorder } from "../lib/dragReorder";
 import type { Tables } from "../types/database";
 
 type Load = Tables<"laundry_tasks">;
@@ -14,7 +15,9 @@ const STAGES = [
   { label: "הפעלת מכונה", icon: WashingMachine },
   { label: "תלייה / מייבש", icon: Wind },
   { label: "קיפול", icon: Shirt },
+  { label: "פיזור", icon: PackageOpen },
 ];
+const LAST_STAGE = STAGES.length; // completed when stage reaches this
 
 export default function Laundry() {
   const { homeId, members } = useHome();
@@ -50,7 +53,7 @@ export default function Laundry() {
     load();
   };
   const advance = async (l: Load) => {
-    await supabase.from("laundry_tasks").update({ stage: Math.min(l.stage + 1, 3) }).eq("id", l.id);
+    await supabase.from("laundry_tasks").update({ stage: Math.min(l.stage + 1, LAST_STAGE) }).eq("id", l.id);
     load();
   };
   const back = async (l: Load) => {
@@ -62,6 +65,16 @@ export default function Laundry() {
     load();
   };
   const nameFor = (uid: string | null) => members.find((m) => m.user_id === uid)?.profile?.display_name ?? "";
+
+  const persistOrder = useCallback(
+    async (ids: string[]) => {
+      await Promise.all(ids.map((id, i) => supabase.from("laundry_tasks").update({ position: i }).eq("id", id)));
+      load();
+    },
+    [load]
+  );
+  const dr = useDragReorder(loads, persistOrder);
+  const byId = useMemo(() => new Map(loads.map((l) => [l.id, l])), [loads]);
 
   if (loading) return <FullPageSpinner />;
 
@@ -105,11 +118,16 @@ export default function Laundry() {
         <EmptyState icon={<WashingMachine size={42} />} title="אין כביסות השבוע" hint="פתחו כביסה מהסוגים למעלה" />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {loads.map((l) => {
-            const doneAll = l.stage >= 3;
+          {dr.order.map((id) => {
+            const l = byId.get(id);
+            if (!l) return null;
+            const doneAll = l.stage >= LAST_STAGE;
             return (
-              <div className="nst-card" key={l.id} style={{ padding: "1rem 1.1rem", display: "flex", flexDirection: "column", gap: 12, opacity: doneAll ? 0.7 : 1 }}>
+              <div className="nst-card" key={l.id} ref={dr.setItemRef(l.id)} style={{ padding: "1rem 1.1rem", display: "flex", flexDirection: "column", gap: 12, opacity: doneAll ? 0.7 : 1, ...dr.itemStyle(l.id) }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span className="nst-grip" {...dr.handleProps(l.id)} title="גרירה לסידור">
+                    <GripVertical size={18} />
+                  </span>
                   <span style={{ width: 40, height: 40, borderRadius: 12, background: "var(--cat-7-bg)", color: "var(--cat-7-fg)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
                     <WashingMachine size={20} />
                   </span>
