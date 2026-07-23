@@ -19,6 +19,7 @@ export function useDragReorder<T extends { id: string }>(items: T[], onCommit: (
   const orderRef = useRef(order);
   orderRef.current = order;
   const draggingRef = useRef<string | null>(null);
+  const didMoveRef = useRef(false);
   const refs = useRef(new Map<string, HTMLElement>());
 
   // Keep local order synced with incoming items, but never while dragging.
@@ -55,54 +56,45 @@ export function useDragReorder<T extends { id: string }>(items: T[], onCommit: (
     if (adj === from) return;
     cur.splice(adj, 0, id);
     orderRef.current = cur;
+    didMoveRef.current = true;
     setOrder(cur);
   }, []);
 
   const handleProps = useCallback(
     (id: string) => {
+      // The handle uses touch-action:none so the browser never turns the drag
+      // into a page-scroll; we own the whole gesture from pointerdown.
       const onPointerDown = (e: ReactPointerEvent) => {
         if (e.pointerType === "mouse" && e.button !== 0) return;
-        const startY = e.clientY;
-        let activated = false;
-
-        const activate = () => {
-          activated = true;
-          draggingRef.current = id;
-          setDraggingId(id);
-          if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(12);
-        };
-        const timer = window.setTimeout(activate, 200);
+        e.preventDefault();
+        const target = e.currentTarget as HTMLElement;
+        try {
+          target.setPointerCapture(e.pointerId);
+        } catch {
+          /* older browsers */
+        }
+        draggingRef.current = id;
+        didMoveRef.current = false;
+        setDraggingId(id);
+        if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(10);
 
         const move = (ev: PointerEvent) => {
-          if (!activated) {
-            if (Math.abs(ev.clientY - startY) > 9) {
-              window.clearTimeout(timer);
-              cleanup();
-            }
-            return;
-          }
           ev.preventDefault();
           reorderTo(id, ev.clientY);
         };
-        const up = () => {
-          window.clearTimeout(timer);
-          cleanup();
-          if (activated) {
-            draggingRef.current = null;
-            setDraggingId(null);
-            onCommit(orderRef.current);
-          }
-        };
-        const cleanup = () => {
+        const finish = () => {
           window.removeEventListener("pointermove", move);
-          window.removeEventListener("pointerup", up);
-          window.removeEventListener("pointercancel", up);
+          window.removeEventListener("pointerup", finish);
+          window.removeEventListener("pointercancel", finish);
+          draggingRef.current = null;
+          setDraggingId(null);
+          if (didMoveRef.current) onCommit(orderRef.current);
         };
         window.addEventListener("pointermove", move, { passive: false });
-        window.addEventListener("pointerup", up);
-        window.addEventListener("pointercancel", up);
+        window.addEventListener("pointerup", finish);
+        window.addEventListener("pointercancel", finish);
       };
-      return { onPointerDown, style: { touchAction: "pan-y" } as CSSProperties };
+      return { onPointerDown, style: { touchAction: "none" } as CSSProperties };
     },
     [onCommit, reorderTo]
   );

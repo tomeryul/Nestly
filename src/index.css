@@ -204,7 +204,7 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .reorder-btn { border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 0 2px; line-height: 0; display: flex; }
 .reorder-btn:hover { color: var(--text-bright); }
 .reorder-btn:disabled { opacity: 0.3; cursor: default; }
-.nst-grip { border: none; background: transparent; color: var(--text-faint); cursor: grab; padding: 4px 2px; line-height: 0; display: flex; align-items: center; flex: none; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.nst-grip { border: none; background: transparent; color: var(--text-faint); cursor: grab; padding: 6px 4px; line-height: 0; display: flex; align-items: center; flex: none; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .nst-grip:active { cursor: grabbing; color: var(--text-muted); }
 .nst-dragging { transition: none !important; }
 .nst-tag { display: inline-flex; align-items: center; gap: 4px; font: 700 10px var(--font-body); text-transform: uppercase; letter-spacing: 0.04em; padding: 3px 8px; border-radius: 7px; background: var(--surface-3); color: var(--text-3); }
