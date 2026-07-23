@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Check, Sparkles, DoorOpen, X, GripVertical } from "lucide-react";
+import { Plus, Trash2, Check, Sparkles, DoorOpen, X, GripVertical, ChevronDown } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -144,6 +144,7 @@ export default function Cleaning() {
           {rooms.map((room) => (
             <RoomSection
               key={room.id}
+              collapseKey={`${tab}:${room.id}`}
               name={room.name}
               tasks={tasksByRoom.get(room.id) ?? []}
               doneIds={doneIds}
@@ -155,7 +156,7 @@ export default function Cleaning() {
             />
           ))}
           {noRoomTasks.length > 0 && (
-            <RoomSection name="ללא חדר" tasks={noRoomTasks} doneIds={doneIds} onAddTask={(title) => addTask(null, title)} onToggle={toggle} onRemoveTask={removeTask} onReorder={reorderTasks} />
+            <RoomSection collapseKey={`${tab}:none`} name="ללא חדר" tasks={noRoomTasks} doneIds={doneIds} onAddTask={(title) => addTask(null, title)} onToggle={toggle} onRemoveTask={removeTask} onReorder={reorderTasks} />
           )}
         </>
       )}
@@ -164,6 +165,7 @@ export default function Cleaning() {
 }
 
 function RoomSection({
+  collapseKey,
   name,
   tasks,
   doneIds,
@@ -173,6 +175,7 @@ function RoomSection({
   onReorder,
   onRemoveRoom,
 }: {
+  collapseKey: string;
   name: string;
   tasks: CleaningTask[];
   doneIds: Set<string>;
@@ -183,6 +186,13 @@ function RoomSection({
   onRemoveRoom?: () => void;
 }) {
   const [title, setTitle] = useState("");
+  const storageKey = `nestly.cleanCollapse.${collapseKey}`;
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(storageKey) === "1");
+  const toggleCollapsed = () =>
+    setCollapsed((c) => {
+      localStorage.setItem(storageKey, c ? "0" : "1");
+      return !c;
+    });
   const dr = useDragReorder(tasks, onReorder);
   const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   const submit = () => {
@@ -194,8 +204,11 @@ function RoomSection({
   return (
     <div className="nst-card" style={{ padding: "1rem 1.1rem", display: "flex", flexDirection: "column", gap: 9 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button onClick={toggleCollapsed} title={collapsed ? "הרחבה" : "צמצום"} style={{ border: "none", background: "transparent", cursor: "pointer", color: "var(--accent)", display: "flex", padding: 0, lineHeight: 0 }}>
+          <ChevronDown size={18} style={{ transition: "transform .15s", transform: collapsed ? "rotate(-90deg)" : "none" }} />
+        </button>
         <DoorOpen size={16} style={{ color: "var(--accent)" }} />
-        <h2 style={{ font: "600 16px var(--font-display)", color: "var(--text-bright)", margin: 0, flex: 1 }}>{name}</h2>
+        <h2 onClick={toggleCollapsed} style={{ font: "600 16px var(--font-display)", color: "var(--text-bright)", margin: 0, flex: 1, cursor: "pointer" }}>{name}</h2>
         {tasks.length > 0 && (
           <span className="badge b-wt" style={{ borderRadius: 30 }}>
             {done}/{tasks.length}
@@ -208,7 +221,9 @@ function RoomSection({
         )}
       </div>
 
-      {dr.order.map((id) => {
+      {collapsed
+        ? null
+        : dr.order.map((id) => {
         const t = byId.get(id);
         if (!t) return null;
         const isDone = doneIds.has(t.id);
@@ -230,12 +245,14 @@ function RoomSection({
         );
       })}
 
-      <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
-        <input style={{ flex: 1 }} placeholder="הוספת משימה…" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
-        <button className="btn" style={{ padding: "0 14px" }} onClick={submit}>
-          <Plus size={16} />
-        </button>
-      </div>
+      {!collapsed && (
+        <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
+          <input style={{ flex: 1 }} placeholder="הוספת משימה…" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
+          <button className="btn" style={{ padding: "0 14px" }} onClick={submit}>
+            <Plus size={16} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

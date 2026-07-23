@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter, GripVertical, Tags } from "lucide-react";
+import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter, Tags, ShoppingCart } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
 import { CATEGORIES, DAYS_HE } from "../lib/constants";
-import { useDragReorder } from "../lib/dragReorder";
 import type { Tables } from "../types/database";
 
 type Item = Tables<"shopping_items">;
@@ -136,18 +135,18 @@ export default function Shopping() {
     await supabase.from("shopping_items").delete().eq("list_id", activeList).eq("is_checked", true);
     loadItems();
   };
-  const reorderItems = useCallback(async (ids: string[]) => {
-    await Promise.all(ids.map((id, i) => supabase.from("shopping_items").update({ position: i }).eq("id", id)));
-    loadItems();
-  }, [loadItems]);
 
   if (loading && !lists.length) return <FullPageSpinner />;
-  const checkedCount = items.filter((i) => i.is_checked).length;
 
-  // when grouped, order categories by the CATEGORIES list, with any others last
+  const collator = new Intl.Collator("he");
+  const byName = (a: Item, b: Item) => collator.compare(a.name, b.name);
+  const active = items.filter((i) => !i.is_checked).sort(byName);
+  const taken = items.filter((i) => i.is_checked).sort(byName);
+
+  // when grouped, order categories by the CATEGORIES list (others last); items א־ב within each
   const groupedSections: [string, Item[]][] = (() => {
     const map = new Map<string, Item[]>();
-    for (const it of items) {
+    for (const it of active) {
       const key = it.category || "אחר";
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(it);
@@ -159,6 +158,58 @@ export default function Shopping() {
       return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
     });
   })();
+
+  const renderRow = (item: Item) => (
+    <div className="nst-row" key={item.id} style={{ opacity: item.is_checked ? 0.55 : 1 }}>
+      <button className={`nst-check ${item.is_checked ? "on" : ""}`} onClick={() => toggle(item)}>
+        <Check size={14} />
+      </button>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: item.is_checked ? "line-through" : "none" }}>{item.name}</p>
+        <div style={{ display: "flex", gap: 7, alignItems: "center", marginTop: 3, flexWrap: "wrap" }}>
+          {item.category && !grouped && <span className="nst-tag">{item.category}</span>}
+          {item.source === "recipe" && (
+            <span className="nst-tag" style={{ background: "var(--cat-3-bg)", color: "var(--cat-3-fg)" }}>
+              <ChefHat /> ממתכון
+            </span>
+          )}
+          {item.source === "recurring" && (
+            <span className="nst-tag" style={{ background: "var(--accent-soft)", color: "var(--accent-ink)" }}>
+              <Repeat /> קבוע
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="nst-stepper">
+        <button onClick={() => changeQty(item, -1)}>
+          <Minus />
+        </button>
+        <span className="val">{item.quantity}</span>
+        <button onClick={() => changeQty(item, 1)}>
+          <Plus />
+        </button>
+      </div>
+      <button className="nst-del" onClick={() => remove(item.id)}>
+        <Trash2 />
+      </button>
+    </div>
+  );
+
+  const takenSection =
+    taken.length > 0 ? (
+      <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 4px" }}>
+          <span style={{ color: "var(--text-3)", font: "700 11.5px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            <ShoppingCart size={12} style={{ verticalAlign: -2, marginInlineEnd: 4 }} /> נלקחו · {taken.length}
+          </span>
+          <span style={{ flex: 1 }} />
+          <button className="reorder-btn" style={{ color: "var(--danger)", fontSize: 12, fontWeight: 700, gap: 4, alignItems: "center" }} onClick={clearChecked}>
+            <Eraser size={14} /> ניקוי
+          </button>
+        </div>
+        {taken.map(renderRow)}
+      </div>
+    ) : null;
 
   return (
     <section className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -260,23 +311,15 @@ export default function Shopping() {
               <div style={{ margin: "0 4px 0.5rem", color: "var(--text-3)", font: "700 11.5px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                 {cat} · {catItems.length}
               </div>
-              <ItemRows items={catItems} grouped onToggle={toggle} onChangeQty={changeQty} onRemove={remove} onReorder={reorderItems} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>{catItems.map(renderRow)}</div>
             </div>
           ))}
-          {checkedCount > 0 && (
-            <button className="btn btn-block" style={{ color: "var(--danger)" }} onClick={clearChecked}>
-              <Eraser size={16} /> מחיקת {checkedCount} פריטים מסומנים
-            </button>
-          )}
+          {takenSection}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-          <ItemRows items={items} grouped={false} onToggle={toggle} onChangeQty={changeQty} onRemove={remove} onReorder={reorderItems} />
-          {checkedCount > 0 && (
-            <button className="btn btn-block" style={{ color: "var(--danger)", marginTop: 4 }} onClick={clearChecked}>
-              <Eraser size={16} /> מחיקת {checkedCount} פריטים מסומנים
-            </button>
-          )}
+          {active.map(renderRow)}
+          {takenSection}
         </div>
       )}
 
@@ -351,73 +394,6 @@ function CategoriesModal({ homeId, defaults, onClose }: { homeId: string; defaul
         ))}
       </div>
     </Modal>
-  );
-}
-
-function ItemRows({
-  items,
-  grouped,
-  onToggle,
-  onChangeQty,
-  onRemove,
-  onReorder,
-}: {
-  items: Item[];
-  grouped: boolean;
-  onToggle: (i: Item) => void;
-  onChangeQty: (i: Item, delta: number) => void;
-  onRemove: (id: string) => void;
-  onReorder: (ids: string[]) => void;
-}) {
-  const dr = useDragReorder(items, onReorder);
-  const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-      {dr.order.map((id) => {
-        const item = byId.get(id);
-        if (!item) return null;
-        return (
-          <div className="nst-row" key={item.id} ref={dr.setItemRef(item.id)} style={{ opacity: item.is_checked ? 0.55 : 1, ...dr.itemStyle(item.id) }}>
-            {items.length > 1 && (
-              <span className="nst-grip" {...dr.handleProps(item.id)} title="גרירה לסידור">
-                <GripVertical size={17} />
-              </span>
-            )}
-            <button className={`nst-check ${item.is_checked ? "on" : ""}`} onClick={() => onToggle(item)}>
-              <Check size={14} />
-            </button>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: item.is_checked ? "line-through" : "none" }}>{item.name}</p>
-              <div style={{ display: "flex", gap: 7, alignItems: "center", marginTop: 3, flexWrap: "wrap" }}>
-                {item.category && !grouped && <span className="nst-tag">{item.category}</span>}
-                {item.source === "recipe" && (
-                  <span className="nst-tag" style={{ background: "var(--cat-3-bg)", color: "var(--cat-3-fg)" }}>
-                    <ChefHat /> ממתכון
-                  </span>
-                )}
-                {item.source === "recurring" && (
-                  <span className="nst-tag" style={{ background: "var(--accent-soft)", color: "var(--accent-ink)" }}>
-                    <Repeat /> קבוע
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="nst-stepper">
-              <button onClick={() => onChangeQty(item, -1)}>
-                <Minus />
-              </button>
-              <span className="val">{item.quantity}</span>
-              <button onClick={() => onChangeQty(item, 1)}>
-                <Plus />
-              </button>
-            </div>
-            <button className="nst-del" onClick={() => onRemove(item.id)}>
-              <Trash2 />
-            </button>
-          </div>
-        );
-      })}
-    </div>
   );
 }
 
