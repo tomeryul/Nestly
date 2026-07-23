@@ -156,9 +156,12 @@ export default function Schedule() {
             setAdding(false);
             setEditTask(null);
           }}
-          onSaved={() => {
+          onSaved={(savedDate) => {
             setAdding(false);
             setEditTask(null);
+            const d = new Date(savedDate + "T00:00:00");
+            setSelected(d);
+            setWeekStart(startOfWeek(d));
             load();
           }}
         />
@@ -261,9 +264,10 @@ function MemberSelect({ value, onChange }: { value: string; onChange: (v: string
   );
 }
 
-function TaskModal({ homeId, dateIso, initial, onClose, onSaved }: { homeId: string; dateIso: string; initial?: Task | null; onClose: () => void; onSaved: () => void }) {
+function TaskModal({ homeId, dateIso, initial, onClose, onSaved }: { homeId: string; dateIso: string; initial?: Task | null; onClose: () => void; onSaved: (savedDate: string) => void }) {
   const { user } = useAuth();
   const [title, setTitle] = useState(initial?.title ?? "");
+  const [date, setDate] = useState(initial?.scheduled_date ?? dateIso);
   const [start, setStart] = useState(initial?.start_time ? initial.start_time.slice(0, 5) : "");
   const [end, setEnd] = useState(initial?.end_time ? initial.end_time.slice(0, 5) : "");
   const [category, setCategory] = useState<TaskCategory>((initial?.category as TaskCategory) ?? "general");
@@ -272,11 +276,11 @@ function TaskModal({ homeId, dateIso, initial, onClose, onSaved }: { homeId: str
   const save = async () => {
     if (!title.trim()) return;
     if (initial) {
-      await supabase.from("schedule_tasks").update({ title: title.trim(), start_time: start || null, end_time: end || null, category, assigned_to: assigned || null }).eq("id", initial.id);
+      await supabase.from("schedule_tasks").update({ title: title.trim(), scheduled_date: date, start_time: start || null, end_time: end || null, category, assigned_to: assigned || null }).eq("id", initial.id);
     } else {
-      await supabase.from("schedule_tasks").insert({ home_id: homeId, title: title.trim(), scheduled_date: dateIso, start_time: start || null, end_time: end || null, category, assigned_to: assigned || null, created_by: user?.id ?? null });
+      await supabase.from("schedule_tasks").insert({ home_id: homeId, title: title.trim(), scheduled_date: date, start_time: start || null, end_time: end || null, category, assigned_to: assigned || null, created_by: user?.id ?? null });
     }
-    onSaved();
+    onSaved(date);
   };
 
   return (
@@ -285,6 +289,10 @@ function TaskModal({ homeId, dateIso, initial, onClose, onSaved }: { homeId: str
         <div>
           <label>כותרת המשימה</label>
           <input placeholder="למשל: הוצאת זבל" value={title} onChange={(e) => setTitle(e.target.value)} />
+        </div>
+        <div>
+          <label>תאריך {initial ? "(אפשר להעביר ליום אחר)" : ""}</label>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ flex: 1 }}>
