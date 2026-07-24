@@ -27,6 +27,7 @@ export default function Cleaning() {
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [newRoom, setNewRoom] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const periodKey = useMemo(() => periodKeyFor(tab), [tab]);
 
@@ -118,31 +119,51 @@ export default function Cleaning() {
     return new Date().toLocaleDateString("he-IL", { month: "long", year: "numeric" });
   })();
 
-  const exportSheet = () => {
+  const exportSheet = async () => {
     const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] ?? c));
     const roomBlock = (title: string, list: CleaningTask[]) =>
-      list.length ? `<section class="room"><h2>${esc(title)}</h2>${list.map((t) => `<div class="task"><span class="box"></span><span>${esc(t.title)}</span></div>`).join("")}</section>` : "";
-    const body = rooms.map((r) => roomBlock(r.name, tasksByRoom.get(r.id) ?? [])).join("") + roomBlock("ללא חדר", noRoomTasks);
-    const doc = `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>דף ניקיון</title><style>
-      *{box-sizing:border-box}
-      body{font-family:-apple-system,"Segoe UI",Arial,sans-serif;color:#111;margin:0;padding:24px}
-      header{border-bottom:3px solid #111;padding-bottom:12px;margin-bottom:20px}
-      h1{font-size:24px;margin:0}
-      .date{font-size:15px;color:#444;margin-top:5px;font-weight:600}
-      .room{margin-bottom:18px;break-inside:avoid}
-      .room h2{font-size:17px;margin:0 0 8px;border-bottom:1px solid #bbb;padding-bottom:4px}
-      .task{display:flex;align-items:center;gap:11px;padding:6px 2px;font-size:15px;break-inside:avoid}
-      .box{width:18px;height:18px;border:1.6px solid #111;border-radius:4px;flex:none}
-      .empty{color:#666;font-size:14px}
-      @media print{ body{padding:0} @page{margin:14mm} }
-    </style></head><body><header><h1>דף ניקיון ${tab === "weekly" ? "שבועי" : "חודשי"}</h1><div class="date">${esc(periodLabel)}</div></header>${body || '<p class="empty">אין משימות ברשימה.</p>'}<script>window.onload=function(){setTimeout(function(){window.focus();window.print();},250)}</script></body></html>`;
-    const w = window.open("", "_blank");
-    if (!w) {
-      alert("כדי לייצא PDF יש לאפשר חלונות קופצים (popups) לאתר.");
-      return;
+      list.length
+        ? `<div style="margin-bottom:20px"><div style="font-size:18px;font-weight:700;border-bottom:1px solid #bbb;padding-bottom:5px;margin-bottom:8px">${esc(title)}</div>${list
+            .map(
+              (t) =>
+                `<div style="display:flex;align-items:center;padding:7px 2px;font-size:16px"><span style="width:20px;height:20px;border:1.6px solid #111;border-radius:4px;flex:none;display:inline-block;margin-left:12px"></span><span>${esc(t.title)}</span></div>`
+            )
+            .join("")}</div>`
+        : "";
+    const bodyHtml = rooms.map((r) => roomBlock(r.name, tasksByRoom.get(r.id) ?? [])).join("") + roomBlock("ללא חדר", noRoomTasks);
+
+    const el = document.createElement("div");
+    el.dir = "rtl";
+    el.style.cssText = "position:fixed;left:-10000px;top:0;width:794px;background:#fff;color:#111;padding:40px;font-family:Arial,'Segoe UI',sans-serif;";
+    el.innerHTML = `<div style="border-bottom:3px solid #111;padding-bottom:12px;margin-bottom:22px"><div style="font-size:26px;font-weight:700">דף ניקיון ${tab === "weekly" ? "שבועי" : "חודשי"}</div><div style="font-size:16px;color:#444;margin-top:6px;font-weight:600">${esc(periodLabel)}</div></div>${bodyHtml || '<div style="color:#666">אין משימות ברשימה.</div>'}`;
+    document.body.appendChild(el);
+    setExporting(true);
+    try {
+      const [{ jsPDF }, html2canvas] = await Promise.all([import("jspdf"), import("html2canvas").then((m) => m.default)]);
+      const canvas = await html2canvas(el, { scale: 2, backgroundColor: "#ffffff" });
+      const img = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgH = (canvas.height * pageW) / canvas.width;
+      let heightLeft = imgH;
+      let position = 0;
+      pdf.addImage(img, "PNG", 0, position, pageW, imgH);
+      heightLeft -= pageH;
+      while (heightLeft > 0) {
+        position -= pageH;
+        pdf.addPage();
+        pdf.addImage(img, "PNG", 0, position, pageW, imgH);
+        heightLeft -= pageH;
+      }
+      pdf.save(`דף-ניקיון-${tab === "weekly" ? "שבועי" : "חודשי"}.pdf`);
+    } catch (e) {
+      console.error(e);
+      alert("אירעה שגיאה בהכנת ה-PDF. נסו שוב.");
+    } finally {
+      setExporting(false);
+      document.body.removeChild(el);
     }
-    w.document.write(doc);
-    w.document.close();
   };
 
   if (loading) return <FullPageSpinner />;
@@ -151,8 +172,8 @@ export default function Cleaning() {
     <section className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <h1 className="page-title">ניקיון</h1>
-        <button className="btn btn-sm" onClick={exportSheet} title="ייצוא דף להדפסה / PDF">
-          <Printer size={15} /> ייצוא PDF
+        <button className="btn btn-sm" onClick={exportSheet} disabled={exporting} title="הורדת דף PDF להדפסה">
+          <Printer size={15} /> {exporting ? "מכין…" : "הורדת PDF"}
         </button>
       </div>
       <div className="nst-seg">
