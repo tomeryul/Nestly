@@ -123,12 +123,12 @@ export default function Cleaning() {
     const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] ?? c));
     const roomBlock = (title: string, list: CleaningTask[]) =>
       list.length
-        ? `<div style="margin-bottom:20px"><div style="font-size:18px;font-weight:700;border-bottom:1px solid #bbb;padding-bottom:5px;margin-bottom:8px">${esc(title)}</div>${list
+        ? `<div style="margin-bottom:20px"><div style="font-size:18px;font-weight:700;border-bottom:1px solid #bbb;padding-bottom:5px;margin-bottom:6px">${esc(title)}</div><table style="width:100%;border-collapse:collapse">${list
             .map(
               (t) =>
-                `<div style="padding:7px 2px;font-size:16px;line-height:22px"><span style="display:inline-block;width:18px;height:18px;border:1.6px solid #111;border-radius:4px;margin-left:12px;vertical-align:-4px"></span>${esc(t.title)}</div>`
+                `<tr><td style="width:30px;padding:7px 0;vertical-align:middle"><span style="display:inline-block;width:18px;height:18px;border:1.6px solid #111;border-radius:4px"></span></td><td style="padding:7px 10px;font-size:16px;vertical-align:middle;text-align:right">${esc(t.title)}</td></tr>`
             )
-            .join("")}</div>`
+            .join("")}</table></div>`
         : "";
     const bodyHtml = rooms.map((r) => roomBlock(r.name, tasksByRoom.get(r.id) ?? [])).join("") + roomBlock("ללא חדר", noRoomTasks);
 
