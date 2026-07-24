@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Check, Sparkles, DoorOpen, X, GripVertical, ChevronDown } from "lucide-react";
+import { Plus, Trash2, Check, Sparkles, DoorOpen, X, GripVertical, ChevronDown, Printer } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { EmptyState, FullPageSpinner } from "../components/ui";
-import { startOfWeek, toISODate } from "../lib/dates";
+import { startOfWeek, toISODate, addDays, formatDayMonth } from "../lib/dates";
 import { useDragReorder } from "../lib/dragReorder";
 import { bgWrite, newId } from "../lib/optimistic";
 import type { Tables } from "../types/database";
@@ -110,11 +110,51 @@ export default function Cleaning() {
   const doneCount = tasks.filter((t) => doneIds.has(t.id)).length;
   const noRoomTasks = tasksByRoom.get("__none__") ?? [];
 
+  const periodLabel = (() => {
+    if (tab === "weekly") {
+      const s = startOfWeek(new Date());
+      return `שבוע ${formatDayMonth(s)} – ${formatDayMonth(addDays(s, 6))}`;
+    }
+    return new Date().toLocaleDateString("he-IL", { month: "long", year: "numeric" });
+  })();
+
+  const exportSheet = () => {
+    const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] ?? c));
+    const roomBlock = (title: string, list: CleaningTask[]) =>
+      list.length ? `<section class="room"><h2>${esc(title)}</h2>${list.map((t) => `<div class="task"><span class="box"></span><span>${esc(t.title)}</span></div>`).join("")}</section>` : "";
+    const body = rooms.map((r) => roomBlock(r.name, tasksByRoom.get(r.id) ?? [])).join("") + roomBlock("ללא חדר", noRoomTasks);
+    const doc = `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>דף ניקיון</title><style>
+      *{box-sizing:border-box}
+      body{font-family:-apple-system,"Segoe UI",Arial,sans-serif;color:#111;margin:0;padding:24px}
+      header{border-bottom:3px solid #111;padding-bottom:12px;margin-bottom:20px}
+      h1{font-size:24px;margin:0}
+      .date{font-size:15px;color:#444;margin-top:5px;font-weight:600}
+      .room{margin-bottom:18px;break-inside:avoid}
+      .room h2{font-size:17px;margin:0 0 8px;border-bottom:1px solid #bbb;padding-bottom:4px}
+      .task{display:flex;align-items:center;gap:11px;padding:6px 2px;font-size:15px;break-inside:avoid}
+      .box{width:18px;height:18px;border:1.6px solid #111;border-radius:4px;flex:none}
+      .empty{color:#666;font-size:14px}
+      @media print{ body{padding:0} @page{margin:14mm} }
+    </style></head><body><header><h1>דף ניקיון ${tab === "weekly" ? "שבועי" : "חודשי"}</h1><div class="date">${esc(periodLabel)}</div></header>${body || '<p class="empty">אין משימות ברשימה.</p>'}<script>window.onload=function(){setTimeout(function(){window.focus();window.print();},250)}</script></body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) {
+      alert("כדי לייצא PDF יש לאפשר חלונות קופצים (popups) לאתר.");
+      return;
+    }
+    w.document.write(doc);
+    w.document.close();
+  };
+
   if (loading) return <FullPageSpinner />;
 
   return (
     <section className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      <h1 className="page-title">ניקיון</h1>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <h1 className="page-title">ניקיון</h1>
+        <button className="btn btn-sm" onClick={exportSheet} title="ייצוא דף להדפסה / PDF">
+          <Printer size={15} /> ייצוא PDF
+        </button>
+      </div>
       <div className="nst-seg">
         <button className={tab === "weekly" ? "active" : ""} onClick={() => setTab("weekly")}>
           משימות השבוע
