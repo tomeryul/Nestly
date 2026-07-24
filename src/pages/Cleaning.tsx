@@ -126,7 +126,7 @@ export default function Cleaning() {
         ? `<div style="margin-bottom:20px"><div style="font-size:18px;font-weight:700;border-bottom:1px solid #bbb;padding-bottom:5px;margin-bottom:8px">${esc(title)}</div>${list
             .map(
               (t) =>
-                `<div style="display:flex;align-items:center;padding:7px 2px;font-size:16px"><span style="width:20px;height:20px;border:1.6px solid #111;border-radius:4px;flex:none;display:inline-block;margin-left:12px"></span><span>${esc(t.title)}</span></div>`
+                `<div style="padding:7px 2px;font-size:16px;line-height:22px"><span style="display:inline-block;width:18px;height:18px;border:1.6px solid #111;border-radius:4px;margin-left:12px;vertical-align:-4px"></span>${esc(t.title)}</div>`
             )
             .join("")}</div>`
         : "";
