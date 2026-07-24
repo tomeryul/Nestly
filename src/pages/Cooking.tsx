@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
 import { CATEGORIES, DAYS_HE, MEAL_TYPES } from "../lib/constants";
 import { addDays, formatDayMonth, startOfWeek, toISODate } from "../lib/dates";
+import { bgWrite, newId } from "../lib/optimistic";
 import type { Tables } from "../types/database";
 
 type Dish = Tables<"dishes">;
@@ -54,15 +55,17 @@ function DishesTab() {
     load();
   }, [load]);
 
-  const add = async () => {
+  const add = () => {
     if (!name.trim() || !homeId) return;
-    await supabase.from("dishes").insert({ home_id: homeId, name: name.trim(), created_by: user?.id ?? null });
+    const id = newId();
+    const row: Dish = { id, home_id: homeId, name: name.trim(), description: null, created_by: user?.id ?? null, created_at: new Date().toISOString() };
+    setDishes((prev) => [...prev, row].sort((a, b) => a.name.localeCompare(b.name, "he")));
     setName("");
-    load();
+    bgWrite(supabase.from("dishes").insert({ id, home_id: homeId, name: row.name, created_by: user?.id ?? null }), load);
   };
-  const remove = async (id: string) => {
-    await supabase.from("dishes").delete().eq("id", id);
-    load();
+  const remove = (id: string) => {
+    setDishes((prev) => prev.filter((d) => d.id !== id));
+    bgWrite(supabase.from("dishes").delete().eq("id", id), load);
   };
 
   if (loading) return <FullPageSpinner />;
@@ -240,9 +243,9 @@ function WeekTab() {
     load();
   }, [load]);
 
-  const removeMeal = async (id: string) => {
-    await supabase.from("weekly_meals").delete().eq("id", id);
-    load();
+  const removeMeal = (id: string) => {
+    setMeals((prev) => prev.filter((m) => m.id !== id));
+    bgWrite(supabase.from("weekly_meals").delete().eq("id", id), load);
   };
   const addToList = async (meal: Meal, listId: string) => {
     await supabase.rpc("add_meal_to_list", { meal_id: meal.id, list_id: listId });

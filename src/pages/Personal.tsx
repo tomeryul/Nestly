@@ -5,6 +5,7 @@ import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { EmptyState, FullPageSpinner } from "../components/ui";
 import { useDragReorder } from "../lib/dragReorder";
+import { bgWrite, newId } from "../lib/optimistic";
 import type { Tables } from "../types/database";
 
 type PTask = Tables<"personal_tasks">;
@@ -25,26 +26,24 @@ export default function Personal() {
     load();
   }, [load]);
 
-  const add = async (scope: "personal" | "general", ownerId: string | null, title: string) => {
+  const add = (scope: "personal" | "general", ownerId: string | null, title: string) => {
     if (!title.trim() || !homeId) return;
     const siblings = tasks.filter((t) => t.scope === scope && (scope === "general" || t.owner_id === ownerId));
-    await supabase.from("personal_tasks").insert({
-      home_id: homeId,
-      scope,
-      owner_id: scope === "personal" ? ownerId : null,
-      title: title.trim(),
-      position: siblings.length,
-      created_by: user?.id ?? null,
-    });
-    load();
+    const id = newId();
+    const row: PTask = {
+      id, home_id: homeId, scope, owner_id: scope === "personal" ? ownerId : null, title: title.trim(),
+      is_done: false, position: siblings.length, due_date: null, created_by: user?.id ?? null, created_at: new Date().toISOString(),
+    };
+    setTasks((prev) => [...prev, row]);
+    bgWrite(supabase.from("personal_tasks").insert({ id, home_id: homeId, scope, owner_id: row.owner_id, title: row.title, position: row.position, created_by: user?.id ?? null }), load);
   };
-  const toggle = async (t: PTask) => {
-    await supabase.from("personal_tasks").update({ is_done: !t.is_done }).eq("id", t.id);
-    load();
+  const toggle = (t: PTask) => {
+    setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, is_done: !x.is_done } : x)));
+    bgWrite(supabase.from("personal_tasks").update({ is_done: !t.is_done }).eq("id", t.id), load);
   };
-  const remove = async (id: string) => {
-    await supabase.from("personal_tasks").delete().eq("id", id);
-    load();
+  const remove = (id: string) => {
+    setTasks((prev) => prev.filter((x) => x.id !== id));
+    bgWrite(supabase.from("personal_tasks").delete().eq("id", id), load);
   };
   const reorder = useCallback(
     async (ids: string[]) => {

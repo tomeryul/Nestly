@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { EmptyState, FullPageSpinner } from "../components/ui";
 import { startOfWeek, toISODate } from "../lib/dates";
 import { useDragReorder } from "../lib/dragReorder";
+import { bgWrite, newId } from "../lib/optimistic";
 import type { Tables } from "../types/database";
 
 type CleaningTask = Tables<"cleaning_tasks">;
@@ -51,32 +52,43 @@ export default function Cleaning() {
     load();
   }, [load]);
 
-  const addRoom = async () => {
+  const addRoom = () => {
     if (!newRoom.trim() || !homeId) return;
-    await supabase.from("cleaning_rooms").insert({ home_id: homeId, name: newRoom.trim(), frequency: tab, position: rooms.length });
+    const id = newId();
+    const row: Room = { id, home_id: homeId, name: newRoom.trim(), frequency: tab, position: rooms.length, created_at: new Date().toISOString() };
+    setRooms((prev) => [...prev, row]);
     setNewRoom("");
-    load();
+    bgWrite(supabase.from("cleaning_rooms").insert({ id, home_id: homeId, name: row.name, frequency: tab, position: row.position }), load);
   };
-  const removeRoom = async (id: string) => {
-    await supabase.from("cleaning_rooms").delete().eq("id", id);
-    load();
+  const removeRoom = (id: string) => {
+    setRooms((prev) => prev.filter((r) => r.id !== id));
+    setTasks((prev) => prev.filter((t) => t.room_id !== id));
+    bgWrite(supabase.from("cleaning_rooms").delete().eq("id", id), load);
   };
-  const addTask = async (roomId: string | null, title: string) => {
+  const addTask = (roomId: string | null, title: string) => {
     if (!title.trim() || !homeId) return;
-    await supabase.from("cleaning_tasks").insert({ home_id: homeId, title: title.trim(), room_id: roomId, frequency: tab, created_by: user?.id ?? null });
-    load();
+    const id = newId();
+    const row: CleaningTask = { id, home_id: homeId, title: title.trim(), room_id: roomId, room: null, frequency: tab, position: tasks.length, assigned_to: null, created_by: user?.id ?? null, created_at: new Date().toISOString() };
+    setTasks((prev) => [...prev, row]);
+    bgWrite(supabase.from("cleaning_tasks").insert({ id, home_id: homeId, title: row.title, room_id: roomId, frequency: tab, created_by: user?.id ?? null }), load);
   };
-  const toggle = async (t: CleaningTask) => {
-    if (doneIds.has(t.id)) {
-      await supabase.from("cleaning_completions").delete().eq("cleaning_task_id", t.id).eq("period_key", periodKey);
+  const toggle = (t: CleaningTask) => {
+    const has = doneIds.has(t.id);
+    setDoneIds((prev) => {
+      const n = new Set(prev);
+      if (has) n.delete(t.id);
+      else n.add(t.id);
+      return n;
+    });
+    if (has) {
+      bgWrite(supabase.from("cleaning_completions").delete().eq("cleaning_task_id", t.id).eq("period_key", periodKey), load);
     } else {
-      await supabase.from("cleaning_completions").insert({ cleaning_task_id: t.id, home_id: t.home_id, period_key: periodKey, done_by: user?.id ?? null });
+      bgWrite(supabase.from("cleaning_completions").insert({ cleaning_task_id: t.id, home_id: t.home_id, period_key: periodKey, done_by: user?.id ?? null }), load);
     }
-    load();
   };
-  const removeTask = async (id: string) => {
-    await supabase.from("cleaning_tasks").delete().eq("id", id);
-    load();
+  const removeTask = (id: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    bgWrite(supabase.from("cleaning_tasks").delete().eq("id", id), load);
   };
   const reorderTasks = useCallback(
     async (ids: string[]) => {

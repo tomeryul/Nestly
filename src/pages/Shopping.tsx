@@ -5,6 +5,7 @@ import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
 import { CATEGORIES, DAYS_HE } from "../lib/constants";
+import { bgWrite, newId } from "../lib/optimistic";
 import type { Tables } from "../types/database";
 
 type Item = Tables<"shopping_items">;
@@ -109,31 +110,41 @@ export default function Shopping() {
     };
   }, [activeList, loadItems]);
 
-  const addItem = async () => {
+  const addItem = () => {
     if (!name.trim() || !homeId || !activeList) return;
-    await supabase.from("shopping_items").insert({ list_id: activeList, home_id: homeId, name: name.trim(), quantity: qty, category, source: "manual", position: items.length, created_by: user?.id ?? null });
+    const id = newId();
+    const row: Item = {
+      id, list_id: activeList, home_id: homeId, name: name.trim(), quantity: qty, category,
+      source: "manual", is_checked: false, position: items.length, created_by: user?.id ?? null,
+      created_at: new Date().toISOString(), dish_id: null, note: null, unit: null,
+    };
+    setItems((prev) => [...prev, row]);
     setName("");
     setQty(1);
     setFocused(false);
-    loadItems();
+    bgWrite(
+      supabase.from("shopping_items").insert({ id, list_id: activeList, home_id: homeId, name: row.name, quantity: row.quantity, category, source: "manual", position: row.position, created_by: user?.id ?? null }),
+      loadItems
+    );
     loadCatalog();
   };
-  const toggle = async (item: Item) => {
-    await supabase.from("shopping_items").update({ is_checked: !item.is_checked }).eq("id", item.id);
-    loadItems();
+  const toggle = (item: Item) => {
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, is_checked: !i.is_checked } : i)));
+    bgWrite(supabase.from("shopping_items").update({ is_checked: !item.is_checked }).eq("id", item.id), loadItems);
   };
-  const changeQty = async (item: Item, delta: number) => {
-    await supabase.from("shopping_items").update({ quantity: Math.max(1, item.quantity + delta) }).eq("id", item.id);
-    loadItems();
+  const changeQty = (item: Item, delta: number) => {
+    const quantity = Math.max(1, item.quantity + delta);
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, quantity } : i)));
+    bgWrite(supabase.from("shopping_items").update({ quantity }).eq("id", item.id), loadItems);
   };
-  const remove = async (id: string) => {
-    await supabase.from("shopping_items").delete().eq("id", id);
-    loadItems();
+  const remove = (id: string) => {
+    setItems((prev) => prev.filter((i) => i.id !== id));
+    bgWrite(supabase.from("shopping_items").delete().eq("id", id), loadItems);
   };
-  const clearChecked = async () => {
+  const clearChecked = () => {
     if (!activeList) return;
-    await supabase.from("shopping_items").delete().eq("list_id", activeList).eq("is_checked", true);
-    loadItems();
+    setItems((prev) => prev.filter((i) => !i.is_checked));
+    bgWrite(supabase.from("shopping_items").delete().eq("list_id", activeList).eq("is_checked", true), loadItems);
   };
 
   if (loading && !lists.length) return <FullPageSpinner />;

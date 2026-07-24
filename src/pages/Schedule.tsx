@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
 import { DAYS_HE, DAYS_HE_SHORT, TASK_CATEGORIES, type TaskCategory } from "../lib/constants";
 import { addDays, formatTime, isToday, startOfWeek, toISODate, weekDates } from "../lib/dates";
+import { bgWrite, newId } from "../lib/optimistic";
 import type { Tables } from "../types/database";
 
 type Task = Tables<"schedule_tasks">;
@@ -56,13 +57,13 @@ export default function Schedule() {
   const dayTasks = tasks.filter((t) => t.scheduled_date === selectedIso).sort((a, b) => (a.start_time ?? "99").localeCompare(b.start_time ?? "99"));
   const countFor = (iso: string) => tasks.filter((t) => t.scheduled_date === iso).length;
 
-  const toggle = async (t: Task) => {
-    await supabase.from("schedule_tasks").update({ is_done: !t.is_done }).eq("id", t.id);
-    load();
+  const toggle = (t: Task) => {
+    setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, is_done: !x.is_done } : x)));
+    bgWrite(supabase.from("schedule_tasks").update({ is_done: !t.is_done }).eq("id", t.id), load);
   };
-  const remove = async (id: string) => {
-    await supabase.from("schedule_tasks").delete().eq("id", id);
-    load();
+  const remove = (id: string) => {
+    setTasks((prev) => prev.filter((x) => x.id !== id));
+    bgWrite(supabase.from("schedule_tasks").delete().eq("id", id), load);
   };
 
   if (loading) return <FullPageSpinner />;
@@ -196,19 +197,21 @@ function TaskDetailModal({ task, onEdit, onClose }: { task: Task; onEdit: (t: Ta
     load();
   }, [load]);
 
-  const add = async () => {
+  const add = () => {
     if (!title.trim()) return;
-    await supabase.from("task_subtasks").insert({ task_id: task.id, home_id: task.home_id, title: title.trim(), position: subs.length });
+    const id = newId();
+    const row: Tables<"task_subtasks"> = { id, task_id: task.id, home_id: task.home_id, title: title.trim(), is_done: false, position: subs.length, created_at: new Date().toISOString() };
+    setSubs((prev) => [...prev, row]);
     setTitle("");
-    load();
+    bgWrite(supabase.from("task_subtasks").insert({ id, task_id: task.id, home_id: task.home_id, title: row.title, position: row.position }), load);
   };
-  const toggle = async (s: Tables<"task_subtasks">) => {
-    await supabase.from("task_subtasks").update({ is_done: !s.is_done }).eq("id", s.id);
-    load();
+  const toggle = (s: Tables<"task_subtasks">) => {
+    setSubs((prev) => prev.map((x) => (x.id === s.id ? { ...x, is_done: !x.is_done } : x)));
+    bgWrite(supabase.from("task_subtasks").update({ is_done: !s.is_done }).eq("id", s.id), load);
   };
-  const remove = async (id: string) => {
-    await supabase.from("task_subtasks").delete().eq("id", id);
-    load();
+  const remove = (id: string) => {
+    setSubs((prev) => prev.filter((x) => x.id !== id));
+    bgWrite(supabase.from("task_subtasks").delete().eq("id", id), load);
   };
 
   const done = subs.filter((s) => s.is_done).length;

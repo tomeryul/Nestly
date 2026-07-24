@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
 import { startOfWeek, toISODate } from "../lib/dates";
 import { useDragReorder } from "../lib/dragReorder";
+import { bgWrite, newId } from "../lib/optimistic";
 import type { Tables } from "../types/database";
 
 type Load = Tables<"laundry_tasks">;
@@ -47,22 +48,26 @@ export default function Laundry() {
     if (user && !assignee) setAssignee(user.id);
   }, [user, assignee]);
 
-  const addLoad = async (name: string) => {
+  const addLoad = (name: string) => {
     if (!name.trim() || !homeId) return;
-    await supabase.from("laundry_tasks").insert({ home_id: homeId, name: name.trim(), week_start: weekStart, assigned_to: assignee || null, stage: 0, position: loads.length, created_by: user?.id ?? null });
-    load();
+    const id = newId();
+    const row: Load = { id, home_id: homeId, name: name.trim(), week_start: weekStart, assigned_to: assignee || null, stage: 0, position: loads.length, created_by: user?.id ?? null, created_at: new Date().toISOString() };
+    setLoads((prev) => [...prev, row]);
+    bgWrite(supabase.from("laundry_tasks").insert({ id, home_id: homeId, name: row.name, week_start: weekStart, assigned_to: assignee || null, stage: 0, position: row.position, created_by: user?.id ?? null }), load);
   };
-  const advance = async (l: Load) => {
-    await supabase.from("laundry_tasks").update({ stage: Math.min(l.stage + 1, LAST_STAGE) }).eq("id", l.id);
-    load();
+  const advance = (l: Load) => {
+    const stage = Math.min(l.stage + 1, LAST_STAGE);
+    setLoads((prev) => prev.map((x) => (x.id === l.id ? { ...x, stage } : x)));
+    bgWrite(supabase.from("laundry_tasks").update({ stage }).eq("id", l.id), load);
   };
-  const back = async (l: Load) => {
-    await supabase.from("laundry_tasks").update({ stage: Math.max(l.stage - 1, 0) }).eq("id", l.id);
-    load();
+  const back = (l: Load) => {
+    const stage = Math.max(l.stage - 1, 0);
+    setLoads((prev) => prev.map((x) => (x.id === l.id ? { ...x, stage } : x)));
+    bgWrite(supabase.from("laundry_tasks").update({ stage }).eq("id", l.id), load);
   };
-  const removeLoad = async (id: string) => {
-    await supabase.from("laundry_tasks").delete().eq("id", id);
-    load();
+  const removeLoad = (id: string) => {
+    setLoads((prev) => prev.filter((l) => l.id !== id));
+    bgWrite(supabase.from("laundry_tasks").delete().eq("id", id), load);
   };
   const nameFor = (uid: string | null) => members.find((m) => m.user_id === uid)?.profile?.display_name ?? "";
 
