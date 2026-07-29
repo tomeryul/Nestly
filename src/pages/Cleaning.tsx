@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Check, Sparkles, DoorOpen, X, GripVertical, ChevronDown, Printer } from "lucide-react";
+import { Plus, Trash2, Check, Sparkles, DoorOpen, X, GripVertical, ChevronDown, Printer, Pencil } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -65,6 +65,12 @@ export default function Cleaning() {
     setRooms((prev) => prev.filter((r) => r.id !== id));
     setTasks((prev) => prev.filter((t) => t.room_id !== id));
     bgWrite(supabase.from("cleaning_rooms").delete().eq("id", id), load);
+  };
+  const renameRoom = (id: string, name: string) => {
+    const n = name.trim();
+    if (!n) return;
+    setRooms((prev) => prev.map((r) => (r.id === id ? { ...r, name: n } : r)));
+    bgWrite(supabase.from("cleaning_rooms").update({ name: n }).eq("id", id), load);
   };
   const addTask = (roomId: string | null, title: string) => {
     if (!title.trim() || !homeId) return;
@@ -226,6 +232,7 @@ export default function Cleaning() {
               onRemoveTask={removeTask}
               onReorder={reorderTasks}
               onRemoveRoom={() => removeRoom(room.id)}
+              onRename={(name) => renameRoom(room.id, name)}
             />
           ))}
           {noRoomTasks.length > 0 && (
@@ -247,6 +254,7 @@ function RoomSection({
   onRemoveTask,
   onReorder,
   onRemoveRoom,
+  onRename,
 }: {
   collapseKey: string;
   name: string;
@@ -257,8 +265,11 @@ function RoomSection({
   onRemoveTask: (id: string) => void;
   onReorder: (ids: string[]) => void;
   onRemoveRoom?: () => void;
+  onRename?: (name: string) => void;
 }) {
   const [title, setTitle] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(name);
   const storageKey = `nestly.cleanCollapse.${collapseKey}`;
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(storageKey) === "1");
   const toggleCollapsed = () =>
@@ -272,6 +283,14 @@ function RoomSection({
     onAddTask(title);
     setTitle("");
   };
+  const startEdit = () => {
+    setDraft(name);
+    setEditing(true);
+  };
+  const saveEdit = () => {
+    if (draft.trim() && draft.trim() !== name) onRename?.(draft);
+    setEditing(false);
+  };
   const done = tasks.filter((t) => doneIds.has(t.id)).length;
 
   return (
@@ -281,16 +300,41 @@ function RoomSection({
           <ChevronDown size={18} style={{ transition: "transform .15s", transform: collapsed ? "rotate(-90deg)" : "none" }} />
         </button>
         <DoorOpen size={16} style={{ color: "var(--accent)" }} />
-        <h2 onClick={toggleCollapsed} style={{ font: "600 16px var(--font-display)", color: "var(--text-bright)", margin: 0, flex: 1, cursor: "pointer" }}>{name}</h2>
-        {tasks.length > 0 && (
-          <span className="badge b-wt" style={{ borderRadius: 30 }}>
-            {done}/{tasks.length}
-          </span>
-        )}
-        {onRemoveRoom && (
-          <button className="nst-del" onClick={onRemoveRoom} title="מחיקת חדר">
-            <Trash2 size={16} />
-          </button>
+        {editing ? (
+          <>
+            <input
+              autoFocus
+              style={{ flex: 1, font: "600 15px var(--font-body)" }}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") saveEdit();
+                if (e.key === "Escape") setEditing(false);
+              }}
+            />
+            <button className="nst-check on" onClick={saveEdit} title="שמירה">
+              <Check size={14} />
+            </button>
+          </>
+        ) : (
+          <>
+            <h2 onClick={toggleCollapsed} style={{ font: "600 16px var(--font-display)", color: "var(--text-bright)", margin: 0, flex: 1, cursor: "pointer" }}>{name}</h2>
+            {tasks.length > 0 && (
+              <span className="badge b-wt" style={{ borderRadius: 30 }}>
+                {done}/{tasks.length}
+              </span>
+            )}
+            {onRename && (
+              <button className="nst-del" onClick={startEdit} title="עריכת שם החדר">
+                <Pencil size={15} />
+              </button>
+            )}
+            {onRemoveRoom && (
+              <button className="nst-del" onClick={onRemoveRoom} title="מחיקת חדר">
+                <Trash2 size={16} />
+              </button>
+            )}
+          </>
         )}
       </div>
 
