@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Check, X, User, Globe, GripVertical } from "lucide-react";
+import { Plus, Check, X, User, Globe, GripVertical, Pencil } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -45,6 +45,12 @@ export default function Personal() {
     setTasks((prev) => prev.filter((x) => x.id !== id));
     bgWrite(supabase.from("personal_tasks").delete().eq("id", id), load);
   };
+  const rename = (id: string, title: string) => {
+    const n = title.trim();
+    if (!n) return;
+    setTasks((prev) => prev.map((x) => (x.id === id ? { ...x, title: n } : x)));
+    bgWrite(supabase.from("personal_tasks").update({ title: n }).eq("id", id), load);
+  };
   const reorder = useCallback(
     async (ids: string[]) => {
       await Promise.all(ids.map((id, i) => supabase.from("personal_tasks").update({ position: i }).eq("id", id)));
@@ -77,6 +83,7 @@ export default function Personal() {
             onAdd={(v) => add("personal", m.user_id, v)}
             onToggle={toggle}
             onRemove={remove}
+            onRename={rename}
             onReorder={reorder}
           />
         );
@@ -91,6 +98,7 @@ export default function Personal() {
         onAdd={(v) => add("general", null, v)}
         onToggle={toggle}
         onRemove={remove}
+        onRename={rename}
         onReorder={reorder}
       />
     </section>
@@ -106,6 +114,7 @@ function Section({
   onAdd,
   onToggle,
   onRemove,
+  onRename,
   onReorder,
 }: {
   title: string;
@@ -116,14 +125,25 @@ function Section({
   onAdd: (v: string) => void;
   onToggle: (t: PTask) => void;
   onRemove: (id: string) => void;
+  onRename: (id: string, title: string) => void;
   onReorder: (ids: string[]) => void;
 }) {
   const [v, setV] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
   const dr = useDragReorder(tasks, onReorder);
   const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   const submit = () => {
     onAdd(v);
     setV("");
+  };
+  const startEdit = (t: PTask) => {
+    setDraft(t.title);
+    setEditingId(t.id);
+  };
+  const saveEdit = (t: PTask) => {
+    if (draft.trim() && draft.trim() !== t.title) onRename(t.id, draft);
+    setEditingId(null);
   };
   return (
     <div className="nst-card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -146,19 +166,47 @@ function Section({
             if (!t) return null;
             return (
               <div key={t.id} ref={dr.setItemRef(t.id)} style={{ display: "flex", alignItems: "center", gap: 8, opacity: t.is_done ? 0.55 : 1, ...dr.itemStyle(t.id) }}>
-                {tasks.length > 1 && (
-                  <span className="nst-grip" {...dr.handleProps(t.id)} title="גרירה לסידור">
-                    <GripVertical size={17} />
-                  </span>
-                )}
-                <button className={`nst-check ${t.is_done ? "on" : ""}`} onClick={() => onToggle(t)}>
-                  <Check size={14} />
-                </button>
-                <span style={{ flex: 1, font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: t.is_done ? "line-through" : "none" }}>{t.title}</span>
-                {canDelete && (
-                  <button className="nst-del" onClick={() => onRemove(t.id)}>
-                    <X size={16} />
-                  </button>
+                {editingId === t.id ? (
+                  <>
+                    <input
+                      autoFocus
+                      style={{ flex: 1, font: "600 14px var(--font-body)" }}
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveEdit(t);
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                    />
+                    <button className="nst-check on" onClick={() => saveEdit(t)} title="שמירה">
+                      <Check size={14} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {tasks.length > 1 && (
+                      <span className="nst-grip" {...dr.handleProps(t.id)} title="גרירה לסידור">
+                        <GripVertical size={17} />
+                      </span>
+                    )}
+                    <button className={`nst-check ${t.is_done ? "on" : ""}`} onClick={() => onToggle(t)}>
+                      <Check size={14} />
+                    </button>
+                    <span
+                      onClick={() => startEdit(t)}
+                      style={{ flex: 1, font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: t.is_done ? "line-through" : "none", cursor: "pointer" }}
+                    >
+                      {t.title}
+                    </span>
+                    <button className="nst-del" onClick={() => startEdit(t)} title="עריכה">
+                      <Pencil size={14} />
+                    </button>
+                    {canDelete && (
+                      <button className="nst-del" onClick={() => onRemove(t.id)}>
+                        <X size={16} />
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             );
