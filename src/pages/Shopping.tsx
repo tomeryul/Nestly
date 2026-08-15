@@ -152,6 +152,21 @@ export default function Shopping() {
 
   const addItem = () => {
     if (!name.trim() || !homeId || !activeList) return;
+
+    // Never create a second row for something already on the list. If it was
+    // already bought, tick it back on instead; if it is still pending, leave it.
+    const existing = items.find((i) => i.name.trim().toLowerCase() === name.trim().toLowerCase());
+    if (existing) {
+      if (existing.is_checked) {
+        setItems((prev) => prev.map((i) => (i.id === existing.id ? { ...i, is_checked: false } : i)));
+        bgWrite(supabase.from("shopping_items").update({ is_checked: false }).eq("id", existing.id), loadItems);
+      }
+      setName("");
+      setQty(1);
+      setFocused(false);
+      return;
+    }
+
     const id = newId();
     const row: Item = {
       id, list_id: activeList, home_id: homeId, name: name.trim(), quantity: qty, category,
@@ -328,6 +343,18 @@ export default function Shopping() {
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
+                    // Already on the list: don't duplicate it. Un-tick it if it was
+                    // bought, otherwise leave it exactly as it is.
+                    if (cur) {
+                      if (cur.is_checked) {
+                        setItems((prev) => prev.map((i) => (i.id === cur.id ? { ...i, is_checked: false } : i)));
+                        bgWrite(supabase.from("shopping_items").update({ is_checked: false }).eq("id", cur.id), loadItems);
+                      }
+                      setName("");
+                      setQty(1);
+                      setFocused(false);
+                      return;
+                    }
                     setName(s.name);
                     setQty(s.quantity);
                     if (s.category) setCategory(s.category);
@@ -340,9 +367,9 @@ export default function Shopping() {
                   {!s.builtin && <span className="nst-tag">×{s.quantity}</span>}
                   {cur &&
                     (cur.is_checked ? (
-                      <span className="nst-tag" style={{ background: "var(--ok-soft)", color: "var(--ok)" }}>נקנה</span>
+                      <span className="nst-tag" style={{ background: "var(--ok-soft)", color: "var(--ok)" }}>נקנה · החזרה לרשימה</span>
                     ) : (
-                      <span className="nst-tag" style={{ background: "var(--accent-soft)", color: "var(--accent-ink)" }}>ברשימה</span>
+                      <span className="nst-tag" style={{ background: "var(--accent-soft)", color: "var(--accent-ink)" }}>כבר ברשימה</span>
                     ))}
                 </button>
               );
@@ -390,12 +417,13 @@ export default function Shopping() {
             <div className="next-action-kicker">קינג סטור{storeName ? ` · ${storeName}` : ""}</div>
             <div className="next-action-title">
               הערכת עלות: ₪
-              {items
+              {active
                 .reduce((sum, i) => sum + (priceMap[i.name.trim()]?.price ?? 0) * i.quantity, 0)
                 .toFixed(2)}
             </div>
             <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
-              {items.filter((i) => priceMap[i.name.trim()]).length}/{items.length} מוצרים נמצאו · מחירים רשמיים
+              {active.filter((i) => priceMap[i.name.trim()]).length}/{active.length} מוצרים שנותרו לקנות
+              {taken.length > 0 ? ` · ${taken.length} שנקנו לא נספרים` : ""}
             </div>
           </div>
           <button className="btn btn-sm" onClick={() => setShowStores(true)}>
