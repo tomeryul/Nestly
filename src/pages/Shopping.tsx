@@ -35,6 +35,8 @@ export default function Shopping() {
   const [pricing, setPricing] = useState(false);
   const [showStores, setShowStores] = useState(false);
   const [priceErr, setPriceErr] = useState("");
+  const [priceOptions, setPriceOptions] = useState<Record<string, PriceItem[]>>({});
+  const [pickFor, setPickFor] = useState<string | null>(null);
   const [storeName, setStoreNameState] = useState(getStoreName());
 
   const loadPrices = async (list: Item[]) => {
@@ -47,9 +49,10 @@ export default function Shopping() {
     setPriceErr("");
     try {
       const names = [...new Set(list.map((i) => i.name.trim()))];
-      const res = await priceMany(storeId, names);
-      setPriceMap(res);
-      if (Object.values(res).every((v) => !v)) setPriceErr("לא נמצאו התאמות למוצרים ברשימה בסניף שנבחר.");
+      const { matches, options } = await priceMany(storeId, names);
+      setPriceMap(matches);
+      setPriceOptions(options);
+      if (Object.values(matches).every((v) => !v)) setPriceErr("לא נמצאו התאמות למוצרים ברשימה בסניף שנבחר.");
     } catch (e) {
       setPriceErr(`שגיאה בטעינת מחירים: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -216,10 +219,19 @@ export default function Shopping() {
         <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: item.is_checked ? "line-through" : "none" }}>{item.name}</p>
         <div style={{ display: "flex", gap: 7, alignItems: "center", marginTop: 3, flexWrap: "wrap" }}>
           {priceMap[item.name.trim()] && (
-            <span className="nst-tag" style={{ background: "var(--ok-soft)", color: "var(--ok)" }} title={priceMap[item.name.trim()]!.name}>
-              ₪{(priceMap[item.name.trim()]!.price * item.quantity).toFixed(2)}
-              {item.quantity > 1 ? ` (₪${priceMap[item.name.trim()]!.price.toFixed(2)} ליח׳)` : ""}
-            </span>
+            <button
+              onClick={() => setPickFor(item.name.trim())}
+              title="הקישו להחלפת המוצר שזוהה"
+              style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "none", background: "transparent", padding: 0, cursor: "pointer", maxWidth: "100%" }}
+            >
+              <span className="nst-tag" style={{ background: "var(--ok-soft)", color: "var(--ok)" }}>
+                ₪{(priceMap[item.name.trim()]!.price * item.quantity).toFixed(2)}
+                {item.quantity > 1 ? ` (₪${priceMap[item.name.trim()]!.price.toFixed(2)} ליח׳)` : ""}
+              </span>
+              <span style={{ fontSize: 10.5, color: "var(--text-muted)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 150 }}>
+                {priceMap[item.name.trim()]!.name}
+              </span>
+            </button>
           )}
           {item.category && !grouped && <span className="nst-tag">{item.category}</span>}
           {item.source === "recipe" && (
@@ -426,6 +438,33 @@ export default function Shopping() {
       )}
       {showRecurring && <RecurringModal homeId={homeId!} lists={lists} onClose={() => setShowRecurring(false)} />}
       {showCats && <CategoriesModal homeId={homeId!} defaults={[...CATEGORIES]} onClose={() => { setShowCats(false); loadCats(); }} />}
+      {pickFor && (
+        <Modal open onClose={() => setPickFor(null)} title={`איזה מוצר? · ${pickFor}`}>
+          {(priceOptions[pickFor] ?? []).length === 0 ? (
+            <p className="section-sub">לא נמצאו חלופות למוצר הזה בסניף.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {(priceOptions[pickFor] ?? []).map((o) => {
+                const chosen = priceMap[pickFor]?.code === o.code;
+                return (
+                  <button
+                    key={o.code + o.name}
+                    className="btn btn-block"
+                    style={{ justifyContent: "space-between", ...(chosen ? { boxShadow: "inset 0 0 0 2px var(--accent)" } : {}) }}
+                    onClick={() => {
+                      setPriceMap((p) => ({ ...p, [pickFor]: o }));
+                      setPickFor(null);
+                    }}
+                  >
+                    <span style={{ textAlign: "right", flex: 1, minWidth: 0 }}>{o.name}</span>
+                    <span className="nst-tag" style={{ background: "var(--ok-soft)", color: "var(--ok)" }}>₪{o.price.toFixed(2)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </Modal>
+      )}
       {showStores && (
         <StorePickerModal
           onClose={() => setShowStores(false)}

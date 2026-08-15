@@ -23,13 +23,19 @@ const cors = {
 type Item = { code: string; name: string; price: number; unit: string; manufacturer: string };
 type FileRow = { FileNm: string; Store: string; TypeFile: string };
 
-// Cached per isolate; warm invocations answer without re-downloading.
-const cache = new Map<string, { at: number; items: Item[] }>();
+// Cached per isolate; warm invocations answer without re-downloading or re-indexing.
+const cache = new Map<string, { at: number; index: Index }>();
 let filesCache: { at: number; rows: FileRow[] } | null = null;
 
+/**
+ * WFileType=4 lists the daily *full* catalogue ("PriceFull…", ~5k items per
+ * branch). The unfiltered listing is dominated by hourly delta files that carry
+ * only a few hundred changed items — using those made most of a shopping list
+ * look unavailable.
+ */
 async function listFiles(): Promise<FileRow[]> {
   if (filesCache && Date.now() - filesCache.at < TTL_MS) return filesCache.rows;
-  const res = await fetch(`${BASE}/MainIO_Hok.aspx`, { headers: { "User-Agent": UA } });
+  const res = await fetch(`${BASE}/MainIO_Hok.aspx?WFileType=4`, { headers: { "User-Agent": UA } });
   if (!res.ok) throw new Error(`file list failed: ${res.status}`);
   const rows = (await res.json()) as FileRow[];
   filesCache = { at: Date.now(), rows };
@@ -56,18 +62,27 @@ async function stores() {
     .sort((a, b) => a.name.localeCompare(b.name, "he"));
 }
 
+const ENTITIES: Record<string, string> = { amp: "&", quot: '"', apos: "'", lt: "<", gt: ">", nbsp: " " };
+const decode = (s: string) =>
+  s.replace(/&(#\d+|#x[0-9a-f]+|\w+);/gi, (m, e: string) =>
+    e[0] === "#"
+      ? String.fromCodePoint(parseInt(e[1] === "x" || e[1] === "X" ? e.slice(2) : e.slice(1), e[1] === "x" || e[1] === "X" ? 16 : 10))
+      : ENTITIES[e.toLowerCase()] ?? m
+  );
+
 const tag = (xml: string, name: string) => {
   const m = xml.match(new RegExp(`<${name}>([^<]*)</${name}>`));
-  return m ? m[1].trim() : "";
+  return m ? decode(m[1]).trim() : "";
 };
 
-async function loadStore(storeId: string): Promise<Item[]> {
+async function loadStore(storeId: string): Promise<Index> {
   const hit = cache.get(storeId);
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.items;
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.index;
 
   const rows = await listFiles();
-  // Newest price file for this branch (the list is already newest-first).
-  const row = rows.find((r) => r.TypeFile === "מחירים" && parseStore(r.Store).id === storeId);
+  // Newest full catalogue for this branch (the list is already newest-first).
+  const mine = rows.filter((r) => r.TypeFile === "מחירים" && parseStore(r.Store).id === storeId);
+  const row = mine.find((r) => r.FileNm.startsWith("PriceFull")) ?? mine[0];
   if (!row) throw new Error(`no price file for store ${storeId}`);
 
   const meta = await fetch(`${BASE}/Download.aspx?FileNm=${encodeURIComponent(row.FileNm)}`, { headers: { "User-Agent": UA } });
@@ -92,57 +107,89 @@ async function loadStore(storeId: string): Promise<Item[]> {
       manufacturer: tag(chunk, "ManufactureName"),
     });
   }
-  cache.set(storeId, { at: Date.now(), items });
-  return items;
+  const index = buildIndex(items);
+  cache.set(storeId, { at: Date.now(), index });
+  return index;
 }
 
-const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/**
- * Rank matches. Israeli product names lead with the product ("חלב תנובה 3%"),
- * so a name whose *opening words* are the query beats one that merely starts
- * with the same letters ("חלבי טבעי") or mentions it later ("פירורי לחם").
+/* ---------------- Hebrew-aware matching ----------------
+ * Shoppers type generic plurals ("עגבניות") while the catalogue lists specific
+ * singulars ("עגבניה"), so exact substring matching missed a lot. Normalise
+ * punctuation and Hebrew final letters, stem plural/feminine endings, and weigh
+ * each word by how rare it is so "קוטג" outranks the generic "גבינת".
  */
-function rank(items: Item[], query: string, out: Map<string, { item: Item; score: number }>) {
-  const terms = query.split(/\s+/).filter(Boolean);
-  const whole = new RegExp(`(^|\\s)${esc(query)}(\\s|$)`);
-  for (const item of items) {
-    const name = item.name;
-    if (!terms.every((t) => name.includes(t))) continue;
-    let score: number;
-    if (name === query) score = 200;
-    else if (name.startsWith(query + " ")) score = 150; // query is the leading word(s)
-    else if (whole.test(name)) score = 100; // appears as its own word later on
-    else if (name.startsWith(query)) score = 55; // only a prefix of a longer word
-    else score = 30;
-    score -= Math.min(name.split(/\s+/).length * 2, 12); // prefer concise names
-    const key = item.code || name;
-    const prev = out.get(key);
-    if (!prev || score > prev.score) out.set(key, { item, score });
-  }
+const FINALS: Record<string, string> = { "ך": "כ", "ם": "מ", "ן": "נ", "ף": "פ", "ץ": "צ" };
+
+function normalize(s: string) {
+  return s
+    .replace(/[׳'״"`,.\/\\*()\[\]{}+_%־–—-]/g, " ")
+    .replace(/[ךםןףץ]/g, (m) => FINALS[m])
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-function search(items: Item[], q: string, limit = 12) {
-  const query = q.trim();
-  if (!query) return [];
-  // Score the plural as typed and its singular together ("בננות" must be able to
-  // reach the plain "בננה" rather than settling for a dessert that mentions it).
-  const variants = [query];
-  const stem = query.replace(/(ות|ים)$/, "");
-  if (stem.length >= 3 && stem !== query) {
-    // "מלפפונים" -> stem "מלפפונ" -> "מלפפון" (Hebrew final letter form)
-    const FINAL: Record<string, string> = { "כ": "ך", "מ": "ם", "נ": "ן", "פ": "ף", "צ": "ץ" };
-    const last = stem[stem.length - 1];
-    variants.push(stem, stem + "ה");
-    if (FINAL[last]) variants.push(stem.slice(0, -1) + FINAL[last]);
+/** "מלפפונים"→"מלפפונ", "בננה"/"בננות"→"בננ" (no trailing-ת rule: it fuses "ביצת" with "ביצים"). */
+function stemWord(w: string) {
+  for (const suf of ["ימ", "ות", "ה"]) {
+    if (w.endsWith(suf) && w.length - suf.length >= 3) return w.slice(0, -suf.length);
+  }
+  return w;
+}
+
+const tokenize = (s: string) => normalize(s).split(" ").filter((w) => w.length > 1).map(stemWord);
+
+type Entry = { item: Item; norm: string; words: string[] };
+type Index = { entries: Entry[]; df: Map<string, number>; n: number };
+
+function buildIndex(items: Item[]): Index {
+  const entries = items.map((item) => ({ item, norm: normalize(item.name), words: tokenize(item.name) }));
+  const df = new Map<string, number>();
+  for (const e of entries) for (const w of new Set(e.words)) df.set(w, (df.get(w) ?? 0) + 1);
+  return { entries, df, n: entries.length };
+}
+
+const related = (a: string, b: string) =>
+  a === b || (a.length >= 3 && b.startsWith(a)) || (b.length >= 3 && a.startsWith(b));
+
+function search(index: Index, q: string, limit = 12): Item[] {
+  const qn = normalize(q);
+  const terms = tokenize(q);
+  if (!terms.length) return [];
+
+  // Inverse document frequency: rare words carry the meaning.
+  const weights = terms.map((t) => {
+    let rarest = index.n;
+    for (const [w, c] of index.df) if (c < rarest && related(t, w)) rarest = c;
+    return Math.log(1 + index.n / Math.max(rarest, 1));
+  });
+  const total = weights.reduce((a, b) => a + b, 0) || 1;
+
+  const scored: { item: Item; score: number; words: number }[] = [];
+  for (const entry of index.entries) {
+    let covered = 0;
+    let exact = 0;
+    let leads = false;
+    for (let i = 0; i < terms.length; i++) {
+      const at = entry.words.findIndex((w) => related(terms[i], w));
+      if (at < 0) continue;
+      covered += weights[i];
+      if (entry.words[at] === terms[i]) exact++;
+      if (i === 0 && at === 0) leads = true;
+    }
+    if (!covered) continue;
+
+    const coverage = covered / total;
+    let score = coverage * 140;
+    if (entry.norm === qn) score += 120; // the product is exactly what was typed
+    if (leads) score += 55 * (weights[0] / total); // leads with the query's word, weighted by how telling it is
+    if (coverage > 0.999) score += 40; // every word accounted for
+    score += exact * 15; // whole-word hits beat prefix hits
+    score -= Math.min(entry.words.length * 3, 24); // prefer concise names
+    scored.push({ item: entry.item, score, words: entry.words.length });
   }
 
-  const scored = new Map<string, { item: Item; score: number }>();
-  for (const v of variants) rank(items, v, scored);
-  return [...scored.values()]
-    .sort((a, b) => b.score - a.score || a.item.price - b.item.price)
-    .slice(0, limit)
-    .map((s) => s.item);
+  scored.sort((a, b) => b.score - a.score || a.words - b.words || a.item.price - b.item.price);
+  return scored.slice(0, limit).map((s) => s.item);
 }
 
 const json = (body: unknown, status = 200) =>
@@ -161,17 +208,22 @@ Deno.serve(async (req) => {
       const store = body.store ?? url.searchParams.get("store");
       const names: string[] = body.names ?? (url.searchParams.get("names") ?? "").split("|").filter(Boolean);
       if (!store) return json({ error: "missing store" }, 400);
-      const items = await loadStore(store);
+      const index = await loadStore(store);
       const matches: Record<string, Item | null> = {};
-      for (const n of names) matches[n] = search(items, n, 1)[0] ?? null;
-      return json({ matches, count: items.length });
+      const options: Record<string, Item[]> = {};
+      for (const n of names) {
+        const hits = search(index, n, 4);
+        matches[n] = hits[0] ?? null;
+        options[n] = hits; // alternatives, so a wrong pick can be corrected in the UI
+      }
+      return json({ matches, options, count: index.n });
     }
 
     const store = url.searchParams.get("store");
     const q = url.searchParams.get("q") ?? "";
     if (!store) return json({ error: "missing store" }, 400);
-    const items = await loadStore(store);
-    return json({ results: search(items, q), count: items.length });
+    const index = await loadStore(store);
+    return json({ results: search(index, q), count: index.n });
   } catch (e) {
     return json({ error: String(e instanceof Error ? e.message : e) }, 500);
   }

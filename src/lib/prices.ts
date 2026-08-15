@@ -47,8 +47,11 @@ export async function searchPrice(storeId: string, q: string): Promise<PriceItem
  * Price a whole list in ONE request. Doing a request per item meant the branch
  * file was re-fetched each time (~3s each), so a long list appeared to hang.
  */
-export async function priceMany(storeId: string, names: string[]): Promise<Record<string, PriceItem | null>> {
-  if (names.length === 0) return {};
-  const { matches } = await call({ action: "match" }, { store: storeId, names });
-  return matches ?? {};
+export async function priceMany(
+  storeId: string,
+  names: string[]
+): Promise<{ matches: Record<string, PriceItem | null>; options: Record<string, PriceItem[]> }> {
+  if (names.length === 0) return { matches: {}, options: {} };
+  const { matches, options } = await call({ action: "match" }, { store: storeId, names });
+  return { matches: matches ?? {}, options: options ?? {} };
 }
