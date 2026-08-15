@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
 import { CATEGORIES, DAYS_HE } from "../lib/constants";
 import { bgWrite, newId } from "../lib/optimistic";
+import { searchCatalog } from "../lib/products";
 import type { Tables } from "../types/database";
 
 type Item = Tables<"shopping_items">;
@@ -69,10 +70,18 @@ export default function Shopping() {
     loadCatalog();
   }, [loadCatalog]);
 
+  // Suggestions: products this home has bought before come first (they carry the
+  // remembered quantity/category), then common Israeli products from the built-in list.
   const suggestions = useMemo(() => {
-    const q = name.trim().toLowerCase();
+    const q = name.trim();
     if (!q) return [];
-    return catalog.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 6);
+    const lower = q.toLowerCase();
+    const mine = catalog.filter((c) => c.name.toLowerCase().includes(lower)).slice(0, 6);
+    const seen = new Set(mine.map((m) => m.name.trim().toLowerCase()));
+    const builtin = searchCatalog(q, 8)
+      .filter((p) => !seen.has(p.name.trim().toLowerCase()))
+      .map((p) => ({ name: p.name, category: p.category, quantity: 1, builtin: true }));
+    return [...mine.map((m) => ({ ...m, builtin: false })), ...builtin].slice(0, 8);
   }, [name, catalog]);
 
   const loadLists = useCallback(async () => {
@@ -253,6 +262,7 @@ export default function Shopping() {
       <div className="nst-card" style={{ padding: "1rem 1.1rem", display: "flex", flexDirection: "column", gap: 10 }}>
         <input
           placeholder="הוספת מצרך…"
+          autoComplete="off"
           value={name}
           onChange={(e) => setName(e.target.value)}
           onFocus={() => setFocused(true)}
@@ -278,7 +288,7 @@ export default function Shopping() {
                 >
                   <span style={{ flex: 1, font: "600 13.5px var(--font-body)", color: "var(--text-bright)", textDecoration: cur?.is_checked ? "line-through" : "none" }}>{s.name}</span>
                   {s.category && <span className="nst-tag">{s.category}</span>}
-                  <span className="nst-tag">×{s.quantity}</span>
+                  {!s.builtin && <span className="nst-tag">×{s.quantity}</span>}
                   {cur &&
                     (cur.is_checked ? (
                       <span className="nst-tag" style={{ background: "var(--ok-soft)", color: "var(--ok)" }}>נקנה</span>
