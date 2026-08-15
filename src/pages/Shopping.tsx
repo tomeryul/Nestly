@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter, Tags, ShoppingCart } from "lucide-react";
+import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter, Tags, Tag, ShoppingCart } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -7,6 +7,7 @@ import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
 import { CATEGORIES, DAYS_HE } from "../lib/constants";
 import { bgWrite, newId } from "../lib/optimistic";
 import { searchCatalog } from "../lib/products";
+import { fetchStores, getStoreId, getStoreName, priceMany, setStoreId, setStoreName, type PriceItem, type PriceStore } from "../lib/prices";
 import type { Tables } from "../types/database";
 
 type Item = Tables<"shopping_items">;
@@ -28,6 +29,30 @@ export default function Shopping() {
   const [grouped, setGrouped] = useState(() => localStorage.getItem("nestly.shopGrouped") === "1");
   const [customCats, setCustomCats] = useState<string[]>([]);
   const [showCats, setShowCats] = useState(false);
+
+  // King Store prices (public price-transparency data, via the `prices` edge function)
+  const [priceMap, setPriceMap] = useState<Record<string, PriceItem | null>>({});
+  const [pricing, setPricing] = useState(false);
+  const [showStores, setShowStores] = useState(false);
+  const [storeName, setStoreNameState] = useState(getStoreName());
+
+  const loadPrices = async (list: Item[]) => {
+    const storeId = getStoreId();
+    if (!storeId) {
+      setShowStores(true);
+      return;
+    }
+    setPricing(true);
+    try {
+      const names = [...new Set(list.map((i) => i.name.trim()))];
+      setPriceMap(await priceMany(storeId, names));
+    } catch (e) {
+      alert("לא הצלחנו לטעון מחירים כרגע. נסו שוב.");
+      console.error(e);
+    } finally {
+      setPricing(false);
+    }
+  };
 
   const loadCats = useCallback(async () => {
     if (!homeId) return;
@@ -187,6 +212,12 @@ export default function Shopping() {
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: item.is_checked ? "line-through" : "none" }}>{item.name}</p>
         <div style={{ display: "flex", gap: 7, alignItems: "center", marginTop: 3, flexWrap: "wrap" }}>
+          {priceMap[item.name.trim()] && (
+            <span className="nst-tag" style={{ background: "var(--ok-soft)", color: "var(--ok)" }} title={priceMap[item.name.trim()]!.name}>
+              ₪{(priceMap[item.name.trim()]!.price * item.quantity).toFixed(2)}
+              {item.quantity > 1 ? ` (₪${priceMap[item.name.trim()]!.price.toFixed(2)} ליח׳)` : ""}
+            </span>
+          )}
           {item.category && !grouped && <span className="nst-tag">{item.category}</span>}
           {item.source === "recipe" && (
             <span className="nst-tag" style={{ background: "var(--cat-3-bg)", color: "var(--cat-3-fg)" }}>
@@ -241,6 +272,9 @@ export default function Shopping() {
           </button>
           <button className="btn btn-sm" onClick={() => setShowCats(true)} title="ניהול קטגוריות">
             <Tags size={15} />
+          </button>
+          <button className="btn btn-sm" onClick={() => loadPrices(items)} disabled={pricing || items.length === 0} title="מחירים מקינג סטור">
+            <Tag size={15} /> {pricing ? "טוען…" : "מחירים"}
           </button>
           <button className="btn btn-sm" onClick={() => setShowRecurring(true)}>
             <Repeat size={15} /> קבועים
@@ -323,6 +357,29 @@ export default function Shopping() {
         </div>
       </div>
 
+      {Object.keys(priceMap).length > 0 && (
+        <div className="next-action is-calm">
+          <span className="next-action-ico">
+            <Tag />
+          </span>
+          <div className="next-action-body">
+            <div className="next-action-kicker">קינג סטור{storeName ? ` · ${storeName}` : ""}</div>
+            <div className="next-action-title">
+              הערכת עלות: ₪
+              {items
+                .reduce((sum, i) => sum + (priceMap[i.name.trim()]?.price ?? 0) * i.quantity, 0)
+                .toFixed(2)}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
+              {items.filter((i) => priceMap[i.name.trim()]).length}/{items.length} מוצרים נמצאו · מחירים רשמיים
+            </div>
+          </div>
+          <button className="btn btn-sm" onClick={() => setShowStores(true)}>
+            סניף
+          </button>
+        </div>
+      )}
+
       {items.length === 0 ? (
         <EmptyState icon={<ShoppingBasket size={42} />} title="הרשימה ריקה" hint="הוסיפו מצרך ראשון למעלה" />
       ) : grouped ? (
@@ -357,7 +414,53 @@ export default function Shopping() {
       )}
       {showRecurring && <RecurringModal homeId={homeId!} lists={lists} onClose={() => setShowRecurring(false)} />}
       {showCats && <CategoriesModal homeId={homeId!} defaults={[...CATEGORIES]} onClose={() => { setShowCats(false); loadCats(); }} />}
+      {showStores && (
+        <StorePickerModal
+          onClose={() => setShowStores(false)}
+          onPicked={(s) => {
+            setStoreId(s.id);
+            setStoreName(s.name);
+            setStoreNameState(s.name);
+            setShowStores(false);
+            loadPrices(items);
+          }}
+        />
+      )}
     </section>
+  );
+}
+
+function StorePickerModal({ onClose, onPicked }: { onClose: () => void; onPicked: (s: PriceStore) => void }) {
+  const [stores, setStores] = useState<PriceStore[]>([]);
+  const [err, setErr] = useState("");
+  const [q, setQ] = useState("");
+
+  useEffect(() => {
+    fetchStores()
+      .then(setStores)
+      .catch((e) => setErr(String(e.message ?? e)));
+  }, []);
+
+  const shown = stores.filter((s) => s.name.includes(q.trim()));
+
+  return (
+    <Modal open onClose={onClose} title="בחירת סניף · קינג סטור">
+      <p className="section-sub" style={{ marginBottom: "1rem" }}>המחירים מגיעים מקבצי המחירים הרשמיים שהרשת מפרסמת לפי חוק. בחרו את הסניף שלכם.</p>
+      {err && <p className="alert alert-info" style={{ marginBottom: "1rem" }}>לא הצלחנו לטעון את רשימת הסניפים: {err}</p>}
+      {!err && stores.length === 0 && <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>טוען סניפים…</p>}
+      {stores.length > 0 && (
+        <>
+          <input style={{ marginBottom: 10 }} placeholder="חיפוש סניף…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 7, maxHeight: 340, overflowY: "auto" }}>
+            {shown.map((s) => (
+              <button key={s.id} className="btn btn-block" style={{ justifyContent: "flex-start" }} onClick={() => onPicked(s)}>
+                {s.name}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }
 
