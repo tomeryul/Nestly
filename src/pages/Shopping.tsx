@@ -34,6 +34,7 @@ export default function Shopping() {
   const [priceMap, setPriceMap] = useState<Record<string, PriceItem | null>>({});
   const [pricing, setPricing] = useState(false);
   const [showStores, setShowStores] = useState(false);
+  const [priceErr, setPriceErr] = useState("");
   const [storeName, setStoreNameState] = useState(getStoreName());
 
   const loadPrices = async (list: Item[]) => {
@@ -43,12 +44,14 @@ export default function Shopping() {
       return;
     }
     setPricing(true);
+    setPriceErr("");
     try {
       const names = [...new Set(list.map((i) => i.name.trim()))];
-      setPriceMap(await priceMany(storeId, names));
+      const res = await priceMany(storeId, names);
+      setPriceMap(res);
+      if (Object.values(res).every((v) => !v)) setPriceErr("לא נמצאו התאמות למוצרים ברשימה בסניף שנבחר.");
     } catch (e) {
-      alert("לא הצלחנו לטעון מחירים כרגע. נסו שוב.");
-      console.error(e);
+      setPriceErr(`שגיאה בטעינת מחירים: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setPricing(false);
     }
@@ -264,9 +267,9 @@ export default function Shopping() {
 
   return (
     <section className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
         <h1 className="page-title">קניות</h1>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <button className={`btn btn-sm ${grouped ? "btn-primary" : ""}`} onClick={toggleGrouped} title="מיון לפי קטגוריה">
             <ListFilter size={15} /> קטגוריות
           </button>
@@ -356,6 +359,15 @@ export default function Shopping() {
           </button>
         </div>
       </div>
+
+      {priceErr && (
+        <p className="alert alert-info" style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+          <span>{priceErr}</span>
+          <button className="btn btn-sm" onClick={() => setShowStores(true)}>
+            החלפת סניף
+          </button>
+        </p>
+      )}
 
       {Object.keys(priceMap).length > 0 && (
         <div className="next-action is-calm">

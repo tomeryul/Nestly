@@ -17,7 +17,7 @@ const TTL_MS = 6 * 60 * 60 * 1000; // re-download a branch at most every 6h
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
 type Item = { code: string; name: string; price: number; unit: string; manufacturer: string };
@@ -96,25 +96,53 @@ async function loadStore(storeId: string): Promise<Item[]> {
   return items;
 }
 
-/** Rank by whole-word / prefix / substring so "חלב" ranks plain milk above "אבקת חלב". */
-function search(items: Item[], q: string, limit = 12) {
-  const query = q.trim();
-  if (!query) return [];
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Rank matches. Israeli product names lead with the product ("חלב תנובה 3%"),
+ * so a name whose *opening words* are the query beats one that merely starts
+ * with the same letters ("חלבי טבעי") or mentions it later ("פירורי לחם").
+ */
+function rank(items: Item[], query: string, out: Map<string, { item: Item; score: number }>) {
   const terms = query.split(/\s+/).filter(Boolean);
-  const scored: { item: Item; score: number }[] = [];
+  const whole = new RegExp(`(^|\\s)${esc(query)}(\\s|$)`);
   for (const item of items) {
     const name = item.name;
     if (!terms.every((t) => name.includes(t))) continue;
-    let score = 0;
-    if (name === query) score = 100;
-    else if (name.startsWith(query)) score = 60;
-    else if (new RegExp(`(^|\\s)${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s|$)`).test(name)) score = 50;
-    else score = 20;
-    score -= Math.min(name.length / 10, 8); // prefer concise names
-    scored.push({ item, score });
+    let score: number;
+    if (name === query) score = 200;
+    else if (name.startsWith(query + " ")) score = 150; // query is the leading word(s)
+    else if (whole.test(name)) score = 100; // appears as its own word later on
+    else if (name.startsWith(query)) score = 55; // only a prefix of a longer word
+    else score = 30;
+    score -= Math.min(name.split(/\s+/).length * 2, 12); // prefer concise names
+    const key = item.code || name;
+    const prev = out.get(key);
+    if (!prev || score > prev.score) out.set(key, { item, score });
   }
-  scored.sort((a, b) => b.score - a.score || a.item.price - b.item.price);
-  return scored.slice(0, limit).map((s) => s.item);
+}
+
+function search(items: Item[], q: string, limit = 12) {
+  const query = q.trim();
+  if (!query) return [];
+  // Score the plural as typed and its singular together ("בננות" must be able to
+  // reach the plain "בננה" rather than settling for a dessert that mentions it).
+  const variants = [query];
+  const stem = query.replace(/(ות|ים)$/, "");
+  if (stem.length >= 3 && stem !== query) {
+    // "מלפפונים" -> stem "מלפפונ" -> "מלפפון" (Hebrew final letter form)
+    const FINAL: Record<string, string> = { "כ": "ך", "מ": "ם", "נ": "ן", "פ": "ף", "צ": "ץ" };
+    const last = stem[stem.length - 1];
+    variants.push(stem, stem + "ה");
+    if (FINAL[last]) variants.push(stem.slice(0, -1) + FINAL[last]);
+  }
+
+  const scored = new Map<string, { item: Item; score: number }>();
+  for (const v of variants) rank(items, v, scored);
+  return [...scored.values()]
+    .sort((a, b) => b.score - a.score || a.item.price - b.item.price)
+    .slice(0, limit)
+    .map((s) => s.item);
 }
 
 const json = (body: unknown, status = 200) =>
@@ -126,6 +154,18 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const action = url.searchParams.get("action") ?? "search";
     if (action === "stores") return json({ stores: await stores() });
+
+    // Batch: price a whole shopping list in ONE request (the file is loaded once).
+    if (action === "match") {
+      const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+      const store = body.store ?? url.searchParams.get("store");
+      const names: string[] = body.names ?? (url.searchParams.get("names") ?? "").split("|").filter(Boolean);
+      if (!store) return json({ error: "missing store" }, 400);
+      const items = await loadStore(store);
+      const matches: Record<string, Item | null> = {};
+      for (const n of names) matches[n] = search(items, n, 1)[0] ?? null;
+      return json({ matches, count: items.length });
+    }
 
     const store = url.searchParams.get("store");
     const q = url.searchParams.get("q") ?? "";

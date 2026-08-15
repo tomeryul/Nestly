@@ -17,12 +17,18 @@ export const setStoreId = (id: string) => localStorage.setItem(STORE_KEY, id);
 export const getStoreName = () => localStorage.getItem(STORE_KEY + ".name") ?? "";
 export const setStoreName = (n: string) => localStorage.setItem(STORE_KEY + ".name", n);
 
-async function call(params: Record<string, string>) {
+async function call(params: Record<string, string>, post?: unknown) {
   const qs = new URLSearchParams(params).toString();
   const res = await fetch(`${ENDPOINT}?${qs}`, {
-    headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}`, apikey: SUPABASE_ANON_KEY },
+    method: post ? "POST" : "GET",
+    headers: {
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      apikey: SUPABASE_ANON_KEY,
+      ...(post ? { "Content-Type": "application/json" } : {}),
+    },
+    body: post ? JSON.stringify(post) : undefined,
   });
-  const body = await res.json();
+  const body = await res.json().catch(() => ({}));
   if (!res.ok || body.error) throw new Error(body.error ?? `HTTP ${res.status}`);
   return body;
 }
@@ -37,16 +43,12 @@ export async function searchPrice(storeId: string, q: string): Promise<PriceItem
   return results ?? [];
 }
 
-/** Look up the cheapest sensible match for each name, sequentially (the function caches per branch). */
+/**
+ * Price a whole list in ONE request. Doing a request per item meant the branch
+ * file was re-fetched each time (~3s each), so a long list appeared to hang.
+ */
 export async function priceMany(storeId: string, names: string[]): Promise<Record<string, PriceItem | null>> {
-  const out: Record<string, PriceItem | null> = {};
-  for (const n of names) {
-    try {
-      const r = await searchPrice(storeId, n);
-      out[n] = r[0] ?? null;
-    } catch {
-      out[n] = null;
-    }
-  }
-  return out;
+  if (names.length === 0) return {};
+  const { matches } = await call({ action: "match" }, { store: storeId, names });
+  return matches ?? {};
 }
