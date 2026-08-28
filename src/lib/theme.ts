@@ -30,3 +30,27 @@ export function setTheme(t: ThemeKey) {
 export function initTheme() {
   applyTheme(getTheme());
 }
+
+/**
+ * Night toggle. Of the six skins only "garden-night" is actually dark, so the
+ * switch flips between it and whichever light skin was in use, restoring that
+ * choice on the way back rather than always landing on the default.
+ */
+export const NIGHT: ThemeKey = "garden-night";
+const LIGHT_KEY = "nestly.themeLight";
+
+export function isNight(t: ThemeKey = getTheme()) {
+  return t === NIGHT;
+}
+
+export function toggleNight(): ThemeKey {
+  const current = getTheme();
+  if (isNight(current)) {
+    const back = localStorage.getItem(LIGHT_KEY) as ThemeKey | null;
+    setTheme(back && back !== NIGHT && THEMES.some((x) => x.key === back) ? back : "garden");
+  } else {
+    localStorage.setItem(LIGHT_KEY, current);
+    setTheme(NIGHT);
+  }
+  return getTheme();
+}

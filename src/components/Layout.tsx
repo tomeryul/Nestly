@@ -1,9 +1,10 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Home, ShoppingCart, ChefHat, Sparkles, WashingMachine, CalendarDays, ListTodo, Settings, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { Home, ShoppingCart, ChefHat, Sparkles, WashingMachine, CalendarDays, ListTodo, Settings, ChevronDown, Moon, Sun } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import NotificationBell from "./NotificationBell";
+import { isNight, toggleNight } from "../lib/theme";
 
 const NAV = [
   { to: "/", label: "בית", icon: Home, end: true, title: "בית" },
@@ -20,8 +21,11 @@ export default function Layout() {
   const { homeName, homes, selectHome, homeId, members } = useHome();
   const { user } = useAuth();
   const [switcher, setSwitcher] = useState(false);
+  const [night, setNight] = useState(() => isNight());
   const navigate = useNavigate();
   const location = useLocation();
+  // The theme can also be changed from Settings, so re-read it on navigation.
+  useEffect(() => setNight(isNight()), [location.pathname]);
 
   const current = NAV.find((n) => (n.end ? location.pathname === "/" : location.pathname.startsWith(n.to)));
   const me = members.find((m) => m.user_id === user?.id);
@@ -108,6 +112,14 @@ export default function Layout() {
                 </div>
               )}
             </div>
+            <button
+              className="nst-iconbtn plain"
+              onClick={() => setNight(toggleNight() === "garden-night")}
+              title={night ? "מצב יום" : "מצב לילה"}
+              aria-label={night ? "מצב יום" : "מצב לילה"}
+            >
+              {night ? <Sun /> : <Moon />}
+            </button>
             <NotificationBell />
           </header>
 
