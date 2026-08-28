@@ -97,6 +97,12 @@ export default function Cleaning() {
     setTasks((prev) => prev.filter((t) => t.id !== id));
     bgWrite(supabase.from("cleaning_tasks").delete().eq("id", id), load);
   };
+  const renameTask = (id: string, title: string) => {
+    const n = title.trim();
+    if (!n) return;
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, title: n } : t)));
+    bgWrite(supabase.from("cleaning_tasks").update({ title: n }).eq("id", id), load);
+  };
   const reorderTasks = useCallback(
     async (ids: string[]) => {
       await Promise.all(ids.map((id, i) => supabase.from("cleaning_tasks").update({ position: i }).eq("id", id)));
@@ -198,7 +204,15 @@ export default function Cleaning() {
           </span>
           <div className="next-action-body">
             <div className="next-action-kicker">{tab === "weekly" ? "השבוע" : "החודש"}</div>
-            <div className="next-action-title">{doneCount}/{tasks.length} הושלמו</div>
+            <div className="next-action-title">
+              {doneCount}/{tasks.length} הושלמו · {Math.round((doneCount / tasks.length) * 100)}%
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 7 }}>
+              <span className="nst-meter">
+                <i style={{ width: `${(doneCount / tasks.length) * 100}%` }} />
+              </span>
+              {doneCount === tasks.length && <span style={{ fontSize: 15 }}>🎉</span>}
+            </div>
           </div>
         </div>
       )}
@@ -233,10 +247,11 @@ export default function Cleaning() {
               onReorder={reorderTasks}
               onRemoveRoom={() => removeRoom(room.id)}
               onRename={(name) => renameRoom(room.id, name)}
+              onRenameTask={renameTask}
             />
           ))}
           {noRoomTasks.length > 0 && (
-            <RoomSection collapseKey={`${tab}:none`} name="ללא חדר" tasks={noRoomTasks} doneIds={doneIds} onAddTask={(title) => addTask(null, title)} onToggle={toggle} onRemoveTask={removeTask} onReorder={reorderTasks} />
+            <RoomSection collapseKey={`${tab}:none`} name="ללא חדר" tasks={noRoomTasks} doneIds={doneIds} onAddTask={(title) => addTask(null, title)} onToggle={toggle} onRemoveTask={removeTask} onReorder={reorderTasks} onRenameTask={renameTask} />
           )}
         </>
       )}
@@ -255,6 +270,7 @@ function RoomSection({
   onReorder,
   onRemoveRoom,
   onRename,
+  onRenameTask,
 }: {
   collapseKey: string;
   name: string;
@@ -266,10 +282,13 @@ function RoomSection({
   onReorder: (ids: string[]) => void;
   onRemoveRoom?: () => void;
   onRename?: (name: string) => void;
+  onRenameTask?: (id: string, title: string) => void;
 }) {
   const [title, setTitle] = useState("");
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
+  const [editingTask, setEditingTask] = useState<string | null>(null);
+  const [taskDraft, setTaskDraft] = useState("");
   const storageKey = `nestly.cleanCollapse.${collapseKey}`;
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(storageKey) === "1");
   const toggleCollapsed = () =>
@@ -338,6 +357,17 @@ function RoomSection({
         )}
       </div>
 
+      {tasks.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: -2 }}>
+          <span className="nst-meter">
+            <i style={{ width: `${(done / tasks.length) * 100}%` }} />
+          </span>
+          <span style={{ font: "700 11px var(--font-body)", color: done === tasks.length ? "var(--ok)" : "var(--text-muted)", minWidth: 34, textAlign: "left" }}>
+            {Math.round((done / tasks.length) * 100)}%
+          </span>
+        </div>
+      )}
+
       {collapsed
         ? null
         : dr.order.map((id) => {
@@ -346,18 +376,69 @@ function RoomSection({
         const isDone = doneIds.has(t.id);
         return (
           <div key={t.id} ref={dr.setItemRef(t.id)} style={{ display: "flex", alignItems: "center", gap: 8, opacity: isDone ? 0.55 : 1, ...dr.itemStyle(t.id) }}>
-            {tasks.length > 1 && (
-              <span className="nst-grip" {...dr.handleProps(t.id)} title="גרירה לסידור">
-                <GripVertical size={17} />
-              </span>
+            {editingTask === t.id ? (
+              <>
+                <input
+                  autoFocus
+                  style={{ flex: 1, font: "600 14px var(--font-body)" }}
+                  value={taskDraft}
+                  onChange={(e) => setTaskDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      if (taskDraft.trim() && taskDraft.trim() !== t.title) onRenameTask?.(t.id, taskDraft);
+                      setEditingTask(null);
+                    }
+                    if (e.key === "Escape") setEditingTask(null);
+                  }}
+                />
+                <button
+                  className="nst-check on"
+                  title="שמירה"
+                  onClick={() => {
+                    if (taskDraft.trim() && taskDraft.trim() !== t.title) onRenameTask?.(t.id, taskDraft);
+                    setEditingTask(null);
+                  }}
+                >
+                  <Check size={14} />
+                </button>
+              </>
+            ) : (
+              <>
+                {tasks.length > 1 && (
+                  <span className="nst-grip" {...dr.handleProps(t.id)} title="גרירה לסידור">
+                    <GripVertical size={17} />
+                  </span>
+                )}
+                <button className={`nst-check ${isDone ? "on" : ""}`} onClick={() => onToggle(t)}>
+                  <Check size={14} />
+                </button>
+                <span
+                  onClick={() => {
+                    if (!onRenameTask) return;
+                    setTaskDraft(t.title);
+                    setEditingTask(t.id);
+                  }}
+                  style={{ flex: 1, font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: isDone ? "line-through" : "none", cursor: onRenameTask ? "pointer" : "default" }}
+                >
+                  {t.title}
+                </span>
+                {onRenameTask && (
+                  <button
+                    className="nst-del"
+                    title="עריכת המשימה"
+                    onClick={() => {
+                      setTaskDraft(t.title);
+                      setEditingTask(t.id);
+                    }}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                )}
+                <button className="nst-del" onClick={() => onRemoveTask(t.id)}>
+                  <X size={16} />
+                </button>
+              </>
             )}
-            <button className={`nst-check ${isDone ? "on" : ""}`} onClick={() => onToggle(t)}>
-              <Check size={14} />
-            </button>
-            <span style={{ flex: 1, font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: isDone ? "line-through" : "none" }}>{t.title}</span>
-            <button className="nst-del" onClick={() => onRemoveTask(t.id)}>
-              <X size={16} />
-            </button>
           </div>
         );
       })}

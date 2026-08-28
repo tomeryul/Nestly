@@ -190,9 +190,14 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .nst-logo-tile { width: 40px; height: 40px; border-radius: 12px; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; flex: none; color: var(--accent-ink); }
 .nst-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.4rem 1.4rem; }
 .nst-row { display: flex; align-items: center; gap: 12px; background: var(--surface); border-radius: 16px; padding: 12px 14px; box-shadow: var(--shadow-sm); }
-.nst-check { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border-2); background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #fff; }
-.nst-check.on { background: var(--accent); border-color: var(--accent); }
+.nst-check { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border-2); background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: transparent; }
+.nst-check.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .nst-check svg { width: 14px; height: 14px; }
+
+/* progress meter (cleaning) */
+.nst-meter { height: 7px; border-radius: 99px; background: var(--surface-3); overflow: hidden; flex: 1; }
+.nst-meter > i { display: block; height: 100%; border-radius: 99px; background: var(--ok); transition: width .25s ease; }
+.nst-meter.done > i { background: var(--ok); }
 .nst-stepper { display: flex; align-items: center; gap: 2px; background: var(--surface-2); border-radius: 10px; padding: 2px; box-shadow: inset 0 0 0 1px var(--border-2); flex: none; }
 .nst-stepper button { width: 30px; height: 30px; border: none; background: transparent; color: var(--text-2); cursor: pointer; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
 .nst-stepper button:hover { background: var(--surface-3); color: var(--text-bright); }

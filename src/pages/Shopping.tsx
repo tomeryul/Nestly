@@ -37,6 +37,7 @@ export default function Shopping() {
   const [priceErr, setPriceErr] = useState("");
   const [priceOptions, setPriceOptions] = useState<Record<string, PriceItem[]>>({});
   const [pickFor, setPickFor] = useState<string | null>(null);
+  const [catFor, setCatFor] = useState<Item | null>(null);
   const [storeName, setStoreNameState] = useState(getStoreName());
 
   const loadPrices = async (list: Item[]) => {
@@ -196,6 +197,11 @@ export default function Shopping() {
     setItems((prev) => prev.filter((i) => i.id !== id));
     bgWrite(supabase.from("shopping_items").delete().eq("id", id), loadItems);
   };
+  const changeCategory = (item: Item, category: string) => {
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, category } : i)));
+    bgWrite(supabase.from("shopping_items").update({ category }).eq("id", item.id), loadItems);
+    setCatFor(null);
+  };
   const clearChecked = () => {
     if (!activeList) return;
     setItems((prev) => prev.filter((i) => !i.is_checked));
@@ -248,7 +254,14 @@ export default function Shopping() {
               </span>
             </button>
           )}
-          {item.category && !grouped && <span className="nst-tag">{item.category}</span>}
+          <button
+            className="nst-tag"
+            onClick={() => setCatFor(item)}
+            title="שינוי קטגוריה"
+            style={{ border: "none", cursor: "pointer", font: "700 10px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.04em" }}
+          >
+            {item.category || "ללא קטגוריה"}
+          </button>
           {item.source === "recipe" && (
             <span className="nst-tag" style={{ background: "var(--cat-3-bg)", color: "var(--cat-3-fg)" }}>
               <ChefHat /> ממתכון
@@ -491,6 +504,22 @@ export default function Shopping() {
               })}
             </div>
           )}
+        </Modal>
+      )}
+      {catFor && (
+        <Modal open onClose={() => setCatFor(null)} title={`קטגוריה · ${catFor.name}`}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {allCategories.map((c) => (
+              <button
+                key={c}
+                className="btn btn-block"
+                style={{ justifyContent: "flex-start", ...(catFor.category === c ? { boxShadow: "inset 0 0 0 2px var(--accent)" } : {}) }}
+                onClick={() => changeCategory(catFor, c)}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
         </Modal>
       )}
       {showStores && (
