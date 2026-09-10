@@ -73,9 +73,6 @@ export default function Layout() {
         {/* main */}
         <div className="nst-main">
           <header className="nst-topbar">
-            <button className="nst-iconbtn plain nst-burger" onClick={() => setDrawer(true)} title="תפריט" aria-label="תפריט">
-              <Menu />
-            </button>
             <div className="nst-topbar-title">{current?.title ?? "Nestly"}</div>
             <div style={{ flex: 1 }} />
             <div style={{ position: "relative" }}>
@@ -118,6 +115,9 @@ export default function Layout() {
               {night ? <Sun /> : <Moon />}
             </button>
             <NotificationBell />
+            <button className="nst-iconbtn plain nst-burger" onClick={() => setDrawer(true)} title="תפריט" aria-label="תפריט">
+              <Menu />
+            </button>
           </header>
 
           <main className="nst-content">
