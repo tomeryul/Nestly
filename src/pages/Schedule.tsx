@@ -82,6 +82,17 @@ export default function Schedule() {
     },
     [load]
   );
+  // A day only has meaningful positions once it has been dragged; until then every
+  // row sits at 0 and sorts by time, so a new task must join them at 0 rather than
+  // land beneath them. Computed for the date being saved, not the day on screen.
+  const positionFor = useCallback(
+    (iso: string) => {
+      const onDay = tasks.filter((t) => t.scheduled_date === iso);
+      const max = onDay.reduce((m, t) => Math.max(m, t.position), 0);
+      return max === 0 ? 0 : max + 1;
+    },
+    [tasks]
+  );
   const dr = useDragReorder(dayTasks, reorder);
   const byId = useMemo(() => new Map(dayTasks.map((t) => [t.id, t])), [dayTasks]);
 
@@ -184,7 +195,7 @@ export default function Schedule() {
           homeId={homeId!}
           dateIso={selectedIso}
           initial={editTask}
-          nextPosition={dayTasks.length}
+          positionFor={positionFor}
           onClose={() => {
             setAdding(false);
             setEditTask(null);
@@ -205,7 +216,7 @@ export default function Schedule() {
           homeId={homeId!}
           dateIso={selectedIso}
           dayLabel={DAYS_HE[selected.getDay()]}
-          nextPosition={dayTasks.length}
+          positionFor={positionFor}
           onClose={() => setShowLibrary(false)}
           onAdded={() => {
             setShowLibrary(false);
@@ -307,14 +318,14 @@ function TaskLibraryModal({
   homeId,
   dateIso,
   dayLabel,
-  nextPosition,
+  positionFor,
   onClose,
   onAdded,
 }: {
   homeId: string;
   dateIso: string;
   dayLabel: string;
-  nextPosition: number;
+  positionFor: (iso: string) => number;
   onClose: () => void;
   onAdded: () => void;
 }) {
@@ -359,7 +370,7 @@ function TaskLibraryModal({
       start_time: r.start_time,
       end_time: r.end_time,
       category: r.category,
-      position: nextPosition,
+      position: positionFor(dateIso),
       created_by: user?.id ?? null,
     });
     onAdded();
@@ -432,7 +443,7 @@ function MemberSelect({ value, onChange }: { value: string; onChange: (v: string
   );
 }
 
-function TaskModal({ homeId, dateIso, initial, nextPosition, onClose, onSaved }: { homeId: string; dateIso: string; initial?: Task | null; nextPosition: number; onClose: () => void; onSaved: (savedDate: string) => void }) {
+function TaskModal({ homeId, dateIso, initial, positionFor, onClose, onSaved }: { homeId: string; dateIso: string; initial?: Task | null; positionFor: (iso: string) => number; onClose: () => void; onSaved: (savedDate: string) => void }) {
   const { user } = useAuth();
   const [title, setTitle] = useState(initial?.title ?? "");
   const [date, setDate] = useState(initial?.scheduled_date ?? dateIso);
@@ -446,7 +457,7 @@ function TaskModal({ homeId, dateIso, initial, nextPosition, onClose, onSaved }:
     if (initial) {
       await supabase.from("schedule_tasks").update({ title: title.trim(), scheduled_date: date, start_time: start || null, end_time: end || null, category, assigned_to: assigned || null }).eq("id", initial.id);
     } else {
-      await supabase.from("schedule_tasks").insert({ home_id: homeId, title: title.trim(), scheduled_date: date, start_time: start || null, end_time: end || null, category, assigned_to: assigned || null, position: nextPosition, created_by: user?.id ?? null });
+      await supabase.from("schedule_tasks").insert({ home_id: homeId, title: title.trim(), scheduled_date: date, start_time: start || null, end_time: end || null, category, assigned_to: assigned || null, position: positionFor(date), created_by: user?.id ?? null });
     }
     onSaved(date);
   };

@@ -1,27 +1,21 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Home, ShoppingCart, ChefHat, Sparkles, WashingMachine, CalendarDays, ListTodo, Settings, ChevronDown, Moon, Sun } from "lucide-react";
+import { Home, ChevronDown, Moon, Sun, Menu } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import NotificationBell from "./NotificationBell";
 import { isNight, toggleNight } from "../lib/theme";
+import { NAV, BOTTOM_MAX, getBottomNav, setBottomNav, navItem } from "../lib/nav";
+import NavDrawer from "./NavDrawer";
 
-const NAV = [
-  { to: "/", label: "בית", icon: Home, end: true, title: "בית" },
-  { to: "/shopping", label: "קניות", icon: ShoppingCart, end: false, title: "קניות" },
-  { to: "/cooking", label: "בישולים", icon: ChefHat, end: false, title: "בישולים" },
-  { to: "/cleaning", label: "ניקיון", icon: Sparkles, end: false, title: "ניקיון" },
-  { to: "/laundry", label: "כביסות", icon: WashingMachine, end: false, title: "כביסות" },
-  { to: "/schedule", label: "לוז", icon: CalendarDays, end: false, title: "לוז שבועי" },
-  { to: "/personal", label: "משימות", icon: ListTodo, end: false, title: "משימות אישיות" },
-  { to: "/settings", label: "הגדרות", icon: Settings, end: false, title: "הגדרות" },
-];
 
 export default function Layout() {
   const { homeName, homes, selectHome, homeId, members } = useHome();
   const { user } = useAuth();
   const [switcher, setSwitcher] = useState(false);
   const [night, setNight] = useState(() => isNight());
+  const [drawer, setDrawer] = useState(false);
+  const [bottom, setBottom] = useState<string[]>(() => getBottomNav());
   const navigate = useNavigate();
   const location = useLocation();
   // The theme can also be changed from Settings, so re-read it on navigation.
@@ -79,6 +73,9 @@ export default function Layout() {
         {/* main */}
         <div className="nst-main">
           <header className="nst-topbar">
+            <button className="nst-iconbtn plain nst-burger" onClick={() => setDrawer(true)} title="תפריט" aria-label="תפריט">
+              <Menu />
+            </button>
             <div className="nst-topbar-title">{current?.title ?? "Nestly"}</div>
             <div style={{ flex: 1 }} />
             <div style={{ position: "relative" }}>
@@ -132,14 +129,31 @@ export default function Layout() {
       {/* bottom nav (mobile) */}
       <nav className="nst-bottomnav">
         <div className="nst-bn-grid">
-          {NAV.map(({ to, label, icon: Icon, end }) => (
-            <NavLink key={to} to={to} end={end} className={({ isActive }) => `nst-bn ${isActive ? "active" : ""}`}>
-              <Icon />
-              <span>{label}</span>
-            </NavLink>
-          ))}
+          {bottom.map((path) => {
+            const item = navItem(path);
+            if (!item) return null;
+            const Icon = item.icon;
+            return (
+              <NavLink key={path} to={path} end={item.end} className={({ isActive }) => `nst-bn ${isActive ? "active" : ""}`}>
+                <Icon />
+                <span>{item.label}</span>
+              </NavLink>
+            );
+          })}
         </div>
       </nav>
+
+      {drawer && (
+        <NavDrawer
+          bottom={bottom}
+          max={BOTTOM_MAX}
+          onClose={() => setDrawer(false)}
+          onBottomChange={(next) => {
+            setBottom(next);
+            setBottomNav(next);
+          }}
+        />
+      )}
     </div>
   );
 }
