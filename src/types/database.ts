@@ -540,6 +540,7 @@ export type Database = {
           home_id: string
           id: string
           is_done: boolean
+          position: number
           recurring_id: string | null
           reminded: boolean
           scheduled_date: string
@@ -557,6 +558,7 @@ export type Database = {
           home_id: string
           id?: string
           is_done?: boolean
+          position?: number
           recurring_id?: string | null
           reminded?: boolean
           scheduled_date: string
@@ -574,6 +576,7 @@ export type Database = {
           home_id?: string
           id?: string
           is_done?: boolean
+          position?: number
           recurring_id?: string | null
           reminded?: boolean
           scheduled_date?: string
@@ -630,6 +633,117 @@ export type Database = {
           quantity?: number
           source?: string
           unit?: string | null
+        }
+        Relationships: []
+      }
+      task_templates: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          end_time: string | null
+          home_id: string
+          id: string
+          position: number
+          start_time: string | null
+          title: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          end_time?: string | null
+          home_id: string
+          id?: string
+          position?: number
+          start_time?: string | null
+          title: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          end_time?: string | null
+          home_id?: string
+          id?: string
+          position?: number
+          start_time?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
+      pickup_points: {
+        Row: {
+          closing_time: string | null
+          created_at: string
+          hold_days: number
+          home_id: string
+          id: string
+          location: string | null
+          name: string
+          notes: string | null
+          position: number
+        }
+        Insert: {
+          closing_time?: string | null
+          created_at?: string
+          hold_days?: number
+          home_id: string
+          id?: string
+          location?: string | null
+          name: string
+          notes?: string | null
+          position?: number
+        }
+        Update: {
+          closing_time?: string | null
+          created_at?: string
+          hold_days?: number
+          home_id?: string
+          id?: string
+          location?: string | null
+          name?: string
+          notes?: string | null
+          position?: number
+        }
+        Relationships: []
+      }
+      deliveries: {
+        Row: {
+          arrived_on: string
+          created_at: string
+          created_by: string | null
+          home_id: string
+          id: string
+          name: string
+          picked_up: boolean
+          pickup_point_id: string | null
+          position: number
+          return_by: string | null
+        }
+        Insert: {
+          arrived_on?: string
+          created_at?: string
+          created_by?: string | null
+          home_id: string
+          id?: string
+          name: string
+          picked_up?: boolean
+          pickup_point_id?: string | null
+          position?: number
+          return_by?: string | null
+        }
+        Update: {
+          arrived_on?: string
+          created_at?: string
+          created_by?: string | null
+          home_id?: string
+          id?: string
+          name?: string
+          picked_up?: boolean
+          pickup_point_id?: string | null
+          position?: number
+          return_by?: string | null
         }
         Relationships: []
       }

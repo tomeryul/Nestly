@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2, ChevronRight, ChevronLeft, Check, Clock, Repeat, X, CalendarDays, ListChecks, Pencil } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Plus, Trash2, ChevronRight, ChevronLeft, Check, Clock, Repeat, X, CalendarDays, ListChecks, Pencil, GripVertical, Library } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -7,6 +7,7 @@ import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
 import { DAYS_HE, DAYS_HE_SHORT, TASK_CATEGORIES, type TaskCategory } from "../lib/constants";
 import { addDays, formatTime, isToday, startOfWeek, toISODate, weekDates } from "../lib/dates";
 import { bgWrite, newId } from "../lib/optimistic";
+import { useDragReorder } from "../lib/dragReorder";
 import type { Tables } from "../types/database";
 
 type Task = Tables<"schedule_tasks">;
@@ -23,6 +24,7 @@ export default function Schedule() {
   const [showRecurring, setShowRecurring] = useState(false);
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [editTask, setEditTask] = useState<Task | null>(null);
+  const [showLibrary, setShowLibrary] = useState(false);
 
   const days = weekDates(weekStart);
   const weekFrom = toISODate(weekStart);
@@ -31,7 +33,7 @@ export default function Schedule() {
 
   const load = useCallback(async () => {
     if (!homeId) return;
-    const { data } = await supabase.from("schedule_tasks").select("*").eq("home_id", homeId).gte("scheduled_date", weekFrom).lte("scheduled_date", weekTo).order("start_time", { nullsFirst: true });
+    const { data } = await supabase.from("schedule_tasks").select("*").eq("home_id", homeId).gte("scheduled_date", weekFrom).lte("scheduled_date", weekTo).order("position").order("start_time", { nullsFirst: true });
     const list = data ?? [];
     setTasks(list);
     const ids = list.map((t) => t.id);
@@ -54,7 +56,14 @@ export default function Schedule() {
   }, [load]);
 
   const nameFor = (uid: string | null) => members.find((m) => m.user_id === uid)?.profile?.display_name ?? "";
-  const dayTasks = tasks.filter((t) => t.scheduled_date === selectedIso).sort((a, b) => (a.start_time ?? "99").localeCompare(b.start_time ?? "99"));
+  // Manual order wins; tasks never dragged all sit at position 0 and fall back to time order.
+  const dayTasks = useMemo(
+    () =>
+      tasks
+        .filter((t) => t.scheduled_date === selectedIso)
+        .sort((a, b) => a.position - b.position || (a.start_time ?? "99").localeCompare(b.start_time ?? "99")),
+    [tasks, selectedIso]
+  );
   const countFor = (iso: string) => tasks.filter((t) => t.scheduled_date === iso).length;
 
   const toggle = (t: Task) => {
@@ -65,6 +74,16 @@ export default function Schedule() {
     setTasks((prev) => prev.filter((x) => x.id !== id));
     bgWrite(supabase.from("schedule_tasks").delete().eq("id", id), load);
   };
+
+  const reorder = useCallback(
+    async (ids: string[]) => {
+      await Promise.all(ids.map((id, i) => supabase.from("schedule_tasks").update({ position: i }).eq("id", id)));
+      load();
+    },
+    [load]
+  );
+  const dr = useDragReorder(dayTasks, reorder);
+  const byId = useMemo(() => new Map(dayTasks.map((t) => [t.id, t])), [dayTasks]);
 
   if (loading) return <FullPageSpinner />;
 
@@ -99,19 +118,31 @@ export default function Schedule() {
         </button>
       </div>
 
-      <button className="btn btn-primary btn-block" style={{ padding: 13 }} onClick={() => setAdding(true)}>
-        <Plus size={18} /> משימה ל{DAYS_HE[selected.getDay()]}
-      </button>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="btn btn-primary" style={{ flex: 1, justifyContent: "center", padding: 13 }} onClick={() => setAdding(true)}>
+          <Plus size={18} /> משימה ל{DAYS_HE[selected.getDay()]}
+        </button>
+        <button className="btn" style={{ padding: "0 14px" }} onClick={() => setShowLibrary(true)} title="מאגר משימות קבוע">
+          <Library size={16} /> מהמאגר
+        </button>
+      </div>
 
       {dayTasks.length === 0 ? (
         <EmptyState icon={<CalendarDays size={42} />} title="אין משימות ליום זה" />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-          {dayTasks.map((t) => {
+          {dr.order.map((id) => {
+            const t = byId.get(id);
+            if (!t) return null;
             const cat = TASK_CATEGORIES[t.category as TaskCategory] ?? TASK_CATEGORIES.general;
             const who = nameFor(t.assigned_to);
             return (
-              <div className="task-item" key={t.id} style={{ opacity: t.is_done ? 0.55 : 1 }}>
+              <div className="task-item" key={t.id} ref={dr.setItemRef(t.id)} style={{ opacity: t.is_done ? 0.55 : 1, ...dr.itemStyle(t.id) }}>
+                {dayTasks.length > 1 && (
+                  <span className="nst-grip" {...dr.handleProps(t.id)} title="גרירה לסידור">
+                    <GripVertical size={17} />
+                  </span>
+                )}
                 <span style={{ width: 5, height: 38, borderRadius: 5, background: t.color ?? cat.color, flex: "none" }} />
                 <button className={`nst-check ${t.is_done ? "on" : ""}`} onClick={() => toggle(t)}>
                   <Check size={14} />
@@ -153,6 +184,7 @@ export default function Schedule() {
           homeId={homeId!}
           dateIso={selectedIso}
           initial={editTask}
+          nextPosition={dayTasks.length}
           onClose={() => {
             setAdding(false);
             setEditTask(null);
@@ -168,6 +200,19 @@ export default function Schedule() {
         />
       )}
       {showRecurring && <RecurringTaskModal homeId={homeId!} onClose={() => setShowRecurring(false)} />}
+      {showLibrary && (
+        <TaskLibraryModal
+          homeId={homeId!}
+          dateIso={selectedIso}
+          dayLabel={DAYS_HE[selected.getDay()]}
+          nextPosition={dayTasks.length}
+          onClose={() => setShowLibrary(false)}
+          onAdded={() => {
+            setShowLibrary(false);
+            load();
+          }}
+        />
+      )}
       {detailTask && (
         <TaskDetailModal
           task={detailTask}
@@ -253,6 +298,126 @@ function TaskDetailModal({ task, onEdit, onClose }: { task: Task; onEdit: (t: Ta
   );
 }
 
+/**
+ * A reusable library of tasks, the schedule's counterpart to `dishes` feeding the
+ * weekly menu: manage the templates here, then drop one onto the selected day as
+ * a real schedule_tasks row.
+ */
+function TaskLibraryModal({
+  homeId,
+  dateIso,
+  dayLabel,
+  nextPosition,
+  onClose,
+  onAdded,
+}: {
+  homeId: string;
+  dateIso: string;
+  dayLabel: string;
+  nextPosition: number;
+  onClose: () => void;
+  onAdded: () => void;
+}) {
+  const { user } = useAuth();
+  const [rows, setRows] = useState<Tables<"task_templates">[]>([]);
+  const [title, setTitle] = useState("");
+  const [start, setStart] = useState("");
+  const [category, setCategory] = useState<TaskCategory>("general");
+
+  const load = useCallback(async () => {
+    const { data } = await supabase.from("task_templates").select("*").eq("home_id", homeId).order("position").order("created_at");
+    setRows(data ?? []);
+  }, [homeId]);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const addTemplate = () => {
+    if (!title.trim()) return;
+    const id = newId();
+    const row: Tables<"task_templates"> = {
+      id, home_id: homeId, title: title.trim(), category, start_time: start || null, end_time: null,
+      position: rows.length, created_by: user?.id ?? null, created_at: new Date().toISOString(),
+    };
+    setRows((prev) => [...prev, row]);
+    setTitle("");
+    setStart("");
+    bgWrite(
+      supabase.from("task_templates").insert({ id, home_id: homeId, title: row.title, category, start_time: row.start_time, position: row.position, created_by: user?.id ?? null }),
+      load
+    );
+  };
+  const removeTemplate = (id: string) => {
+    setRows((prev) => prev.filter((r) => r.id !== id));
+    bgWrite(supabase.from("task_templates").delete().eq("id", id), load);
+  };
+  const useTemplate = async (r: Tables<"task_templates">) => {
+    await supabase.from("schedule_tasks").insert({
+      home_id: homeId,
+      title: r.title,
+      scheduled_date: dateIso,
+      start_time: r.start_time,
+      end_time: r.end_time,
+      category: r.category,
+      position: nextPosition,
+      created_by: user?.id ?? null,
+    });
+    onAdded();
+  };
+
+  return (
+    <Modal open onClose={onClose} title="מאגר משימות">
+      <p className="section-sub" style={{ marginTop: "-0.3rem", marginBottom: "1rem" }}>
+        משימות ששמורות אצלכם קבוע. הקישו על משימה כדי להוסיף אותה ליום {dayLabel}.
+      </p>
+
+      <div style={{ background: "var(--surface-2)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 10, marginBottom: "1rem" }}>
+        <input placeholder="שם המשימה (למשל: הוצאת זבל)" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addTemplate()} />
+        <div style={{ display: "flex", gap: 8 }}>
+          <input type="time" style={{ width: 120 }} value={start} onChange={(e) => setStart(e.target.value)} title="שעה (רשות)" />
+          <select style={{ flex: 1 }} value={category} onChange={(e) => setCategory(e.target.value as TaskCategory)}>
+            {(Object.keys(TASK_CATEGORIES) as TaskCategory[]).map((k) => (
+              <option key={k} value={k}>
+                {TASK_CATEGORIES[k].label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button className="btn btn-primary btn-block" style={{ padding: 11 }} onClick={addTemplate}>
+          <Plus size={16} /> הוספה למאגר
+        </button>
+      </div>
+
+      {rows.length === 0 ? (
+        <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: "0.5rem 0" }}>המאגר ריק — הוסיפו משימה קבועה למעלה</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {rows.map((r) => {
+            const cat = TASK_CATEGORIES[r.category as TaskCategory] ?? TASK_CATEGORIES.general;
+            return (
+              <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface)", borderRadius: 12, padding: "9px 12px", boxShadow: "var(--shadow-sm)" }}>
+                <button
+                  onClick={() => useTemplate(r)}
+                  style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, border: "none", background: "transparent", textAlign: "right", cursor: "pointer" }}
+                  title={`הוספה ליום ${dayLabel}`}
+                >
+                  <Plus size={15} style={{ color: "var(--accent)", flex: "none" }} />
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: "var(--text-2)", fontWeight: 600 }}>{r.title}</span>
+                  {r.start_time && <span className="nst-tag">{formatTime(r.start_time)}</span>}
+                  <span className="nst-tag" style={{ color: cat.color, background: cat.color + "1f" }}>{cat.label}</span>
+                </button>
+                <button className="nst-del" onClick={() => removeTemplate(r.id)} title="מחיקה מהמאגר">
+                  <X size={16} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 function MemberSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const { members } = useHome();
   return (
@@ -267,7 +432,7 @@ function MemberSelect({ value, onChange }: { value: string; onChange: (v: string
   );
 }
 
-function TaskModal({ homeId, dateIso, initial, onClose, onSaved }: { homeId: string; dateIso: string; initial?: Task | null; onClose: () => void; onSaved: (savedDate: string) => void }) {
+function TaskModal({ homeId, dateIso, initial, nextPosition, onClose, onSaved }: { homeId: string; dateIso: string; initial?: Task | null; nextPosition: number; onClose: () => void; onSaved: (savedDate: string) => void }) {
   const { user } = useAuth();
   const [title, setTitle] = useState(initial?.title ?? "");
   const [date, setDate] = useState(initial?.scheduled_date ?? dateIso);
@@ -281,7 +446,7 @@ function TaskModal({ homeId, dateIso, initial, onClose, onSaved }: { homeId: str
     if (initial) {
       await supabase.from("schedule_tasks").update({ title: title.trim(), scheduled_date: date, start_time: start || null, end_time: end || null, category, assigned_to: assigned || null }).eq("id", initial.id);
     } else {
-      await supabase.from("schedule_tasks").insert({ home_id: homeId, title: title.trim(), scheduled_date: date, start_time: start || null, end_time: end || null, category, assigned_to: assigned || null, created_by: user?.id ?? null });
+      await supabase.from("schedule_tasks").insert({ home_id: homeId, title: title.trim(), scheduled_date: date, start_time: start || null, end_time: end || null, category, assigned_to: assigned || null, position: nextPosition, created_by: user?.id ?? null });
     }
     onSaved(date);
   };
