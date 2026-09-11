@@ -25,6 +25,7 @@ export default function Schedule() {
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [showLibrary, setShowLibrary] = useState(false);
+  const [templates, setTemplates] = useState<Tables<"task_templates">[]>([]);
 
   const days = weekDates(weekStart);
   const weekFrom = toISODate(weekStart);
@@ -54,6 +55,15 @@ export default function Schedule() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const loadTemplates = useCallback(async () => {
+    if (!homeId) return;
+    const { data } = await supabase.from("task_templates").select("*").eq("home_id", homeId).order("position").order("created_at");
+    setTemplates(data ?? []);
+  }, [homeId]);
+  useEffect(() => {
+    loadTemplates();
+  }, [loadTemplates]);
 
   const nameFor = (uid: string | null) => members.find((m) => m.user_id === uid)?.profile?.display_name ?? "";
   // Manual order wins; tasks never dragged all sit at position 0 and fall back to time order.
@@ -196,6 +206,7 @@ export default function Schedule() {
           dateIso={selectedIso}
           initial={editTask}
           positionFor={positionFor}
+          templates={templates}
           onClose={() => {
             setAdding(false);
             setEditTask(null);
@@ -217,9 +228,13 @@ export default function Schedule() {
           dateIso={selectedIso}
           dayLabel={DAYS_HE[selected.getDay()]}
           positionFor={positionFor}
-          onClose={() => setShowLibrary(false)}
+          onClose={() => {
+            setShowLibrary(false);
+            loadTemplates();
+          }}
           onAdded={() => {
             setShowLibrary(false);
+            loadTemplates();
             load();
           }}
         />
@@ -443,7 +458,7 @@ function MemberSelect({ value, onChange }: { value: string; onChange: (v: string
   );
 }
 
-function TaskModal({ homeId, dateIso, initial, positionFor, onClose, onSaved }: { homeId: string; dateIso: string; initial?: Task | null; positionFor: (iso: string) => number; onClose: () => void; onSaved: (savedDate: string) => void }) {
+function TaskModal({ homeId, dateIso, initial, positionFor, templates, onClose, onSaved }: { homeId: string; dateIso: string; initial?: Task | null; positionFor: (iso: string) => number; templates: Tables<"task_templates">[]; onClose: () => void; onSaved: (savedDate: string) => void }) {
   const { user } = useAuth();
   const [title, setTitle] = useState(initial?.title ?? "");
   const [date, setDate] = useState(initial?.scheduled_date ?? dateIso);
@@ -451,6 +466,24 @@ function TaskModal({ homeId, dateIso, initial, positionFor, onClose, onSaved }: 
   const [end, setEnd] = useState(initial?.end_time ? initial.end_time.slice(0, 5) : "");
   const [category, setCategory] = useState<TaskCategory>((initial?.category as TaskCategory) ?? "general");
   const [assigned, setAssigned] = useState(initial?.assigned_to ?? "");
+  const [focused, setFocused] = useState(false);
+
+  // Suggest from the saved library as soon as the user starts typing, so a
+  // recurring task can be filled in (title, time, category) without opening it.
+  const suggestions = useMemo(() => {
+    const q = title.trim();
+    if (!q) return [];
+    const lower = q.toLowerCase();
+    return templates.filter((t) => t.title.toLowerCase().includes(lower) && t.title !== title).slice(0, 5);
+  }, [title, templates]);
+
+  const applyTemplate = (t: Tables<"task_templates">) => {
+    setTitle(t.title);
+    if (t.start_time) setStart(t.start_time.slice(0, 5));
+    if (t.end_time) setEnd(t.end_time.slice(0, 5));
+    setCategory((t.category as TaskCategory) ?? "general");
+    setFocused(false);
+  };
 
   const save = async () => {
     if (!title.trim()) return;
@@ -467,7 +500,35 @@ function TaskModal({ homeId, dateIso, initial, positionFor, onClose, onSaved }: 
       <div className="nst-fields">
         <div>
           <label>כותרת המשימה</label>
-          <input placeholder="למשל: הוצאת זבל" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <input
+            placeholder="למשל: הוצאת זבל"
+            autoComplete="off"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setTimeout(() => setFocused(false), 150)}
+          />
+          {focused && suggestions.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+              {suggestions.map((t) => {
+                const cat = TASK_CATEGORIES[t.category as TaskCategory] ?? TASK_CATEGORIES.general;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => applyTemplate(t)}
+                    style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--surface-2)", border: "none", borderRadius: 10, padding: "9px 12px", cursor: "pointer", textAlign: "right" }}
+                  >
+                    <Library size={14} style={{ color: "var(--accent)", flex: "none" }} />
+                    <span style={{ flex: 1, minWidth: 0, font: "600 13.5px var(--font-body)", color: "var(--text-bright)" }}>{t.title}</span>
+                    {t.start_time && <span className="nst-tag">{formatTime(t.start_time)}</span>}
+                    <span className="nst-tag" style={{ color: cat.color, background: cat.color + "1f" }}>{cat.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
         <div>
           <label>תאריך {initial ? "(אפשר להעביר ליום אחר)" : ""}</label>
