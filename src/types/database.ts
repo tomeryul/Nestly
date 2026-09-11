@@ -719,6 +719,7 @@ export type Database = {
           picked_up: boolean
           pickup_point_id: string | null
           position: number
+          stage: number
           return_by: string | null
         }
         Insert: {
@@ -731,6 +732,7 @@ export type Database = {
           picked_up?: boolean
           pickup_point_id?: string | null
           position?: number
+          stage?: number
           return_by?: string | null
         }
         Update: {
@@ -743,6 +745,7 @@ export type Database = {
           picked_up?: boolean
           pickup_point_id?: string | null
           position?: number
+          stage?: number
           return_by?: string | null
         }
         Relationships: []

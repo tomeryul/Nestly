@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Check, Package, MapPin, Clock, X, GripVertical, Store, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Check, Package, MapPin, Clock, X, GripVertical, Store, AlertTriangle, ShoppingBag, PackageCheck, ArrowLeft, Navigation } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -26,6 +26,16 @@ function addDaysIso(iso: string, days: number) {
   return toISODate(d);
 }
 
+const STAGES = [
+  { label: "הזמנה בוצעה", icon: ShoppingBag },
+  { label: "כתובת משלוח", icon: MapPin },
+  { label: "החבילה נאספה", icon: PackageCheck },
+];
+const LAST_STAGE = STAGES.length - 1; // 2 — collected
+
+/** Waze deep link; works as an app handoff on mobile and the web client otherwise. */
+const wazeUrl = (address: string) => `https://waze.com/ul?q=${encodeURIComponent(address)}&navigate=yes`;
+
 export default function Deliveries() {
   const { homeId } = useHome();
   const { user } = useAuth();
@@ -36,7 +46,7 @@ export default function Deliveries() {
 
   // new delivery form
   const [name, setName] = useState("");
-  const [pointId, setPointId] = useState("");
+  const [stagingPoint, setStagingPoint] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     if (!homeId) return;
@@ -51,32 +61,29 @@ export default function Deliveries() {
   useEffect(() => {
     load();
   }, [load]);
-  // Keep the selection valid: a deleted point must not linger as a dangling id,
-  // or the next insert fails the foreign key and the parcel silently vanishes.
+  // Drop staged selections whose pickup point was deleted, so a card never
+  // submits a dangling id that would fail the foreign key.
   useEffect(() => {
-    if (points.length === 0) {
-      if (pointId) setPointId("");
-    } else if (!points.some((p) => p.id === pointId)) {
-      setPointId(points[0].id);
-    }
-  }, [points, pointId]);
+    setStagingPoint((prev) => {
+      const kept = Object.fromEntries(Object.entries(prev).filter(([, v]) => points.some((p) => p.id === v)));
+      return Object.keys(kept).length === Object.keys(prev).length ? prev : kept;
+    });
+  }, [points]);
 
   const pointById = useMemo(() => new Map(points.map((p) => [p.id, p])), [points]);
 
   const addDelivery = () => {
     if (!name.trim() || !homeId) return;
-    const today = toISODate(new Date());
-    const point = pointId ? pointById.get(pointId) : undefined;
     const id = newId();
     const row: Delivery = {
       id,
       home_id: homeId,
       name: name.trim(),
-      pickup_point_id: pointId || null,
-      arrived_on: today,
-      // A parcel goes back to the sender after the point's holding period.
-      return_by: point ? addDaysIso(today, point.hold_days) : null,
+      pickup_point_id: null,
+      arrived_on: toISODate(new Date()),
+      return_by: null,
       picked_up: false,
+      stage: 0,
       position: deliveries.length,
       created_by: user?.id ?? null,
       created_at: new Date().toISOString(),
@@ -84,17 +91,32 @@ export default function Deliveries() {
     setDeliveries((prev) => [...prev, row]);
     setName("");
     bgWrite(
-      supabase.from("deliveries").insert({
-        id, home_id: homeId, name: row.name, pickup_point_id: row.pickup_point_id,
-        arrived_on: today, return_by: row.return_by, position: row.position, created_by: user?.id ?? null,
-      }),
+      supabase.from("deliveries").insert({ id, home_id: homeId, name: row.name, stage: 0, position: row.position, created_by: user?.id ?? null }),
       load
     );
   };
-  const togglePicked = (d: Delivery) => {
-    setDeliveries((prev) => prev.map((x) => (x.id === d.id ? { ...x, picked_up: !x.picked_up } : x)));
-    bgWrite(supabase.from("deliveries").update({ picked_up: !d.picked_up }).eq("id", d.id), load);
+
+  /** Stage 0 -> 1: the parcel reached a pickup point, so the return clock starts now. */
+  const setAddress = (d: Delivery, targetPointId: string) => {
+    const point = pointById.get(targetPointId);
+    if (!point) return;
+    const today = toISODate(new Date());
+    const patch = { pickup_point_id: targetPointId, arrived_on: today, return_by: addDaysIso(today, point.hold_days), stage: 1 };
+    setDeliveries((prev) => prev.map((x) => (x.id === d.id ? { ...x, ...patch } : x)));
+    bgWrite(supabase.from("deliveries").update(patch).eq("id", d.id), load);
   };
+
+  const setStage = (d: Delivery, stage: number) => {
+    const next = Math.max(0, Math.min(stage, LAST_STAGE));
+    // Going back before the address clears it, so the flow stays truthful.
+    const patch =
+      next === 0
+        ? { stage: 0, picked_up: false, pickup_point_id: null, return_by: null }
+        : { stage: next, picked_up: next >= LAST_STAGE };
+    setDeliveries((prev) => prev.map((x) => (x.id === d.id ? { ...x, ...patch } : x)));
+    bgWrite(supabase.from("deliveries").update(patch).eq("id", d.id), load);
+  };
+
   const removeDelivery = (id: string) => {
     setDeliveries((prev) => prev.filter((x) => x.id !== id));
     bgWrite(supabase.from("deliveries").delete().eq("id", id), load);
@@ -127,11 +149,11 @@ export default function Deliveries() {
 
   // Memoised: useDragReorder syncs from this array, and a fresh identity each
   // render would snap the just-dragged order back to the stale server order.
-  const open = useMemo(() => deliveries.filter((d) => !d.picked_up), [deliveries]);
-  const collected = useMemo(() => deliveries.filter((d) => d.picked_up), [deliveries]);
+  const open = useMemo(() => deliveries.filter((d) => d.stage < LAST_STAGE), [deliveries]);
+  const collected = useMemo(() => deliveries.filter((d) => d.stage >= LAST_STAGE), [deliveries]);
   const dr = useDragReorder(open, reorderDeliveries);
   const openById = useMemo(() => new Map(open.map((d) => [d.id, d])), [open]);
-  const urgent = open.filter((d) => d.return_by && daysUntil(d.return_by) <= 1).length;
+  const urgent = open.filter((d) => d.pickup_point_id && d.return_by && daysUntil(d.return_by) <= 1).length;
 
   if (loading) return <FullPageSpinner />;
 
@@ -147,49 +169,126 @@ export default function Deliveries() {
   const row = (d: Delivery, draggable: boolean) => {
     const point = d.pickup_point_id ? pointById.get(d.pickup_point_id) : undefined;
     const dl = deadline(d);
+    const done = d.stage >= LAST_STAGE;
+    const address = point?.location?.trim() || point?.name?.trim() || "";
+
     return (
       <div
-        className="nst-row"
+        className="nst-card"
         key={d.id}
         ref={draggable ? dr.setItemRef(d.id) : undefined}
-        style={{ opacity: d.picked_up ? 0.55 : 1, ...(draggable ? dr.itemStyle(d.id) : {}) }}
+        style={{ padding: "1rem 1.1rem", display: "flex", flexDirection: "column", gap: 12, opacity: done ? 0.7 : 1, ...(draggable ? dr.itemStyle(d.id) : {}) }}
       >
-        {draggable && open.length > 1 && (
-          <span className="nst-grip" {...dr.handleProps(d.id)} title="גרירה לסידור">
-            <GripVertical size={17} />
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {draggable && open.length > 1 && (
+            <span className="nst-grip" {...dr.handleProps(d.id)} title="גרירה לסידור">
+              <GripVertical size={18} />
+            </span>
+          )}
+          <span style={{ width: 40, height: 40, borderRadius: 12, background: "var(--cat-7-bg)", color: "var(--cat-7-fg)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+            <Package size={20} />
           </span>
-        )}
-        <button className={`nst-check ${d.picked_up ? "on" : ""}`} onClick={() => togglePicked(d)} title={d.picked_up ? "החזרה לרשימה" : "נאסף"}>
-          <Check size={14} />
-        </button>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: d.picked_up ? "line-through" : "none" }}>{d.name}</p>
-          <div style={{ display: "flex", gap: 7, alignItems: "center", marginTop: 3, flexWrap: "wrap" }}>
-            {point && (
-              <span className="nst-tag">
-                <Store /> {point.name}
-              </span>
-            )}
-            {point?.location && (
-              <span className="nst-tag">
-                <MapPin /> {point.location}
-              </span>
-            )}
-            {point?.closing_time && (
-              <span className="nst-tag">
-                <Clock /> נסגר {formatTime(point.closing_time)}
-              </span>
-            )}
-            {dl && !d.picked_up && (
-              <span className="nst-tag" style={{ background: dl.soft, color: dl.tone }}>
-                {dl.left <= 0 && <AlertTriangle />} {dl.label}
-              </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ font: "600 15px var(--font-body)", color: "var(--text-bright)", textDecoration: done ? "line-through" : "none" }}>{d.name}</p>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 3, flexWrap: "wrap" }}>
+              {point && (
+                <span className="nst-tag">
+                  <Store /> {point.name}
+                </span>
+              )}
+              {point?.closing_time && (
+                <span className="nst-tag">
+                  <Clock /> נסגר {formatTime(point.closing_time)}
+                </span>
+              )}
+              {dl && point && !done && (
+                <span className="nst-tag" style={{ background: dl.soft, color: dl.tone }}>
+                  {dl.left <= 0 && <AlertTriangle />} {dl.label}
+                </span>
+              )}
+            </div>
+          </div>
+          <button className="nst-del" onClick={() => removeDelivery(d.id)}>
+            <Trash2 size={17} />
+          </button>
+        </div>
+
+        {/* stage progress */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {STAGES.map((st, i) => {
+            const state = d.stage > i ? "done" : d.stage === i ? "current" : "todo";
+            return (
+              <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                <div
+                  style={{
+                    width: 34, height: 34, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center",
+                    background: state === "done" ? "var(--accent)" : state === "current" ? "var(--accent-soft)" : "var(--surface-2)",
+                    color: state === "done" ? "#fff" : state === "current" ? "var(--accent-ink)" : "var(--text-muted)",
+                    boxShadow: state === "todo" ? "inset 0 0 0 1px var(--border-2)" : "none",
+                  }}
+                >
+                  {state === "done" ? <Check size={16} /> : <st.icon size={16} />}
+                </div>
+                <span style={{ fontSize: 9.5, fontWeight: 700, color: state === "todo" ? "var(--text-muted)" : "var(--text-2)", textAlign: "center" }}>{st.label}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* the address, once we have one, with a Waze handoff */}
+        {point && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <MapPin size={15} style={{ color: "var(--accent)", flex: "none" }} />
+            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: "var(--text-2)", fontWeight: 600 }}>{address || "ללא כתובת"}</span>
+            {address && (
+              <a className="btn btn-sm" href={wazeUrl(address)} target="_blank" rel="noopener noreferrer" title="ניווט עם Waze">
+                <Navigation size={14} /> Waze
+              </a>
             )}
           </div>
-        </div>
-        <button className="nst-del" onClick={() => removeDelivery(d.id)}>
-          <Trash2 />
-        </button>
+        )}
+
+        {/* Needs an address: stage 0, or a later stage whose pickup point was deleted. */}
+        {d.stage < LAST_STAGE && !point &&
+          (points.length === 0 ? (
+            <p className="section-sub">הוסיפו נקודת איסוף בלשונית "נקודות איסוף" כדי להמשיך.</p>
+          ) : (
+            <div style={{ display: "flex", gap: 8 }}>
+              <select style={{ flex: 1 }} value={stagingPoint[d.id] ?? points[0].id} onChange={(e) => setStagingPoint((prev) => ({ ...prev, [d.id]: e.target.value }))}>
+                {points.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                    {p.location ? ` · ${p.location}` : ""}
+                  </option>
+                ))}
+              </select>
+              <button className="btn btn-primary" style={{ padding: "0 14px" }} onClick={() => setAddress(d, stagingPoint[d.id] ?? points[0].id)}>
+                הגיע לכתובת <ArrowLeft size={16} />
+              </button>
+            </div>
+          ))}
+
+        {d.stage === 1 && point && (
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn btn-sm" onClick={() => setStage(d, 0)}>
+              שלב קודם
+            </button>
+            <button className="btn btn-primary" style={{ flex: 1, justifyContent: "center" }} onClick={() => setStage(d, 2)}>
+              סיימתי · החבילה נאספה <ArrowLeft size={16} />
+            </button>
+          </div>
+        )}
+
+        {done && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span className="badge b-active" style={{ borderRadius: 30 }}>
+              <Check size={12} style={{ verticalAlign: -2 }} /> נאספה
+            </span>
+            <button className="btn btn-sm" onClick={() => setStage(d, 1)}>
+              חזרה
+            </button>
+          </div>
+        )}
       </div>
     );
   };
@@ -224,30 +323,17 @@ export default function Deliveries() {
           )}
 
           <div className="nst-card" style={{ padding: "1rem 1.1rem", display: "flex", flexDirection: "column", gap: 10 }}>
-            {points.length === 0 ? (
-              <p className="section-sub">קודם הוסיפו נקודת איסוף בלשונית "נקודות איסוף", ואז תוכלו לרשום כאן חבילות.</p>
-            ) : (
-              <>
-                <input placeholder="מה הגיע? (למשל: חבילה מאמזון)" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addDelivery()} />
-                <div style={{ display: "flex", gap: 8 }}>
-                  <select style={{ flex: 1 }} value={pointId} onChange={(e) => setPointId(e.target.value)}>
-                    {points.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                        {p.location ? ` · ${p.location}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <button className="btn btn-primary" style={{ padding: "0 16px" }} onClick={addDelivery}>
-                    <Plus size={18} />
-                  </button>
-                </div>
-              </>
-            )}
+            <p className="section-sub" style={{ marginTop: "-0.2rem" }}>רשמו מה הזמנתם. את הכתובת תבחרו כשהחבילה תגיע לנקודת איסוף.</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input style={{ flex: 1 }} placeholder="מה הוזמן? (למשל: אוזניות מאמזון)" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addDelivery()} />
+              <button className="btn btn-primary" style={{ padding: "0 16px" }} onClick={addDelivery}>
+                <Plus size={18} />
+              </button>
+            </div>
           </div>
 
           {open.length === 0 ? (
-            <EmptyState icon={<Package size={42} />} title="אין חבילות לאיסוף" hint="כל מה שנאסף מופיע למטה" />
+            <EmptyState icon={<Package size={42} />} title="אין משלוחים פתוחים" hint="רשמו הזמנה חדשה למעלה" />
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
               {dr.order.map((id) => {
