@@ -103,6 +103,13 @@ export default function Cleaning() {
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, title: n } : t)));
     bgWrite(supabase.from("cleaning_tasks").update({ title: n }).eq("id", id), load);
   };
+  const reorderRooms = useCallback(
+    async (ids: string[]) => {
+      await Promise.all(ids.map((id, i) => supabase.from("cleaning_rooms").update({ position: i }).eq("id", id)));
+      load();
+    },
+    [load]
+  );
   const reorderTasks = useCallback(
     async (ids: string[]) => {
       await Promise.all(ids.map((id, i) => supabase.from("cleaning_tasks").update({ position: i }).eq("id", id)));
@@ -119,6 +126,9 @@ export default function Cleaning() {
     });
     return m;
   }, [tasks]);
+
+  const roomDrag = useDragReorder(rooms, reorderRooms);
+  const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
 
   const doneCount = tasks.filter((t) => doneIds.has(t.id)).length;
   const noRoomTasks = tasksByRoom.get("__none__") ?? [];
@@ -142,7 +152,13 @@ export default function Cleaning() {
             )
             .join("")}</table></div>`
         : "";
-    const bodyHtml = rooms.map((r) => roomBlock(r.name, tasksByRoom.get(r.id) ?? [])).join("") + roomBlock("ללא חדר", noRoomTasks);
+    // Follow the order shown on screen, including a drag that has not been reloaded yet.
+    const bodyHtml =
+      roomDrag.order
+        .map((rid) => roomById.get(rid))
+        .filter((r): r is Room => !!r)
+        .map((r) => roomBlock(r.name, tasksByRoom.get(r.id) ?? []))
+        .join("") + roomBlock("ללא חדר", noRoomTasks);
 
     const el = document.createElement("div");
     el.dir = "rtl";
@@ -234,11 +250,17 @@ export default function Cleaning() {
         <EmptyState icon={<Sparkles size={42} />} title="בואו נבנה את רשימת הניקיון" hint="הוסיפו חדרים, ותחת כל חדר את המשימות שחוזרות כל תקופה" />
       ) : (
         <>
-          {rooms.map((room) => (
+          {roomDrag.order.map((rid) => {
+            const room = roomById.get(rid);
+            if (!room) return null;
+            return (
             <RoomSection
               key={room.id}
               collapseKey={`${tab}:${room.id}`}
               name={room.name}
+              dragRef={roomDrag.setItemRef(room.id)}
+              dragHandle={rooms.length > 1 ? roomDrag.handleProps(room.id) : undefined}
+              dragStyle={roomDrag.itemStyle(room.id)}
               tasks={tasksByRoom.get(room.id) ?? []}
               doneIds={doneIds}
               onAddTask={(title) => addTask(room.id, title)}
@@ -249,7 +271,8 @@ export default function Cleaning() {
               onRename={(name) => renameRoom(room.id, name)}
               onRenameTask={renameTask}
             />
-          ))}
+            );
+          })}
           {noRoomTasks.length > 0 && (
             <RoomSection collapseKey={`${tab}:none`} name="ללא חדר" tasks={noRoomTasks} doneIds={doneIds} onAddTask={(title) => addTask(null, title)} onToggle={toggle} onRemoveTask={removeTask} onReorder={reorderTasks} onRenameTask={renameTask} />
           )}
@@ -262,6 +285,9 @@ export default function Cleaning() {
 function RoomSection({
   collapseKey,
   name,
+  dragRef,
+  dragHandle,
+  dragStyle,
   tasks,
   doneIds,
   onAddTask,
@@ -274,6 +300,9 @@ function RoomSection({
 }: {
   collapseKey: string;
   name: string;
+  dragRef?: (el: HTMLElement | null) => void;
+  dragHandle?: Record<string, unknown>;
+  dragStyle?: React.CSSProperties;
   tasks: CleaningTask[];
   doneIds: Set<string>;
   onAddTask: (title: string) => void;
@@ -313,8 +342,13 @@ function RoomSection({
   const done = tasks.filter((t) => doneIds.has(t.id)).length;
 
   return (
-    <div className="nst-card" style={{ padding: "1rem 1.1rem", display: "flex", flexDirection: "column", gap: 9 }}>
+    <div className="nst-card" ref={dragRef} style={{ padding: "1rem 1.1rem", display: "flex", flexDirection: "column", gap: 9, ...dragStyle }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {dragHandle && (
+          <span className="nst-grip" {...dragHandle} title="גרירה לסידור החדרים">
+            <GripVertical size={17} />
+          </span>
+        )}
         <button onClick={toggleCollapsed} title={collapsed ? "הרחבה" : "צמצום"} style={{ border: "none", background: "transparent", cursor: "pointer", color: "var(--accent)", display: "flex", padding: 0, lineHeight: 0 }}>
           <ChevronDown size={18} style={{ transition: "transform .15s", transform: collapsed ? "rotate(-90deg)" : "none" }} />
         </button>
