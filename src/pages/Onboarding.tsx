@@ -39,7 +39,7 @@ export default function Onboarding() {
 
   return (
     <div className="nst-root" dir="rtl">
-      <div className="login-screen" style={{ minHeight: "100vh", position: "relative", zIndex: 1 }}>
+      <div className="login-screen" style={{ minHeight: "100dvh", position: "relative", zIndex: 1 }}>
         <div className="login-box">
           <div style={{ display: "flex", justifyContent: "center", marginBottom: "0.4rem" }}>
             <span className="nst-logo-tile" style={{ width: 46, height: 46 }}>

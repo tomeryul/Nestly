@@ -18,8 +18,18 @@ export default function Layout() {
   const [bottom, setBottom] = useState<string[]>(() => getBottomNav());
   const navigate = useNavigate();
   const location = useLocation();
+  const [scrolled, setScrolled] = useState(false);
   // The theme can also be changed from Settings, so re-read it on navigation.
   useEffect(() => setNight(isNight()), [location.pathname]);
+
+  // The top bar is a material the content passes under: it stays clear until
+  // something is actually behind it, then frosts over and grows its hairline.
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 2);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [location.pathname]);
 
   const current = NAV.find((n) => (n.end ? location.pathname === "/" : location.pathname.startsWith(n.to)));
   const me = members.find((m) => m.user_id === user?.id);
@@ -72,7 +82,7 @@ export default function Layout() {
 
         {/* main */}
         <div className="nst-main">
-          <header className="nst-topbar">
+          <header className="nst-topbar" data-scrolled={scrolled}>
             <div className="nst-topbar-title">{current?.title ?? "Nestly"}</div>
             <div style={{ flex: 1 }} />
             <div style={{ position: "relative" }}>

@@ -51,7 +51,7 @@ export default function Login() {
 
   return (
     <div className="nst-root" dir="rtl">
-      <div className="login-screen" style={{ minHeight: "100vh", position: "relative", zIndex: 1 }}>
+      <div className="login-screen" style={{ minHeight: "100dvh", position: "relative", zIndex: 1 }}>
         <div className="login-box">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginBottom: "1.5rem" }}>
             <span className="nst-logo-tile" style={{ width: 46, height: 46 }}>

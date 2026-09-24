@@ -1,13 +1,16 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  // Touch browsers fake :hover on tap and leave it stuck until you touch
+  // something else; this wraps every hover: utility in a pointer query.
+  future: { hoverOnlyWhenSupported: true },
   theme: {
     extend: {
       fontFamily: {
         // Body / UI
-        sans: ['"Plus Jakarta Sans"', "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"],
+        sans: ["-apple-system", "BlinkMacSystemFont", '"SF Pro Text"', '"Segoe UI"', "system-ui", "sans-serif"],
         // Headings / numerics
-        display: ['"Spectral"', "Georgia", "serif"],
+        display: ["-apple-system", "BlinkMacSystemFont", '"SF Pro Display"', '"Segoe UI"', "system-ui", "sans-serif"],
       },
       colors: {
         // Sage accent ("Garden")

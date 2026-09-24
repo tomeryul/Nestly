@@ -13,7 +13,7 @@ export function Spinner({ className = "" }: { className?: string }) {
 
 export function FullPageSpinner() {
   return (
-    <div className="flex min-h-[60vh] items-center justify-center">
+    <div className="flex min-h-[60dvh] items-center justify-center">
       <Spinner className="h-8 w-8" />
     </div>
   );

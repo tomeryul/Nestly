@@ -74,6 +74,27 @@
   /* 8pt rhythm and a 44pt minimum hit target */
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px;
   --tap: 44px;
+
+  /* Leading runs inverse to size: the bigger the text, the tighter it sets. */
+  --lh-title: 1.14;
+  --lh-body: 1.45;
+
+  /* ---- Motion ----
+     Springs rather than ease curves. A spring's velocity is continuous, so an
+     animation that gets interrupted mid-flight still reads as one movement
+     instead of a restart — the thing that makes native UI feel alive. These
+     curves are sampled from the classic spring solution using Apple's own
+     (damping, response) pairs: damping 1.0 never overshoots and is the default;
+     0.8 overshoots slightly and is reserved for sheets and for anything a
+     gesture handed momentum to. */
+  --spring-move: linear(0, 0.0215, 0.0745, 0.1456, 0.2252, 0.3073, 0.3875, 0.4634, 0.5335, 0.597, 0.6538, 0.704, 0.7479, 0.7862, 0.8192, 0.8476, 0.8718, 0.8925, 0.91, 0.9248, 0.9373, 0.9478, 0.9566, 0.964, 0.9702, 0.9753, 0.9796, 0.9831, 0.9861, 0.9885, 0.9905, 0.9922, 0.9936, 0.9947, 0.9957, 0.9965, 0.9971, 0.9976, 0.9981, 0.9984, 0.9987);
+  --spring-move-dur: 569ms;
+  --spring-sheet: linear(0, 0.0198, 0.0707, 0.1418, 0.2248, 0.3131, 0.4019, 0.4877, 0.5682, 0.6418, 0.7078, 0.7659, 0.8162, 0.859, 0.8948, 0.9243, 0.9482, 0.9673, 0.9821, 0.9933, 1.0016, 1.0074, 1.0113, 1.0137, 1.0149, 1.0152, 1.0148, 1.014, 1.0129, 1.0116, 1.0102, 1.0089, 1.0076, 1.0064, 1.0053, 1.0043, 1.0034, 1.0027, 1.0021, 1.0015, 1.0011);
+  --spring-sheet-dur: 402ms;
+  --spring-quick: linear(0, 0.0219, 0.0758, 0.1477, 0.2283, 0.3111, 0.392, 0.4682, 0.5385, 0.6021, 0.6588, 0.7088, 0.7526, 0.7905, 0.8232, 0.8513, 0.8752, 0.8955, 0.9127, 0.9273, 0.9395, 0.9497, 0.9583, 0.9655, 0.9714, 0.9764, 0.9805, 0.9839, 0.9868, 0.9891, 0.9911, 0.9927, 0.994, 0.9951, 0.996, 0.9967, 0.9973, 0.9978, 0.9982, 0.9985, 0.9988);
+  --spring-quick-dur: 359ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --press: 120ms; /* press and release — short enough to read as contact */
 }
 
 /* ---- Alternate skins (data-theme on <html>) ---- */
@@ -123,6 +144,12 @@ html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   touch-action: manipulation;
+  /* The grey flash Safari paints on tap is the wrong shape and arrives late;
+     every control below draws its own press state instead. */
+  -webkit-tap-highlight-color: transparent;
+  /* Has to sit on html as well as body, or the page still rubber-bands as a
+     whole and drags the PWA's pull-to-refresh with it. */
+  overscroll-behavior: none;
 }
 body {
   margin: 0;
@@ -133,25 +160,24 @@ body {
   -webkit-font-smoothing: antialiased;
   touch-action: manipulation;
   overscroll-behavior: none;
+  line-height: var(--lh-body);
 }
-h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0.022em; font-weight: 700; }
+h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0.022em; font-weight: 700; line-height: var(--lh-title); }
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-.tab-content { animation: fadeIn 0.28s var(--ease-soft); }
+.tab-content { animation: fadeIn 0.24s var(--ease-out); }
 
 /* ---- Buttons ---- */
 .btn {
   min-height: var(--tap); padding: 11px 18px; border: none; background: var(--surface-3); color: var(--accent-ink);
   border-radius: var(--radius-sm); cursor: pointer; font: 600 var(--t-subhead)/1.2 var(--font-body); display: inline-flex;
   align-items: center; justify-content: center; gap: 6px; letter-spacing: -0.01em;
-  transition: opacity .15s var(--ease-soft), background .15s var(--ease-soft);
+  transition: transform var(--press) var(--ease-out), background var(--press) var(--ease-out);
 }
-.btn:hover { background: var(--surface-4); }
-.btn:active { opacity: 0.55; }
+.btn:active { transform: scale(0.96); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn svg { width: 16px; height: 16px; }
 .btn-primary { background: var(--accent); color: var(--on-accent); }
-.btn-primary:hover { background: var(--accent-hover); }
 .btn-danger { background: var(--danger); color: #fff; }
 .btn-sm { min-height: 34px; padding: 7px 13px; font-size: var(--t-footnote); border-radius: 9px; }
 .btn-block { width: 100%; }
@@ -220,14 +246,11 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .nst-meter.done > i { background: var(--ok); }
 .nst-stepper { display: flex; align-items: center; gap: 2px; background: var(--surface-2); border-radius: 10px; padding: 2px; box-shadow: inset 0 0 0 1px var(--border-2); flex: none; }
 .nst-stepper button { width: 30px; height: 30px; border: none; background: transparent; color: var(--text-2); cursor: pointer; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
-.nst-stepper button:hover { background: var(--surface-3); color: var(--text-bright); }
 .nst-stepper button svg { width: 15px; height: 15px; }
 .nst-stepper .val { min-width: 24px; text-align: center; font: 600 14px var(--font-body); color: var(--text-bright); }
 .nst-del { border: none; background: transparent; color: var(--text-faint); cursor: pointer; padding: 10px; border-radius: 9px; flex: none; display: inline-flex; align-items: center; justify-content: center; }
-.nst-del:hover { color: var(--danger); background: var(--danger-soft); }
 .nst-del svg { width: 17px; height: 17px; }
 .reorder-btn { border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 0 2px; line-height: 0; display: flex; }
-.reorder-btn:hover { color: var(--text-bright); }
 .reorder-btn:disabled { opacity: 0.3; cursor: default; }
 .nst-grip { border: none; background: transparent; color: var(--text-faint); cursor: grab; padding: 11px 6px; line-height: 0; display: flex; align-items: center; flex: none; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .nst-grip:active { cursor: grabbing; color: var(--text-muted); }
@@ -253,7 +276,6 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .nst-avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--accent); color: var(--on-accent); flex: none; display: flex; align-items: center; justify-content: center; font: 700 15px var(--font-body); }
 .nst-iconbtn { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; background: var(--surface-2); border: none; border-radius: 11px; color: var(--text-2); cursor: pointer; box-shadow: inset 0 0 0 1px var(--border-2); flex: none; }
 .nst-iconbtn.plain { background: transparent; box-shadow: none; }
-.nst-iconbtn:hover { color: var(--text-bright); }
 .nst-iconbtn svg { width: 18px; height: 18px; }
 
 /* next-action banner */
@@ -271,7 +293,7 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 /* stat / category tiles */
 .section-overview { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .sec-tile { border-radius: 16px; padding: 14px 14px 12px; background: var(--cat-bg, var(--surface-3)); color: var(--cat-fg, var(--text-2)); display: flex; flex-direction: column; gap: 4px; cursor: pointer; min-height: 92px; border: 1px solid transparent; text-align: right; transition: transform .15s var(--ease), box-shadow .2s var(--ease-soft); }
-.sec-tile:active { opacity: .7; }
+.sec-tile:active { transform: scale(0.975); }
 .sec-tile-ico { opacity: .8; margin-bottom: 2px; }
 .sec-tile-ico svg { width: 20px; height: 20px; }
 .sec-tile-count { font-family: var(--font-display); font-size: var(--t-title1); font-weight: 600; line-height: 1; margin-top: auto; letter-spacing: -0.028em; }
@@ -281,14 +303,28 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .task-item { background: var(--surface); padding: 11px 14px; border-radius: var(--radius); display: flex; gap: 12px; align-items: center; min-height: var(--tap); box-shadow: inset 0 0 0 1px var(--sep); }
 
 /* modal (bottom sheet) */
-.nst-modal-bg { position: fixed; inset: 0; background: rgba(30,25,30,.34); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 200; display: flex; align-items: flex-end; justify-content: center; animation: fadeIn .2s var(--ease-soft); }
-.nst-modal { background: var(--surface); border-radius: 12px 12px 0 0; padding: 1.5rem 1.4rem calc(1.5rem + env(safe-area-inset-bottom)); width: 100%; max-width: 520px; max-height: 92vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
+@keyframes dimIn { from { opacity: 0 } to { opacity: 1 } }
+/* The sheet rises from the edge it will leave by, on a spring that overshoots
+   a hair (damping 0.8) so it arrives with weight instead of just appearing. */
+@keyframes sheetIn { from { transform: translateY(100%) } to { transform: none } }
+.nst-modal-bg { position: fixed; inset: 0; background: rgba(30,25,30,.34); backdrop-filter: blur(20px) saturate(1.3); -webkit-backdrop-filter: blur(20px) saturate(1.3); z-index: 200; display: flex; align-items: flex-end; justify-content: center; animation: dimIn .22s var(--ease-out); }
+.nst-modal {
+  background: var(--surface); border-radius: 16px 16px 0 0;
+  padding: 1.5rem 1.4rem calc(1.5rem + env(safe-area-inset-bottom));
+  width: 100%; max-width: 520px; max-height: 92dvh;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  /* Keep the bounce inside the sheet — without this, scrolling past the end
+     hands the gesture to the page behind and drags it too. */
+  overscroll-behavior: contain;
+  box-shadow: var(--shadow-lg);
+  animation: sheetIn var(--spring-sheet-dur) var(--spring-sheet);
+  will-change: transform;
+}
 .nst-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; }
 .nst-modal-head h3 { font: 600 var(--t-title3) var(--font-display); color: var(--text-bright); letter-spacing: -0.022em; margin: 0; }
 .nst-fields { display: flex; flex-direction: column; gap: 12px; }
 .nst-dropdown { position: absolute; top: calc(100% + 8px); inset-inline-end: 0; min-width: 200px; background: var(--surface); border-radius: 16px; box-shadow: var(--shadow-lg); padding: 7px; z-index: 90; }
 .nst-dropdown button { display: block; width: 100%; text-align: right; padding: 11px 14px; border: none; background: transparent; color: var(--text-2); font: 600 13.5px var(--font-body); border-radius: 10px; cursor: pointer; }
-.nst-dropdown button:hover { background: var(--surface-2); color: var(--text-bright); }
 .nst-dropdown button.on { color: var(--accent-ink); font-weight: 700; }
 
 /* section title inside cards */
@@ -299,24 +335,38 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 /* ============================================================
    Layout — sidebar (desktop) + bottom nav (mobile)
    ============================================================ */
-.nst-root { min-height: 100vh; position: relative; }
+.nst-root { min-height: 100dvh; position: relative; }
 .nst-root::before {
   content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background: radial-gradient(60% 45% at 8% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
               radial-gradient(50% 35% at 100% 100%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%);
 }
-.nst-shell { position: relative; z-index: 1; display: flex; min-height: 100vh; }
+.nst-shell { position: relative; z-index: 1; display: flex; min-height: 100dvh; }
 .nst-sidebar { position: fixed; top: 0; bottom: 0; inset-inline-end: 0; width: 252px; background: var(--surface); border-inline-start: 1px solid var(--border); box-shadow: var(--shadow); display: flex; flex-direction: column; z-index: 80; }
 .nst-side-head { display: flex; align-items: center; gap: 11px; padding: 20px 16px 14px; }
 .nst-nav { flex: 1; overflow-y: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; }
 .nst-nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 13px; border-radius: 11px; border: none; background: transparent; color: var(--text-2); font: 500 var(--t-callout) var(--font-body); cursor: pointer; text-align: right; position: relative; letter-spacing: -.01em; width: 100%; min-height: var(--tap); }
-.nst-nav-item:hover { background: var(--hover); color: var(--text-bright); }
 .nst-nav-item.active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
 .nst-nav-item.active::before { content: ''; position: absolute; inset-inline-end: -12px; top: 50%; transform: translateY(-50%); width: 3px; height: 19px; border-radius: 3px 0 0 3px; background: var(--accent); }
 .nst-nav-item svg { width: 19px; height: 19px; flex: none; }
 .nst-side-foot { padding: 12px; border-top: 0.5px solid var(--sep); }
 .nst-main { flex: 1; margin-inline-end: 252px; min-width: 0; display: flex; flex-direction: column; }
-.nst-topbar { position: sticky; top: 0; z-index: 60; display: flex; align-items: center; gap: 10px; padding: 10px 16px; padding-top: calc(10px + env(safe-area-inset-top)); background: color-mix(in srgb, var(--bg) 80%, transparent); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5); border-bottom: 0.5px solid var(--sep); }
+/* A bar is a material the content slides under, not a panel sitting on top of
+   it: at the top of a page it is plain background with no edge, and it only
+   frosts over and grows a hairline once something has scrolled beneath it. */
+.nst-topbar {
+  position: sticky; top: 0; z-index: 60; display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; padding-top: calc(10px + env(safe-area-inset-top));
+  background: transparent; border-bottom: 0.5px solid transparent;
+  transition: background .25s var(--ease-out), border-color .25s var(--ease-out),
+              backdrop-filter .25s var(--ease-out);
+}
+.nst-topbar[data-scrolled="true"] {
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  border-bottom-color: var(--sep);
+}
 .nst-topbar-title { font: 600 var(--t-headline) var(--font-display); color: var(--text-bright); letter-spacing: -.02em; white-space: nowrap; }
 .nst-content { flex: 1; max-width: 920px; width: 100%; margin: 0 auto; padding: var(--sp-5) var(--sp-4) 6rem; }
 .nst-bottomnav { display: none; }
@@ -328,7 +378,7 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
   .nst-sidebar { display: none; }
   .nst-main { margin-inline-end: 0; }
   .nst-content { padding: var(--sp-4) var(--sp-4) 6.5rem; }
-  .nst-bottomnav { display: block; position: fixed; inset-inline: 0; bottom: 0; z-index: 80; background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); border-top: 1px solid var(--border); }
+  .nst-bottomnav { display: block; position: fixed; inset-inline: 0; bottom: 0; z-index: 80; background: color-mix(in srgb, var(--surface) 80%, transparent); backdrop-filter: blur(20px) saturate(1.8); -webkit-backdrop-filter: blur(20px) saturate(1.8); border-top: 0.5px solid var(--sep); }
   .nst-bn-grid { display: flex; max-width: 760px; margin: 0 auto; }
   .nst-bn-grid::-webkit-scrollbar { display: none; }
   .nst-bn { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 4px calc(7px + env(safe-area-inset-bottom)); border: none; background: transparent; color: var(--text-muted); font: 500 10px var(--font-body); letter-spacing: 0; cursor: pointer; white-space: nowrap; }
@@ -342,17 +392,121 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 
 /* ---- Hamburger menu ---- */
 .nst-burger { display: none; }
-.nst-drawer-wrap { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.38); backdrop-filter: blur(2px); display: flex; justify-content: flex-end; animation: nst-fade .15s ease; }
-.nst-drawer { width: min(310px, 86vw); background: var(--surface); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); animation: nst-slide-in .2s ease; overflow-y: auto; }
+.nst-drawer-wrap { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.38); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; justify-content: flex-end; animation: dimIn .22s var(--ease-out); }
+.nst-drawer { width: min(310px, 86vw); background: var(--surface); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); overflow-y: auto; overscroll-behavior: contain; animation: nst-slide-in var(--spring-quick-dur) var(--spring-quick); will-change: transform; }
 .nst-drawer-head { display: flex; align-items: center; gap: 11px; padding: 1.1rem 1rem 0.9rem; }
 .nst-drawer-nav { display: flex; flex-direction: column; gap: 2px; padding: 0 0.6rem; }
 .nst-drawer-item { display: flex; align-items: center; gap: 11px; width: 100%; padding: 12px 12px; border: none; background: transparent; color: var(--text-2); font: 600 14px var(--font-body); border-radius: 12px; cursor: pointer; text-align: right; text-decoration: none; }
-.nst-drawer-item:hover { background: var(--surface-2); color: var(--text-bright); }
 .nst-drawer-item.active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
 .nst-drawer-item.picked { color: var(--text-bright); }
 .nst-drawer-item svg { width: 19px; height: 19px; flex: none; }
-@keyframes nst-fade { from { opacity: 0 } to { opacity: 1 } }
-@keyframes nst-slide-in { from { transform: translateX(-14px); opacity: .6 } to { transform: none; opacity: 1 } }
+@keyframes nst-slide-in { from { transform: translateX(-100%) } to { transform: none } }
 @media (max-width: 860px) {
   .nst-burger { display: flex; }
+}
+
+
+/* ============================================================
+   Response, hover and accessibility
+   ============================================================ */
+
+/* Feedback belongs on touch-down, not on release: :active fires the moment a
+   finger lands, which is the whole reason a native control feels connected to
+   the hand. Everything tappable answers, and since the OS tap highlight is
+   switched off above, everything tappable *has* to. */
+.btn, .nst-chip, .nst-iconbtn, .nst-check, .nst-del, .sec-tile, .nst-day,
+.nst-seg button, .nst-stepper button, .login-tab, .theme-option, .user-chip,
+.next-action-cta, .nst-dropdown button, .nst-drawer-item, .nst-nav-item,
+.nst-bn, .reorder-btn {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Controls shrink under the finger; rows in a list dim instead, the way a
+   table row does on iOS — a scaling list row looks like it came loose. */
+.nst-chip:active, .nst-iconbtn:active, .nst-check:active, .nst-del:active,
+.nst-day:active, .nst-seg button:active, .nst-stepper button:active,
+.login-tab:active, .theme-option:active, .next-action-cta:active,
+.reorder-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.nst-nav-item:active, .nst-drawer-item:active,
+.nst-dropdown button:active, .user-chip:active { background-color: var(--hover); }
+/* A tab bar item has no plate to tint, so it answers by dimming. */
+.nst-bn:active { opacity: 0.45; }
+.nst-bn { transition: opacity var(--press) var(--ease-out), color var(--press) var(--ease-out); }
+.btn, .nst-chip, .nst-iconbtn, .nst-check, .nst-del, .sec-tile, .nst-day,
+.nst-seg button, .nst-stepper button, .login-tab, .theme-option,
+.next-action-cta, .reorder-btn {
+  transition: transform var(--press) var(--ease-out), background var(--press) var(--ease-out),
+              color var(--press) var(--ease-out), opacity var(--press) var(--ease-out);
+}
+.nst-nav-item, .nst-drawer-item, .nst-dropdown button, .user-chip {
+  transition: background var(--press) var(--ease-out), color var(--press) var(--ease-out);
+}
+/* Text still has to be selectable where it is content rather than a control. */
+input, textarea, p, li, h1, h2, h3, .nst-card-title, .page-title {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+
+/* Hover is a mouse idea. On a touchscreen the browser fakes it on tap and the
+   highlight then sticks until you touch something else, so gate every one. */
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover { background: var(--surface-4); }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .nst-stepper button:hover { background: var(--surface-3); color: var(--text-bright); }
+  .nst-del:hover { color: var(--danger); background: var(--danger-soft); }
+  .reorder-btn:hover:not(:disabled) { color: var(--text-bright); }
+  .nst-iconbtn:hover { color: var(--text-bright); }
+  .nst-dropdown button:hover { background: var(--surface-2); color: var(--text-bright); }
+  .nst-nav-item:hover { background: var(--hover); color: var(--text-bright); }
+  .nst-drawer-item:hover { background: var(--surface-2); color: var(--text-bright); }
+}
+
+/* Keyboard focus must stay visible even though the pointer states are quiet. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+/* --- Accessibility settings are three independent switches, not one --- */
+
+/* Motion off: nothing travels, nothing scales. Things still change state, they
+   just cross-fade, so the UI never appears to freeze. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .nst-modal, .nst-drawer { animation: dimIn 0.15s linear !important; }
+  .btn:active, .sec-tile:active, .nst-chip:active, .nst-iconbtn:active,
+  .nst-check:active, .nst-del:active, .nst-day:active, .nst-seg button:active,
+  .nst-stepper button:active, .login-tab:active, .theme-option:active,
+  .next-action-cta:active, .reorder-btn:active:not(:disabled) {
+    transform: none;
+    opacity: 0.6;
+  }
+}
+
+/* Transparency off: the frosted bars and the sheet scrim become solid. Blur is
+   expensive to read through for some people, and the setting exists to say so. */
+@media (prefers-reduced-transparency: reduce) {
+  .nst-topbar[data-scrolled="true"], .nst-bottomnav, .nst-modal-bg, .nst-drawer-wrap {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .nst-topbar[data-scrolled="true"] { background: var(--bg); }
+  .nst-bottomnav { background: var(--surface); }
+  .nst-modal-bg, .nst-drawer-wrap { background: rgba(30, 25, 30, 0.6); }
+}
+
+/* Contrast up: the hairlines that carry the layout get real weight, and muted
+   text stops being muted. */
+@media (prefers-contrast: more) {
+  :root { --sep: rgba(60, 60, 67, 0.5); --text-3: var(--text-2); --text-muted: var(--text-3); }
+  [data-theme="garden-night"] { --sep: rgba(235, 235, 245, 0.55); }
+  .nst-card, .nst-row, .task-item, .nst-chip { box-shadow: inset 0 0 0 1.5px var(--sep); }
+  .nst-topbar { border-bottom-color: var(--sep); }
+  .nst-check { border-width: 2px; }
 }

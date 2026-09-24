@@ -45,7 +45,7 @@ export default function JoinInvite() {
 
   return (
     <div className="nst-root" dir="rtl">
-      <div className="login-screen" style={{ minHeight: "100vh", position: "relative", zIndex: 1 }}>
+      <div className="login-screen" style={{ minHeight: "100dvh", position: "relative", zIndex: 1 }}>
         <div className="login-box" style={{ textAlign: "center" }}>
           <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
             <span className="nst-logo-tile" style={{ width: 46, height: 46 }}>
