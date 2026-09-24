@@ -101,7 +101,7 @@ export default function Settings() {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span className="nst-avatar" style={{ width: 46, height: 46, fontSize: 18 }}>{(displayName || "?").charAt(0)}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ font: "600 15px var(--font-body)", color: "var(--text-bright)" }}>{displayName || "ללא שם"}</p>
+            <p style={{ font: "400 17px var(--font-body)", color: "var(--text-bright)" }}>{displayName || "ללא שם"}</p>
             <p style={{ fontSize: 12, color: "var(--text-muted)" }}>{user?.email}</p>
           </div>
           <button className="nst-iconbtn plain" onClick={() => setEditName(true)}>
@@ -154,11 +154,11 @@ export default function Settings() {
               <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
                 <span className="nst-avatar" style={{ background: AVATAR_BG[idx % AVATAR_BG.length] }}>{(m.profile?.display_name || "?").charAt(0)}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)" }}>
+                  <p style={{ font: "400 17px var(--font-body)", color: "var(--text-bright)" }}>
                     {m.profile?.display_name ?? "חבר"}
                     {m.user_id === user?.id && <span style={{ color: "var(--text-muted)", fontSize: 12 }}> (אני)</span>}
                   </p>
-                  <p style={{ fontSize: 11.5, color: "var(--text-muted)", fontWeight: 600 }}>{m.role === "owner" ? "מנהל/ת הבית" : "חבר/ה"}</p>
+                  <p style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600 }}>{m.role === "owner" ? "מנהל/ת הבית" : "חבר/ה"}</p>
                 </div>
               </div>
               <div style={{ display: "flex", gap: 7, flexWrap: "wrap", paddingInlineStart: 49 }}>
@@ -169,7 +169,7 @@ export default function Settings() {
                     <button
                       key={area}
                       className={`nst-chip ${active ? "active" : ""}`}
-                      style={{ padding: "5px 12px", fontSize: 11.5, opacity: editable ? 1 : 0.7 }}
+                      style={{ padding: "5px 12px", fontSize: 13, opacity: editable ? 1 : 0.7 }}
                       disabled={!editable}
                       onClick={() => toggleResponsibility(m, area)}
                     >
@@ -219,8 +219,8 @@ export default function Settings() {
         </h2>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "6px 0" }}>
           <div style={{ minWidth: 0 }}>
-            <p style={{ font: "500 13.5px var(--font-body)", color: "var(--text-2)" }}>התראות דחיפה</p>
-            <p style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 1 }}>
+            <p style={{ font: "400 16px var(--font-body)", color: "var(--text-2)" }}>התראות דחיפה</p>
+            <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 1 }}>
               {!pushSupported() ? "לא נתמך בדפדפן זה" : pushOn ? "פעיל במכשיר זה" : "כבוי"}
             </p>
           </div>

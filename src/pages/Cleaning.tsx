@@ -357,7 +357,7 @@ function RoomSection({
           <>
             <input
               autoFocus
-              style={{ flex: 1, font: "600 15px var(--font-body)" }}
+              style={{ flex: 1, font: "400 17px var(--font-body)" }}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
@@ -371,7 +371,7 @@ function RoomSection({
           </>
         ) : (
           <>
-            <h2 onClick={toggleCollapsed} style={{ font: "600 16px var(--font-display)", color: "var(--text-bright)", margin: 0, flex: 1, cursor: "pointer" }}>{name}</h2>
+            <h2 onClick={toggleCollapsed} style={{ font: "600 20px var(--font-display)", letterSpacing: "-0.022em", color: "var(--text-bright)", margin: 0, flex: 1, cursor: "pointer" }}>{name}</h2>
             {tasks.length > 0 && (
               <span className="badge b-wt" style={{ borderRadius: 30 }}>
                 {done}/{tasks.length}
@@ -396,7 +396,7 @@ function RoomSection({
           <span className="nst-meter">
             <i style={{ width: `${(done / tasks.length) * 100}%` }} />
           </span>
-          <span style={{ font: "700 11px var(--font-body)", color: done === tasks.length ? "var(--ok)" : "var(--text-muted)", minWidth: 34, textAlign: "left" }}>
+          <span style={{ font: "400 13px var(--font-body)", color: done === tasks.length ? "var(--ok)" : "var(--text-muted)", minWidth: 34, textAlign: "left" }}>
             {Math.round((done / tasks.length) * 100)}%
           </span>
         </div>
@@ -414,7 +414,7 @@ function RoomSection({
               <>
                 <input
                   autoFocus
-                  style={{ flex: 1, font: "600 14px var(--font-body)" }}
+                  style={{ flex: 1, font: "400 17px var(--font-body)" }}
                   value={taskDraft}
                   onChange={(e) => setTaskDraft(e.target.value)}
                   onKeyDown={(e) => {
@@ -452,7 +452,7 @@ function RoomSection({
                     setTaskDraft(t.title);
                     setEditingTask(t.id);
                   }}
-                  style={{ flex: 1, font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: isDone ? "line-through" : "none", cursor: onRenameTask ? "pointer" : "default" }}
+                  style={{ flex: 1, font: "400 17px var(--font-body)", color: "var(--text-bright)", textDecoration: isDone ? "line-through" : "none", cursor: onRenameTask ? "pointer" : "default" }}
                 >
                   {t.title}
                 </span>

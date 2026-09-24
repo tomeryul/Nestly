@@ -189,7 +189,7 @@ export default function Deliveries() {
             <Package size={20} />
           </span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ font: "600 15px var(--font-body)", color: "var(--text-bright)", textDecoration: done ? "line-through" : "none" }}>{d.name}</p>
+            <p style={{ font: "400 17px var(--font-body)", color: "var(--text-bright)", textDecoration: done ? "line-through" : "none" }}>{d.name}</p>
             <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 3, flexWrap: "wrap" }}>
               {point && (
                 <span className="nst-tag">
@@ -239,7 +239,7 @@ export default function Deliveries() {
         {point && (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <MapPin size={15} style={{ color: "var(--accent)", flex: "none" }} />
-            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: "var(--text-2)", fontWeight: 600 }}>{address || "ללא כתובת"}</span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--text-2)", fontWeight: 600 }}>{address || "ללא כתובת"}</span>
             {address && (
               <a className="btn btn-sm" href={wazeUrl(address)} target="_blank" rel="noopener noreferrer" title="ניווט עם Waze">
                 <Navigation size={14} /> Waze
@@ -345,7 +345,7 @@ export default function Deliveries() {
 
           {collected.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 6 }}>
-              <div style={{ margin: "0 4px", color: "var(--text-3)", font: "700 11.5px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              <div style={{ margin: "0 4px", color: "var(--text-3)", font: "400 13px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                 נאספו · {collected.length}
               </div>
               {collected.map((d) => row(d, false))}
@@ -388,9 +388,9 @@ function PointsTab({
         <input placeholder="שם המקום (למשל: פיקאפ ברמי לוי)" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
         <input placeholder="מיקום / כתובת" value={location} onChange={(e) => setLocation(e.target.value)} />
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <label style={{ font: "700 11px var(--font-body)", color: "var(--text-3)", margin: 0 }}>נסגר</label>
+          <label style={{ font: "400 13px var(--font-body)", color: "var(--text-3)", margin: 0 }}>נסגר</label>
           <input type="time" style={{ width: 120 }} value={closing} onChange={(e) => setClosing(e.target.value)} />
-          <label style={{ font: "700 11px var(--font-body)", color: "var(--text-3)", margin: 0 }}>ימי המתנה</label>
+          <label style={{ font: "400 13px var(--font-body)", color: "var(--text-3)", margin: 0 }}>ימי המתנה</label>
           <input type="number" min={1} max={60} style={{ width: 74 }} value={hold} onChange={(e) => setHold(Math.max(1, Number(e.target.value) || 1))} />
         </div>
         <button className="btn btn-primary btn-block" style={{ padding: 11 }} onClick={submit}>
@@ -408,7 +408,7 @@ function PointsTab({
                 <Store size={20} />
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)" }}>{p.name}</p>
+                <p style={{ font: "400 17px var(--font-body)", color: "var(--text-bright)" }}>{p.name}</p>
                 <div style={{ display: "flex", gap: 7, alignItems: "center", marginTop: 3, flexWrap: "wrap" }}>
                   {p.location && (
                     <span className="nst-tag">

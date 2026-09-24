@@ -237,7 +237,7 @@ export default function Shopping() {
         <Check size={14} />
       </button>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: item.is_checked ? "line-through" : "none" }}>{item.name}</p>
+        <p style={{ font: "400 17px var(--font-body)", color: "var(--text-bright)", textDecoration: item.is_checked ? "line-through" : "none" }}>{item.name}</p>
         <div style={{ display: "flex", gap: 7, alignItems: "center", marginTop: 3, flexWrap: "wrap" }}>
           {priceMap[item.name.trim()] && (
             <button
@@ -258,7 +258,7 @@ export default function Shopping() {
             className="nst-tag"
             onClick={() => setCatFor(item)}
             title="שינוי קטגוריה"
-            style={{ border: "none", cursor: "pointer", font: "700 10px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.04em" }}
+            style={{ border: "none", cursor: "pointer", font: "400 12px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.04em" }}
           >
             {item.category || "ללא קטגוריה"}
           </button>
@@ -293,7 +293,7 @@ export default function Shopping() {
     taken.length > 0 ? (
       <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 6 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 4px" }}>
-          <span style={{ color: "var(--text-3)", font: "700 11.5px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <span style={{ color: "var(--text-3)", font: "400 13px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
             <ShoppingCart size={12} style={{ verticalAlign: -2, marginInlineEnd: 4 }} /> נלקחו · {taken.length}
           </span>
           <span style={{ flex: 1 }} />
@@ -375,7 +375,7 @@ export default function Shopping() {
                   }}
                   style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--surface-2)", border: "none", borderRadius: 10, padding: "9px 12px", cursor: "pointer", textAlign: "right" }}
                 >
-                  <span style={{ flex: 1, font: "600 13.5px var(--font-body)", color: "var(--text-bright)", textDecoration: cur?.is_checked ? "line-through" : "none" }}>{s.name}</span>
+                  <span style={{ flex: 1, font: "400 16px var(--font-body)", color: "var(--text-bright)", textDecoration: cur?.is_checked ? "line-through" : "none" }}>{s.name}</span>
                   {s.category && <span className="nst-tag">{s.category}</span>}
                   {!s.builtin && <span className="nst-tag">×{s.quantity}</span>}
                   {cur &&
@@ -434,7 +434,7 @@ export default function Shopping() {
                 .reduce((sum, i) => sum + (priceMap[i.name.trim()]?.price ?? 0) * i.quantity, 0)
                 .toFixed(2)}
             </div>
-            <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
               {active.filter((i) => priceMap[i.name.trim()]).length}/{active.length} מוצרים שנותרו לקנות
               {taken.length > 0 ? ` · ${taken.length} שנקנו לא נספרים` : ""}
             </div>
@@ -451,7 +451,7 @@ export default function Shopping() {
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {groupedSections.map(([cat, catItems]) => (
             <div key={cat}>
-              <div style={{ margin: "0 4px 0.5rem", color: "var(--text-3)", font: "700 11.5px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              <div style={{ margin: "0 4px 0.5rem", color: "var(--text-3)", font: "400 13px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                 {cat} · {catItems.length}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>{catItems.map(renderRow)}</div>
@@ -607,18 +607,18 @@ function CategoriesModal({ homeId, defaults, onClose }: { homeId: string; defaul
           <Plus size={18} />
         </button>
       </div>
-      <div style={{ marginBottom: 10, color: "var(--text-3)", font: "700 11.5px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>קבועות</div>
+      <div style={{ marginBottom: 10, color: "var(--text-3)", font: "400 13px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>קבועות</div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: "1.2rem" }}>
         {defaults.map((c) => (
           <span key={c} className="nst-tag">{c}</span>
         ))}
       </div>
-      <div style={{ marginBottom: 10, color: "var(--text-3)", font: "700 11.5px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>שלכם</div>
+      <div style={{ marginBottom: 10, color: "var(--text-3)", font: "400 13px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>שלכם</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {rows.length === 0 && <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: "0.5rem 0" }}>אין קטגוריות מותאמות עדיין</p>}
         {rows.map((r) => (
           <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface)", borderRadius: 12, padding: "9px 12px", boxShadow: "var(--shadow-sm)" }}>
-            <span style={{ flex: 1, fontSize: 13.5, color: "var(--text-2)", fontWeight: 500 }}>{r.name}</span>
+            <span style={{ flex: 1, fontSize: 15, color: "var(--text-2)", fontWeight: 500 }}>{r.name}</span>
             <button className="nst-del" onClick={() => remove(r.id)}>
               <X size={16} />
             </button>
@@ -720,7 +720,7 @@ function RecurringModal({ homeId, lists, onClose }: { homeId: string; lists: Lis
         {rows.length === 0 && <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: "0.5rem 0" }}>אין פריטים אוטומטיים</p>}
         {rows.map((r) => (
           <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface)", borderRadius: 12, padding: "9px 12px", boxShadow: "var(--shadow-sm)" }}>
-            <span style={{ flex: 1, fontSize: 13.5, color: "var(--text-2)", fontWeight: 500 }}>
+            <span style={{ flex: 1, fontSize: 15, color: "var(--text-2)", fontWeight: 500 }}>
               {r.name} × {r.quantity}
             </span>
             <span className="badge b-wt">יום {DAYS_HE[r.day_of_week]}</span>

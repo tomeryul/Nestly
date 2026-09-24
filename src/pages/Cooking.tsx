@@ -89,8 +89,8 @@ function DishesTab() {
                   <ChefHat size={20} />
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: "block", font: "600 14px var(--font-body)", color: "var(--text-bright)" }}>{d.name}</span>
-                  <span style={{ display: "block", fontSize: 11.5, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>{counts[d.id] ?? 0} מצרכים · הקשה לעריכה</span>
+                  <span style={{ display: "block", font: "400 17px var(--font-body)", color: "var(--text-bright)" }}>{d.name}</span>
+                  <span style={{ display: "block", fontSize: 13, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>{counts[d.id] ?? 0} מצרכים · הקשה לעריכה</span>
                 </span>
                 <ChevronLeft size={18} style={{ color: "var(--text-faint)" }} />
               </button>
@@ -148,7 +148,7 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
 
   const rowView = (r: Ingredient) => (
     <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface)", borderRadius: 12, padding: "9px 12px", boxShadow: "var(--shadow-sm)" }}>
-      <span style={{ flex: 1, fontSize: 13.5, color: "var(--text-2)", fontWeight: 500 }}>
+      <span style={{ flex: 1, fontSize: 15, color: "var(--text-2)", fontWeight: 500 }}>
         {r.name} · {fmt(r.quantity)} {r.unit ?? ""}
       </span>
       <button className="nst-del" onClick={() => remove(r.id)}>
@@ -180,7 +180,7 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
             ))}
           </select>
         </div>
-        {isSpice && <p style={{ fontSize: 11, color: "var(--text-muted)" }}>תבלינים לא נכנסים לרשימת הקניות.</p>}
+        {isSpice && <p style={{ fontSize: 12, color: "var(--text-muted)" }}>תבלינים לא נכנסים לרשימת הקניות.</p>}
         <button className="btn btn-primary btn-block" style={{ padding: 11 }} onClick={add}>
           <Plus size={16} /> {isSpice ? "הוספת תבלין" : "הוספת מצרך"}
         </button>
@@ -205,7 +205,7 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
       {ingredients.length > 0 && <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: spices.length ? 14 : 0 }}>{ingredients.map(rowView)}</div>}
       {spices.length > 0 && (
         <>
-          <div style={{ margin: "0 4px 8px", color: "var(--text-3)", font: "700 11.5px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>תבלינים</div>
+          <div style={{ margin: "0 4px 8px", color: "var(--text-3)", font: "400 13px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>תבלינים</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{spices.map(rowView)}</div>
         </>
       )}
@@ -262,10 +262,10 @@ function WeekTab() {
           <ChevronRight />
         </button>
         <div style={{ textAlign: "center" }}>
-          <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)" }}>
+          <p style={{ font: "400 17px var(--font-body)", color: "var(--text-bright)" }}>
             {formatDayMonth(weekStart)} – {formatDayMonth(addDays(weekStart, 6))}
           </p>
-          <p style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600 }}>שבוע</p>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>שבוע</p>
         </div>
         <button className="nst-iconbtn plain" onClick={() => setWeekStart((w) => addDays(w, 7))}>
           <ChevronLeft />
@@ -291,8 +291,8 @@ function WeekTab() {
                 <UtensilsCrossed size={20} />
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)" }}>{meal.dishes?.name ?? "מאכל"}</p>
-                <p style={{ fontSize: 11.5, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
+                <p style={{ font: "400 17px var(--font-body)", color: "var(--text-bright)" }}>{meal.dishes?.name ?? "מאכל"}</p>
+                <p style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
                   {meal.all_week ? "כל השבוע" : meal.day_of_week != null ? `יום ${DAYS_HE[meal.day_of_week]}` : "ללא יום"}
                   {meal.meal_type ? ` · ${MEAL_TYPES[meal.meal_type as keyof typeof MEAL_TYPES]}` : ""}
                   {" · "}
@@ -459,8 +459,8 @@ function RecurringMealsModal({ homeId, dishes, userId, onClose }: { homeId: stri
         {rows.map((r) => (
           <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface)", borderRadius: 12, padding: "9px 12px", boxShadow: "var(--shadow-sm)" }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ font: "600 13.5px var(--font-body)", color: "var(--text-bright)" }}>{r.dishes?.name ?? "מאכל"}</p>
-              <p style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
+              <p style={{ font: "400 16px var(--font-body)", color: "var(--text-bright)" }}>{r.dishes?.name ?? "מאכל"}</p>
+              <p style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
                 {INTERVAL_LABELS[r.interval_weeks] ?? "כל שבוע"}
                 {" · "}
                 {r.all_week ? "כל השבוע" : r.day_of_week != null ? `יום ${DAYS_HE[r.day_of_week]}` : "ללא יום"}

@@ -97,7 +97,7 @@ export default function Dashboard() {
   return (
     <section className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       <div>
-        <p style={{ font: "700 11.5px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-3)" }}>
+        <p style={{ font: "400 13px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-3)" }}>
           יום {DAYS_HE[dow]}
         </p>
         <h1 style={{ font: "600 30px var(--font-display)", color: "var(--text-bright)", letterSpacing: "-0.022em", marginTop: 2 }}>
@@ -172,8 +172,8 @@ export default function Dashboard() {
                     <Check size={14} />
                   </button>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: t.is_done ? "line-through" : "none" }}>{t.title}</p>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11.5, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
+                    <p style={{ font: "400 17px var(--font-body)", color: "var(--text-bright)", textDecoration: t.is_done ? "line-through" : "none" }}>{t.title}</p>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
                       {t.start_time && (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
                           <Clock size={12} />

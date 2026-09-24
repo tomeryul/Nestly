@@ -61,7 +61,7 @@ export default function Login() {
               <h1 style={{ font: "600 25px var(--font-display)", color: "var(--text-bright)", margin: 0 }}>Nestly</h1>
               <p
                 style={{
-                  font: "700 10px var(--font-body)",
+                  font: "400 12px var(--font-body)",
                   textTransform: "uppercase",
                   letterSpacing: "0.14em",
                   color: "var(--text-muted)",
@@ -128,13 +128,13 @@ export default function Login() {
             </button>
           </form>
 
-          <p style={{ textAlign: "center", marginTop: "1rem", fontSize: 12.5, color: "var(--text-muted)", fontWeight: 500 }}>
+          <p style={{ textAlign: "center", marginTop: "1rem", fontSize: 13, color: "var(--text-muted)", fontWeight: 500 }}>
             או{" "}
             <button type="button" onClick={magicLink} style={{ color: "var(--accent)", fontWeight: 700, background: "none", border: "none", cursor: "pointer" }}>
               קישור קסם למייל
             </button>
           </p>
-          <p style={{ textAlign: "center", marginTop: "0.6rem", fontSize: 11, color: "var(--text-faint)" }}>
+          <p style={{ textAlign: "center", marginTop: "0.6rem", fontSize: 12, color: "var(--text-faint)" }}>
             חשבונות חדשים נפתחים כמשתמש רגיל. אפשר להזמין שותפים בהמשך.
           </p>
         </div>

@@ -172,8 +172,8 @@ export default function Schedule() {
                   onClick={() => setDetailTask(t)}
                   style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", textAlign: "right", cursor: "pointer" }}
                 >
-                  <p style={{ font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: t.is_done ? "line-through" : "none" }}>{t.title}</p>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11.5, color: "var(--text-muted)", fontWeight: 600, marginTop: 3, flexWrap: "wrap" }}>
+                  <p style={{ font: "400 17px var(--font-body)", color: "var(--text-bright)", textDecoration: t.is_done ? "line-through" : "none" }}>{t.title}</p>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--text-muted)", fontWeight: 600, marginTop: 3, flexWrap: "wrap" }}>
                     {t.start_time && (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
                         <Clock size={12} />
@@ -312,7 +312,7 @@ function TaskDetailModal({ task, onEdit, onClose }: { task: Task; onEdit: (t: Ta
               <button className={`nst-check ${s.is_done ? "on" : ""}`} onClick={() => toggle(s)}>
                 <Check size={14} />
               </button>
-              <span style={{ flex: 1, font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: s.is_done ? "line-through" : "none" }}>{s.title}</span>
+              <span style={{ flex: 1, font: "400 17px var(--font-body)", color: "var(--text-bright)", textDecoration: s.is_done ? "line-through" : "none" }}>{s.title}</span>
               <button className="nst-del" onClick={() => remove(s.id)}>
                 <X size={16} />
               </button>
@@ -428,7 +428,7 @@ function TaskLibraryModal({
                   title={`הוספה ליום ${dayLabel}`}
                 >
                   <Plus size={15} style={{ color: "var(--accent)", flex: "none" }} />
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: "var(--text-2)", fontWeight: 600 }}>{r.title}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 15, color: "var(--text-2)", fontWeight: 600 }}>{r.title}</span>
                   {r.start_time && <span className="nst-tag">{formatTime(r.start_time)}</span>}
                   <span className="nst-tag" style={{ color: cat.color, background: cat.color + "1f" }}>{cat.label}</span>
                 </button>
@@ -521,7 +521,7 @@ function TaskModal({ homeId, dateIso, initial, positionFor, templates, onClose, 
                     style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--surface-2)", border: "none", borderRadius: 10, padding: "9px 12px", cursor: "pointer", textAlign: "right" }}
                   >
                     <Library size={14} style={{ color: "var(--accent)", flex: "none" }} />
-                    <span style={{ flex: 1, minWidth: 0, font: "600 13.5px var(--font-body)", color: "var(--text-bright)" }}>{t.title}</span>
+                    <span style={{ flex: 1, minWidth: 0, font: "400 16px var(--font-body)", color: "var(--text-bright)" }}>{t.title}</span>
                     {t.start_time && <span className="nst-tag">{formatTime(t.start_time)}</span>}
                     <span className="nst-tag" style={{ color: cat.color, background: cat.color + "1f" }}>{cat.label}</span>
                   </button>
@@ -643,7 +643,7 @@ function RecurringTaskModal({ homeId, onClose }: { homeId: string; onClose: () =
         {rows.length === 0 && <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: "0.5rem 0" }}>אין משימות קבועות</p>}
         {rows.map((r) => (
           <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface)", borderRadius: 12, padding: "9px 12px", boxShadow: "var(--shadow-sm)" }}>
-            <span style={{ flex: 1, fontSize: 13.5, color: "var(--text-2)", fontWeight: 500 }}>{r.title}</span>
+            <span style={{ flex: 1, fontSize: 15, color: "var(--text-2)", fontWeight: 500 }}>{r.title}</span>
             <span className="badge b-wt">
               {intervalLabel(r.interval_weeks)} · {DAYS_HE[r.day_of_week]} {formatTime(r.start_time)}
             </span>

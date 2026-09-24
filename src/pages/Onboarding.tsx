@@ -64,7 +64,7 @@ export default function Onboarding() {
               {loading === "create" ? <Spinner className="!border-white/40 !border-t-white" /> : (<><Plus size={16} /> יצירת בית</>)}
             </button>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--text-faint)", fontSize: 11, fontWeight: 600, margin: "0.2rem 0" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--text-faint)", fontSize: 12, fontWeight: 600, margin: "0.2rem 0" }}>
               <span style={{ flex: 1, height: 1, background: "var(--border-2)" }} />
               או
               <span style={{ flex: 1, height: 1, background: "var(--border-2)" }} />

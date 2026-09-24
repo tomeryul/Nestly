@@ -95,7 +95,7 @@ export default function Laundry() {
       {/* quick add from types */}
       <div className="nst-card" style={{ padding: "1rem 1.1rem", display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ font: "700 11px var(--font-body)", color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.04em" }}>אחראי</span>
+          <span style={{ font: "400 13px var(--font-body)", color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.04em" }}>אחראי</span>
           <select style={{ flex: 1 }} value={assignee} onChange={(e) => setAssignee(e.target.value)}>
             <option value="">ללא</option>
             {members.map((m) => (
@@ -137,8 +137,8 @@ export default function Laundry() {
                     <WashingMachine size={20} />
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ font: "600 15px var(--font-body)", color: "var(--text-bright)" }}>{l.name}</p>
-                    {nameFor(l.assigned_to) && <p style={{ fontSize: 11.5, color: "var(--text-muted)", fontWeight: 600 }}>{nameFor(l.assigned_to)}</p>}
+                    <p style={{ font: "400 17px var(--font-body)", color: "var(--text-bright)" }}>{l.name}</p>
+                    {nameFor(l.assigned_to) && <p style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600 }}>{nameFor(l.assigned_to)}</p>}
                   </div>
                   <button className="nst-del" onClick={() => removeLoad(l.id)}>
                     <Trash2 size={17} />
@@ -255,7 +255,7 @@ function TypesModal({ homeId, onClose }: { homeId: string; onClose: () => void }
         {rows.length === 0 && <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: "0.5rem 0" }}>אין סוגים עדיין</p>}
         {rows.map((r) => (
           <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface)", borderRadius: 12, padding: "9px 12px", boxShadow: "var(--shadow-sm)" }}>
-            <span style={{ flex: 1, fontSize: 13.5, color: "var(--text-2)", fontWeight: 500 }}>{r.name}</span>
+            <span style={{ flex: 1, fontSize: 15, color: "var(--text-2)", fontWeight: 500 }}>{r.name}</span>
             <button className="nst-del" onClick={() => remove(r.id)}>
               <X size={16} />
             </button>

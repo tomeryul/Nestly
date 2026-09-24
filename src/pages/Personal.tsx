@@ -170,7 +170,7 @@ function Section({
                   <>
                     <input
                       autoFocus
-                      style={{ flex: 1, font: "600 14px var(--font-body)" }}
+                      style={{ flex: 1, font: "400 17px var(--font-body)" }}
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
                       onKeyDown={(e) => {
@@ -194,7 +194,7 @@ function Section({
                     </button>
                     <span
                       onClick={() => startEdit(t)}
-                      style={{ flex: 1, font: "600 14px var(--font-body)", color: "var(--text-bright)", textDecoration: t.is_done ? "line-through" : "none", cursor: "pointer" }}
+                      style={{ flex: 1, font: "400 17px var(--font-body)", color: "var(--text-bright)", textDecoration: t.is_done ? "line-through" : "none", cursor: "pointer" }}
                     >
                       {t.title}
                     </span>
