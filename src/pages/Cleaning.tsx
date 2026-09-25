@@ -7,6 +7,7 @@ import { Collapse, EmptyState, FullPageSpinner } from "../components/ui";
 import { startOfWeek, toISODate, addDays, formatDayMonth } from "../lib/dates";
 import { useDragReorder } from "../lib/dragReorder";
 import { bgWrite, newId } from "../lib/optimistic";
+import { exportChecklistPdf } from "../lib/checklistPdf";
 import type { Tables } from "../types/database";
 
 type CleaningTask = Tables<"cleaning_tasks">;
@@ -142,55 +143,27 @@ export default function Cleaning() {
   })();
 
   const exportSheet = async () => {
-    const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] ?? c));
-    const roomBlock = (title: string, list: CleaningTask[]) =>
-      list.length
-        ? `<div style="margin-bottom:20px"><div style="font-size:18px;font-weight:700;border-bottom:1px solid #bbb;padding-bottom:5px;margin-bottom:6px">${esc(title)}</div><table style="width:100%;border-collapse:collapse">${list
-            .map(
-              (t) =>
-                `<tr><td style="width:30px;padding:7px 0;vertical-align:middle"><span style="display:inline-block;width:18px;height:18px;border:1.6px solid #111;border-radius:4px"></span></td><td style="padding:7px 10px;font-size:16px;vertical-align:middle;text-align:right">${esc(t.title)}</td></tr>`
-            )
-            .join("")}</table></div>`
-        : "";
     // Follow the order shown on screen, including a drag that has not been reloaded yet.
-    const bodyHtml =
-      roomDrag.order
+    const sections = [
+      ...roomDrag.order
         .map((rid) => roomById.get(rid))
         .filter((r): r is Room => !!r)
-        .map((r) => roomBlock(r.name, tasksByRoom.get(r.id) ?? []))
-        .join("") + roomBlock("ללא חדר", noRoomTasks);
-
-    const el = document.createElement("div");
-    el.dir = "rtl";
-    el.style.cssText = "position:fixed;left:-10000px;top:0;width:794px;background:#fff;color:#111;padding:40px;font-family:Arial,'Segoe UI',sans-serif;";
-    el.innerHTML = `<div style="border-bottom:3px solid #111;padding-bottom:12px;margin-bottom:22px"><div style="font-size:26px;font-weight:700">דף ניקיון ${tab === "weekly" ? "שבועי" : "חודשי"}</div><div style="font-size:16px;color:#444;margin-top:6px;font-weight:600">${esc(periodLabel)}</div></div>${bodyHtml || '<div style="color:#666">אין משימות ברשימה.</div>'}`;
-    document.body.appendChild(el);
+        .map((r) => ({ title: r.name, items: (tasksByRoom.get(r.id) ?? []).map((t) => t.title) })),
+      { title: "ללא חדר", items: noRoomTasks.map((t) => t.title) },
+    ];
     setExporting(true);
     try {
-      const [{ jsPDF }, html2canvas] = await Promise.all([import("jspdf"), import("html2canvas").then((m) => m.default)]);
-      const canvas = await html2canvas(el, { scale: 2, backgroundColor: "#ffffff" });
-      const img = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const imgH = (canvas.height * pageW) / canvas.width;
-      let heightLeft = imgH;
-      let position = 0;
-      pdf.addImage(img, "PNG", 0, position, pageW, imgH);
-      heightLeft -= pageH;
-      while (heightLeft > 0) {
-        position -= pageH;
-        pdf.addPage();
-        pdf.addImage(img, "PNG", 0, position, pageW, imgH);
-        heightLeft -= pageH;
-      }
-      pdf.save(`דף-ניקיון-${tab === "weekly" ? "שבועי" : "חודשי"}.pdf`);
+      await exportChecklistPdf({
+        title: `דף ניקיון ${tab === "weekly" ? "שבועי" : "חודשי"}`,
+        subtitle: periodLabel,
+        sections,
+        filename: `דף-ניקיון-${tab === "weekly" ? "שבועי" : "חודשי"}.pdf`,
+      });
     } catch (e) {
       console.error(e);
       alert("אירעה שגיאה בהכנת ה-PDF. נסו שוב.");
     } finally {
       setExporting(false);
-      document.body.removeChild(el);
     }
   };
 
