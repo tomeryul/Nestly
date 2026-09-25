@@ -56,8 +56,9 @@
   --r-capsule: 999px;   /* every touch control: radius = half the height */
   /* Glass, for the functional layer only (tab bar, floating controls) */
   --glass-tint: color-mix(in srgb, var(--surface) 62%, transparent);
-  --glass-edge: rgba(255, 255, 255, 0.6);
-  --glass-highlight: rgba(255, 255, 255, 0.75);
+  --glass-edge: rgba(255, 255, 255, 0.6);        /* light inner ring */
+  --glass-rim: rgba(0, 0, 0, 0.14);               /* iOS 27: the darkened edge around glass */
+  --glass-highlight: rgba(255, 255, 255, 0.95);   /* iOS 27: brighter specular highlight */
   --lens: rgba(118, 118, 128, 0.12);   /* the selected tab's pill, tertiarySystemFill */
   --fill-2: rgba(120, 120, 128, 0.16); /* secondarySystemFill: switch track when off */
   --shadow-sm: none;
@@ -114,7 +115,7 @@
   --cat-1-bg: #314030; --cat-1-fg: #b9d6ad; --cat-2-bg: #443a1e; --cat-2-fg: #ead8a0; --cat-3-bg: #443122; --cat-3-fg: #e8c4a4; --cat-4-bg: #432a2a; --cat-4-fg: #ecbaba;
   --cat-5-bg: #322a48; --cat-5-fg: #ccc0e8; --cat-6-bg: #243a34; --cat-6-fg: #b4dcc9; --cat-7-bg: #243343; --cat-7-fg: #b6cfe4; --cat-8-bg: #3a342a; --cat-8-fg: #d8cdb4;
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.3); --shadow: 0 2px 8px rgba(0,0,0,0.35), 0 8px 20px -10px rgba(0,0,0,0.4); --shadow-lg: 0 10px 32px -16px rgba(0,0,0,0.6);
-  --glass-edge: rgba(255, 255, 255, 0.12); --glass-highlight: rgba(255, 255, 255, 0.08); --lens: rgba(118, 118, 128, 0.26); --fill-2: rgba(120, 120, 128, 0.36);
+  --glass-edge: rgba(255, 255, 255, 0.12); --glass-rim: rgba(0, 0, 0, 0.55); --glass-highlight: rgba(255, 255, 255, 0.22); --lens: rgba(118, 118, 128, 0.26); --fill-2: rgba(120, 120, 128, 0.36);
 }
 /* Rose quartz */
 [data-theme="warm-dark"] {
@@ -467,8 +468,11 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
   transition: background .25s var(--ease-out), border-color .25s var(--ease-out),
               backdrop-filter .25s var(--ease-out);
 }
+/* iOS 27: a bar carrying a title and several controls firms into a uniform,
+   mostly opaque band once content is beneath it, so its text stays legible over
+   whatever scrolls past (a thin translucent fade let busy rows show through). */
 .nst-topbar[data-scrolled="true"] {
-  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
   backdrop-filter: blur(20px) saturate(1.8);
   -webkit-backdrop-filter: blur(20px) saturate(1.8);
   border-bottom-color: var(--sep);
@@ -492,9 +496,11 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
     inset-inline: 12px; bottom: max(10px, env(safe-area-inset-bottom));
     padding: 4px; border-radius: var(--r-capsule);
     background: var(--glass-tint);
-    backdrop-filter: blur(14px) saturate(1.8); -webkit-backdrop-filter: blur(14px) saturate(1.8);
-    border: 0.5px solid var(--glass-edge);
-    box-shadow: inset 0 1px 0 var(--glass-highlight), 0 10px 30px -10px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.06);
+    /* iOS 27 glass: stronger diffusion, a darkened rim, a bright specular top edge */
+    backdrop-filter: blur(18px) saturate(1.8); -webkit-backdrop-filter: blur(18px) saturate(1.8);
+    border: 0.5px solid var(--glass-rim);
+    box-shadow: inset 0 1px 0 var(--glass-highlight), inset 0 0 0 1px var(--glass-edge),
+                0 10px 30px -10px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.06);
   }
   .nst-bn-grid { display: flex; max-width: 760px; margin: 0 auto; }
   .nst-bn-grid::-webkit-scrollbar { display: none; }
