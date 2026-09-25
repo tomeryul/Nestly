@@ -21,6 +21,34 @@ export function FullPageSpinner() {
   );
 }
 
+/**
+ * Accordion body.
+ *
+ * The one place a height animation is worth its cost: there is no transform
+ * that opens a section. `grid-template-rows: 0fr -> 1fr` gets it without
+ * measuring anything in JS. The clip is only on while the height is actually
+ * moving, so a row lifted out of the list for dragging isn't cut off the rest
+ * of the time.
+ */
+export function Collapse({ open, children }: { open: boolean; children: ReactNode }) {
+  const [moving, setMoving] = useState(false);
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false; // no animation for whatever state the page loads in
+      return;
+    }
+    setMoving(true);
+    const t = setTimeout(() => setMoving(false), 220);
+    return () => clearTimeout(t);
+  }, [open]);
+  return (
+    <div className="nst-collapse" data-open={open} data-moving={moving}>
+      <div>{children}</div>
+    </div>
+  );
+}
+
 export function EmptyState({ icon, title, hint }: { icon?: ReactNode; title: string; hint?: string }) {
   return (
     <div className="empty-state">

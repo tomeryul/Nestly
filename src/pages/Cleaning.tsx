@@ -3,7 +3,7 @@ import { Plus, Trash2, Check, Sparkles, DoorOpen, X, GripVertical, ChevronDown, 
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
-import { EmptyState, FullPageSpinner } from "../components/ui";
+import { Collapse, EmptyState, FullPageSpinner } from "../components/ui";
 import { startOfWeek, toISODate, addDays, formatDayMonth } from "../lib/dates";
 import { useDragReorder } from "../lib/dragReorder";
 import { bgWrite, newId } from "../lib/optimistic";
@@ -350,7 +350,7 @@ function RoomSection({
           </span>
         )}
         <button onClick={toggleCollapsed} title={collapsed ? "הרחבה" : "צמצום"} style={{ border: "none", background: "transparent", cursor: "pointer", color: "var(--accent)", display: "flex", padding: 0, lineHeight: 0 }}>
-          <ChevronDown size={18} style={{ transition: "transform .15s", transform: collapsed ? "rotate(-90deg)" : "none" }} />
+          <ChevronDown size={18} style={{ transition: "transform 200ms var(--ease-out)", transform: collapsed ? "rotate(-90deg)" : "none" }} />
         </button>
         <DoorOpen size={16} style={{ color: "var(--accent)" }} />
         {editing ? (
@@ -402,9 +402,8 @@ function RoomSection({
         </div>
       )}
 
-      {collapsed
-        ? null
-        : dr.order.map((id) => {
+      <Collapse open={!collapsed}>
+        {dr.order.map((id) => {
         const t = byId.get(id);
         if (!t) return null;
         const isDone = doneIds.has(t.id);
@@ -475,16 +474,15 @@ function RoomSection({
             )}
           </div>
         );
-      })}
+        })}
 
-      {!collapsed && (
         <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
           <input style={{ flex: 1 }} placeholder="הוספת משימה…" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
           <button className="btn" style={{ padding: "0 14px" }} onClick={submit}>
             <Plus size={16} />
           </button>
         </div>
-      )}
+      </Collapse>
     </div>
   );
 }
