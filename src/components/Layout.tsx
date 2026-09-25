@@ -7,6 +7,7 @@ import NotificationBell from "./NotificationBell";
 import { isNight, onThemeChange, toggleNight } from "../lib/theme";
 import { NAV, BOTTOM_MAX, getBottomNav, setBottomNav, navItem } from "../lib/nav";
 import NavDrawer from "./NavDrawer";
+import { useTabLens } from "../lib/tabLens";
 
 
 export default function Layout() {
@@ -25,6 +26,10 @@ export default function Layout() {
   // instead of inheriting the last page's state for a frame.
   const [titleState, setTitleState] = useState({ path: "", inBar: false });
   const barRef = useRef<HTMLElement | null>(null);
+  // One selection lens for the whole tab bar, so switching tabs slides it across
+  // rather than switching one tab's background off and another's on.
+  const tabsRef = useRef<HTMLDivElement | null>(null);
+  const lensRef = useRef<HTMLSpanElement | null>(null);
   const contentRef = useRef<HTMLElement | null>(null);
   // The theme can change from Settings or from the system appearance.
   useEffect(() => onThemeChange((t) => setNight(isNight(t))), []);
@@ -37,6 +42,8 @@ export default function Layout() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, [location.pathname]);
+
+  useTabLens(tabsRef, lensRef, [location.pathname, bottom]);
 
   useEffect(() => {
     const content = contentRef.current;
@@ -185,7 +192,8 @@ export default function Layout() {
 
       {/* bottom nav (mobile) */}
       <nav className="nst-bottomnav nst-glass">
-        <div className="nst-bn-grid">
+        <div className="nst-bn-grid" ref={tabsRef}>
+          <span className="nst-bn-lens" ref={lensRef} aria-hidden="true" />
           {bottom.map((path) => {
             const item = navItem(path);
             if (!item) return null;

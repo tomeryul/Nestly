@@ -174,6 +174,9 @@ export default function NavDrawer({
         <p className="section-sub" style={{ margin: "auto 1rem 1.25rem", fontSize: 12 }}>
           כל הסקשנים תמיד זמינים מהתפריט הזה, גם אם הם לא בסרגל התחתון.
         </p>
+        <p className="section-sub" style={{ margin: "-0.75rem 1rem 1.25rem", fontSize: 11 }}>
+          גרסה <bdi>{__APP_VERSION__}</bdi>
+        </p>
       </aside>
     </div>,
     document.body

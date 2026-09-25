@@ -538,12 +538,19 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
   .nst-bn-grid { display: flex; max-width: 760px; margin: 0 auto; }
   .nst-bn-grid::-webkit-scrollbar { display: none; }
   .nst-bn { flex: 1 1 0; min-width: 0; min-height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 6px 4px; border: none; border-radius: var(--r-capsule); background: transparent; color: var(--text-2); font: 600 11px var(--font-body); cursor: pointer; white-space: nowrap; text-decoration: none; }
-  /* The selected tab is its own small lens of glass: grey over white, milky over colour. */
-  .nst-bn.active {
-    color: var(--accent-ink);
+  .nst-bn.active { color: var(--accent-ink); }
+  /* The selection lens: one piece of glass that slides (on a spring, with a
+     liquid stretch) to whichever tab is current — grey over white, milky over colour. */
+  .nst-bn-grid { position: relative; }
+  .nst-bn-lens {
+    position: absolute; top: 0; bottom: 0; left: 0; width: 0; opacity: 0;
+    border-radius: var(--r-capsule); pointer-events: none;
     background: linear-gradient(var(--lens), var(--lens)), color-mix(in srgb, var(--surface) 30%, transparent);
     box-shadow: inset 0 1px 1px var(--glass-highlight), inset 0 0 0 1px var(--glass-edge), inset 0 0 10px var(--glass-glow);
+    transition: transform var(--spring-settle-dur) var(--spring-settle), width var(--spring-settle-dur) var(--spring-settle), opacity 150ms var(--ease-out);
+    will-change: transform;
   }
+  .nst-bn { z-index: 1; }
   .nst-bn svg { width: 24px; height: 24px; stroke-width: 1.9; }
   .nst-bn.active svg { stroke-width: 2.4; }
 }
@@ -661,7 +668,8 @@ input, textarea, p, li, h1, h2, h3, .nst-card-title, .page-title {
   }
   .nst-modal[data-state="closed"], .nst-drawer[data-state="closed"] { opacity: 0; }
   .nst-meter > i { transition: none; }
-  .nst-bn:active, .nst-bar-group .nst-iconbtn:active { transform: none; }  /* no swelling; the glass background still marks the press */
+  .nst-bn:active, .nst-bar-group .nst-iconbtn:active { transform: none; }
+  .nst-bn-lens { transition: opacity 150ms var(--ease-out); }  /* it moves, but doesn't travel */  /* no swelling; the glass background still marks the press */
   /* The section still opens and closes — it just stops sliding open. */
   .nst-collapse { transition: opacity 200ms var(--ease-out); }
   /* Keep the fade, drop the growing-out-of-the-corner. */
