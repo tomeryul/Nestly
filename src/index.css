@@ -330,6 +330,40 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
    iOS list — not a stack of separately bordered cards. Rows keep an opaque
    background (a row lifted for dragging must not turn see-through), so the
    end rows take the section's corners instead of the container clipping. */
+/* ---- Liquid Glass ----
+   One material for every control that floats over content: the tab bar, the
+   top bar's buttons, the home chip. Compared frame by frame with a native iOS
+   tab bar: almost clear (text behind stays readable, only softened), and the
+   glass look comes from the rim — a bright lip all round the inside, a
+   specular top, a catch-light below and iOS 27's dark outer edge. */
+.nst-glass {
+  --glass-lip: 16px;
+  background: var(--glass-tint);
+  backdrop-filter: blur(2.5px) saturate(1.8) brightness(1.06);
+  -webkit-backdrop-filter: blur(2.5px) saturate(1.8) brightness(1.06);
+  border: 0.5px solid var(--glass-rim);
+  box-shadow:
+    inset 0 1.5px 1px var(--glass-highlight),
+    inset 0 -1px 1px var(--glass-edge),
+    inset 0 0 0 1px var(--glass-edge),
+    inset 0 0 var(--glass-lip) 2px var(--glass-glow),
+    0 10px 30px -10px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.06);
+}
+/* Small pieces get a thinner lip, or the glow fills them and they turn milky. */
+.nst-topbar .nst-glass { --glass-lip: 8px; box-shadow:
+    inset 0 1.5px 1px var(--glass-highlight), inset 0 -1px 1px var(--glass-edge),
+    inset 0 0 0 1px var(--glass-edge), inset 0 0 var(--glass-lip) 1px var(--glass-glow),
+    0 6px 16px -8px rgba(0,0,0,.2), 0 1px 4px rgba(0,0,0,.05); }
+.nst-bar-group { display: flex; align-items: center; padding: 2px; border-radius: var(--r-capsule); }
+.nst-bar-group .nst-iconbtn { background: transparent; }
+/* A pressed bar button swells into its own bubble of glass, then springs back. */
+.nst-bar-group .nst-iconbtn { transition: transform 380ms var(--spring-settle), background 200ms var(--ease-out), box-shadow 200ms var(--ease-out); }
+.nst-bar-group .nst-iconbtn:active {
+  position: relative; z-index: 1; transform: scale(1.16); transition-duration: 160ms;
+  background: color-mix(in srgb, var(--surface) 45%, transparent);
+  box-shadow: inset 0 1.5px 1px var(--glass-highlight), inset 0 0 0 1px var(--glass-edge), inset 0 0 10px var(--glass-glow), 0 6px 16px -6px rgba(0,0,0,.28);
+}
+
 .nst-group { position: relative; display: flex; flex-direction: column; background: var(--surface); border-radius: var(--radius); }
 /* The outline is an overlay: an inset shadow on the group would sit *under* the
    rows' opaque backgrounds and vanish. A lifted row (z-index 5) still rises above it. */
@@ -499,18 +533,7 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
   .nst-bottomnav {
     display: block; position: fixed; z-index: 80;
     inset-inline: 12px; bottom: max(10px, env(safe-area-inset-bottom));
-    padding: 4px; border-radius: var(--r-capsule);
-    background: var(--glass-tint);
-    /* Almost clear, slightly brightened and saturated — what's behind stays legible. */
-    backdrop-filter: blur(2.5px) saturate(1.8) brightness(1.06);
-    -webkit-backdrop-filter: blur(2.5px) saturate(1.8) brightness(1.06);
-    border: 0.5px solid var(--glass-rim);                        /* iOS 27 darkened edge */
-    box-shadow:
-      inset 0 1.5px 1px var(--glass-highlight),                  /* specular top */
-      inset 0 -1px 1px var(--glass-edge),                        /* catch-light at the bottom */
-      inset 0 0 0 1px var(--glass-edge),                         /* crisp inner ring */
-      inset 0 0 16px 2px var(--glass-glow),                      /* the thick lens lip */
-      0 10px 30px -10px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.06);
+    padding: 4px; border-radius: var(--r-capsule);   /* material: .nst-glass */
   }
   .nst-bn-grid { display: flex; max-width: 760px; margin: 0 auto; }
   .nst-bn-grid::-webkit-scrollbar { display: none; }
@@ -638,7 +661,7 @@ input, textarea, p, li, h1, h2, h3, .nst-card-title, .page-title {
   }
   .nst-modal[data-state="closed"], .nst-drawer[data-state="closed"] { opacity: 0; }
   .nst-meter > i { transition: none; }
-  .nst-bn:active { transform: none; }  /* no swelling; the glass background still marks the press */
+  .nst-bn:active, .nst-bar-group .nst-iconbtn:active { transform: none; }  /* no swelling; the glass background still marks the press */
   /* The section still opens and closes — it just stops sliding open. */
   .nst-collapse { transition: opacity 200ms var(--ease-out); }
   /* Keep the fade, drop the growing-out-of-the-corner. */
@@ -662,7 +685,7 @@ input, textarea, p, li, h1, h2, h3, .nst-card-title, .page-title {
     -webkit-backdrop-filter: none;
   }
   .nst-topbar[data-scrolled="true"] { background: var(--bg); }
-  .nst-bottomnav { background: var(--surface); }
+  .nst-bottomnav, .nst-glass { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
   .nst-modal-bg, .nst-drawer-wrap { background: rgba(30, 25, 30, 0.6); }
 }
 
@@ -671,7 +694,7 @@ input, textarea, p, li, h1, h2, h3, .nst-card-title, .page-title {
 @media (prefers-contrast: more) {
   :root { --sep: rgba(60, 60, 67, 0.5); --sep-strong: rgba(60, 60, 67, 0.6); --text-3: var(--text-2); --text-muted: var(--text-3); }
   [data-theme="garden-night"] { --sep: rgba(235, 235, 245, 0.55); --sep-strong: rgba(235, 235, 245, 0.6); }
-  .nst-bottomnav { border-color: var(--sep); }
+  .nst-bottomnav, .nst-glass { border-color: var(--sep); }
   .nst-card, .nst-row, .task-item, .nst-chip { box-shadow: inset 0 0 0 1.5px var(--sep); }
   .nst-group::after { box-shadow: inset 0 0 0 1.5px var(--sep); }
   .nst-topbar { border-bottom-color: var(--sep); }

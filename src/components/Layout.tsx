@@ -130,7 +130,7 @@ export default function Layout() {
             <div className="nst-topbar-title">{current?.title ?? "Nestly"}</div>
             <div style={{ flex: 1 }} />
             <div style={{ position: "relative" }}>
-              <button className="nst-chip" onClick={() => homes.length > 1 && setSwitcher((s) => !s)}>
+              <button className="nst-chip nst-glass" onClick={() => homes.length > 1 && setSwitcher((s) => !s)}>
                 {homes.length > 1 && <ChevronDown size={14} />}
                 {homeName ?? "הבית שלי"}
               </button>
@@ -160,18 +160,21 @@ export default function Layout() {
                 </div>
               )}
             </div>
-            <button
-              className="nst-iconbtn plain"
-              onClick={() => setNight(toggleNight() === "garden-night")}
-              title={night ? "מצב יום" : "מצב לילה"}
-              aria-label={night ? "מצב יום" : "מצב לילה"}
-            >
-              {night ? <Sun /> : <Moon />}
-            </button>
-            <NotificationBell />
-            <button className="nst-iconbtn plain nst-burger" onClick={() => setDrawer(true)} title="תפריט" aria-label="תפריט">
-              <Menu />
-            </button>
+            {/* Related bar items share one piece of glass, as native bar buttons do. */}
+            <div className="nst-bar-group nst-glass">
+              <button
+                className="nst-iconbtn plain"
+                onClick={() => setNight(toggleNight() === "garden-night")}
+                title={night ? "מצב יום" : "מצב לילה"}
+                aria-label={night ? "מצב יום" : "מצב לילה"}
+              >
+                {night ? <Sun /> : <Moon />}
+              </button>
+              <NotificationBell />
+              <button className="nst-iconbtn plain nst-burger" onClick={() => setDrawer(true)} title="תפריט" aria-label="תפריט">
+                <Menu />
+              </button>
+            </div>
           </header>
 
           <main className="nst-content" ref={contentRef}>
@@ -181,7 +184,7 @@ export default function Layout() {
       </div>
 
       {/* bottom nav (mobile) */}
-      <nav className="nst-bottomnav">
+      <nav className="nst-bottomnav nst-glass">
         <div className="nst-bn-grid">
           {bottom.map((path) => {
             const item = navItem(path);

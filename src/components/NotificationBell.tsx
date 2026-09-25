@@ -70,7 +70,8 @@ export default function NotificationBell() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative rounded-full p-2 text-slate-600 hover:bg-slate-100"
+        className="nst-iconbtn plain"
+        style={{ position: "relative" }}
         aria-label="התראות"
       >
         <Bell size={22} />
