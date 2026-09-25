@@ -81,11 +81,11 @@ function DishesTab() {
       {dishes.length === 0 ? (
         <EmptyState icon={<ChefHat size={42} />} title="אין מאכלים עדיין" hint="הוסיפו מאכל וקבעו לו מצרכים" />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+        <div className="nst-group">
           {dishes.map((d) => (
             <div className="nst-row" key={d.id}>
               <button style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, border: "none", background: "transparent", textAlign: "right", cursor: "pointer" }} onClick={() => setEditing(d)}>
-                <span style={{ width: 42, height: 42, borderRadius: 13, background: "var(--cat-3-bg)", color: "var(--cat-3-fg)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+                <span className="nst-tile" style={{ background: "var(--cat-3-bg)", color: "var(--cat-3-fg)" }}>
                   <ChefHat size={20} />
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
@@ -284,10 +284,10 @@ function WeekTab() {
       {meals.length === 0 ? (
         <EmptyState icon={<ChefHat size={42} />} title="לא נבחרו מאכלים לשבוע זה" />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+        <div className="nst-group">
           {meals.map((meal) => (
             <div className="nst-row" key={meal.id}>
-              <span style={{ width: 42, height: 42, borderRadius: 13, background: "var(--cat-3-bg)", color: "var(--cat-3-fg)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+              <span className="nst-tile" style={{ background: "var(--cat-3-bg)", color: "var(--cat-3-fg)" }}>
                 <UtensilsCrossed size={20} />
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>

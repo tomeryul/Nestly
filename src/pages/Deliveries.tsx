@@ -401,10 +401,10 @@ function PointsTab({
       {points.length === 0 ? (
         <EmptyState icon={<Store size={42} />} title="עדיין אין נקודות איסוף" hint="הוסיפו את המקומות שאליהם מגיעות החבילות" />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+        <div className="nst-group">
           {points.map((p) => (
             <div className="nst-row" key={p.id}>
-              <span style={{ width: 42, height: 42, borderRadius: 13, background: "var(--accent-soft)", color: "var(--accent-ink)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+              <span className="nst-tile" style={{ background: "var(--accent-soft)", color: "var(--accent-ink)" }}>
                 <Store size={20} />
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>

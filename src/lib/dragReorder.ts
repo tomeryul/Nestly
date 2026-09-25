@@ -62,6 +62,7 @@ export function useDragReorder<T extends { id: string }>(items: T[], onCommit: (
     const layoutTop = el.getBoundingClientRect().top;
     const dy = g.startTop + (g.y - g.startY) - layoutTop;
     el.style.transform = `translateY(${dy}px) scale(1.02)`;
+    el.dataset.lifted = "true";
   }, []);
 
   const reorderTo = useCallback((id: string, y: number) => {
@@ -181,6 +182,7 @@ export function useDragReorder<T extends { id: string }>(items: T[], onCommit: (
           for (const node of refs.current.values()) {
             node.style.transition = "";
             node.style.transform = "";
+            delete node.dataset.lifted;
           }
           setDraggingId(null);
           if (didMoveRef.current) onCommit(orderRef.current);
@@ -199,7 +201,7 @@ export function useDragReorder<T extends { id: string }>(items: T[], onCommit: (
   const itemStyle = useCallback(
     (id: string): CSSProperties =>
       draggingId === id
-        ? { boxShadow: "var(--shadow-lg, 0 8px 24px rgba(0,0,0,.18))", position: "relative", zIndex: 5, cursor: "grabbing" }
+        ? { boxShadow: "var(--shadow-lg, 0 8px 24px rgba(0,0,0,.18))", borderRadius: "var(--radius)", position: "relative", zIndex: 5, cursor: "grabbing" }
         : {},
     [draggingId]
   );

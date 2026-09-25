@@ -118,7 +118,7 @@ export default function NavDrawer({
           </span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ font: "600 20px var(--font-display)", color: "var(--text-bright)" }}>Nestly</div>
-            <div style={{ font: "500 11px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-muted)", marginTop: 1 }}>
+            <div style={{ font: "500 11px var(--font-body)", color: "var(--text-muted)", marginTop: 1 }}>
               כל הסקשנים
             </div>
           </div>

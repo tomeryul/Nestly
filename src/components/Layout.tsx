@@ -1,10 +1,10 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Home, ChevronDown, Moon, Sun, Menu } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import NotificationBell from "./NotificationBell";
-import { isNight, toggleNight } from "../lib/theme";
+import { isNight, onThemeChange, toggleNight } from "../lib/theme";
 import { NAV, BOTTOM_MAX, getBottomNav, setBottomNav, navItem } from "../lib/nav";
 import NavDrawer from "./NavDrawer";
 
@@ -19,8 +19,15 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
-  // The theme can also be changed from Settings, so re-read it on navigation.
-  useEffect(() => setNight(isNight()), [location.pathname]);
+  // The page's large title lives in the content; the bar only repeats it once
+  // that title has scrolled underneath — one title on screen at a time.
+  // Keyed by route, so a new page starts hidden in the very render that shows it
+  // instead of inheriting the last page's state for a frame.
+  const [titleState, setTitleState] = useState({ path: "", inBar: false });
+  const barRef = useRef<HTMLElement | null>(null);
+  const contentRef = useRef<HTMLElement | null>(null);
+  // The theme can change from Settings or from the system appearance.
+  useEffect(() => onThemeChange((t) => setNight(isNight(t))), []);
 
   // The top bar is a material the content passes under: it stays clear until
   // something is actually behind it, then frosts over and grows its hairline.
@@ -29,6 +36,40 @@ export default function Layout() {
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const content = contentRef.current;
+    const bar = barRef.current;
+    if (!content || !bar) return;
+    let io: IntersectionObserver | null = null;
+    let watched: Element | null = null;
+    // Pages render their title after data arrives, so keep looking for it.
+    const path = location.pathname;
+    const set = (inBar: boolean) => setTitleState({ path, inBar });
+    const attach = () => {
+      const title = content.querySelector(".page-title");
+      if (title === watched && title) return;
+      io?.disconnect();
+      watched = title;
+      if (!title) {
+        // Still loading (spinner showing): the title is on its way, keep the bar clear.
+        // Loaded with no large title (e.g. the dashboard): the bar carries the title.
+        set(!content.querySelector(".animate-spin"));
+        return;
+      }
+      io = new IntersectionObserver(([e]) => set(!e.isIntersecting), {
+        rootMargin: `-${bar.offsetHeight}px 0px 0px 0px`,
+      });
+      io.observe(title);
+    };
+    attach();
+    const mo = new MutationObserver(attach);
+    mo.observe(content, { childList: true, subtree: true });
+    return () => {
+      mo.disconnect();
+      io?.disconnect();
+    };
   }, [location.pathname]);
 
   const current = NAV.find((n) => (n.end ? location.pathname === "/" : location.pathname.startsWith(n.to)));
@@ -50,8 +91,6 @@ export default function Layout() {
               <div
                 style={{
                   font: "500 11px var(--font-body)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.14em",
                   color: "var(--text-muted)",
                   marginTop: 1,
                 }}
@@ -82,7 +121,12 @@ export default function Layout() {
 
         {/* main */}
         <div className="nst-main">
-          <header className="nst-topbar" data-scrolled={scrolled}>
+          <header
+            className="nst-topbar"
+            ref={barRef}
+            data-scrolled={scrolled}
+            data-title={titleState.path === location.pathname && titleState.inBar ? "shown" : "hidden"}
+          >
             <div className="nst-topbar-title">{current?.title ?? "Nestly"}</div>
             <div style={{ flex: 1 }} />
             <div style={{ position: "relative" }}>
@@ -130,7 +174,7 @@ export default function Layout() {
             </button>
           </header>
 
-          <main className="nst-content">
+          <main className="nst-content" ref={contentRef}>
             <Outlet />
           </main>
         </div>

@@ -67,8 +67,9 @@ function useMediaQuery(query: string) {
     const mq = window.matchMedia(query);
     const on = () => setMatches(mq.matches);
     on();
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
+    if (mq.addEventListener) mq.addEventListener("change", on);
+    else mq.addListener(on); // Safari < 14
+    return () => (mq.removeEventListener ? mq.removeEventListener("change", on) : mq.removeListener(on));
   }, [query]);
   return matches;
 }

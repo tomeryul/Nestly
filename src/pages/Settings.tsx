@@ -5,7 +5,7 @@ import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { AREAS, type AreaKey } from "../lib/constants";
 import { enablePush, disablePush, pushEnabled, pushSupported } from "../lib/push";
-import { THEMES, getTheme, setTheme, type ThemeKey } from "../lib/theme";
+import { THEMES, getTheme, onThemeChange, setTheme, type ThemeKey } from "../lib/theme";
 import { Modal } from "../components/ui";
 import type { Tables } from "../types/database";
 
@@ -23,6 +23,7 @@ export default function Settings() {
   const [homeNameDraft, setHomeNameDraft] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
   const [theme, setThemeState] = useState<ThemeKey>(getTheme());
+  useEffect(() => onThemeChange(setThemeState), []);
 
   const loadInvites = useCallback(async () => {
     if (!homeId) return;

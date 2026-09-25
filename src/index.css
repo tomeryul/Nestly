@@ -17,13 +17,17 @@
   --border: #ece6d4;
   --border-2: #ddd4bd;
   --sep: rgba(60, 60, 67, 0.13);
+  --sep-strong: rgba(60, 60, 67, 0.22);
   --hover: #f7f3e6;
   --text: #2d2924;
   --text-bright: #1a1714;
   --text-2: #56504a;
-  --text-3: #847b6f;
-  --text-muted: #a89e8f;
-  --text-faint: #ccc3b2;
+  /* Measured, not eyeballed: text-3 ≥5:1 and text-muted ≥4.5:1 on every surface,
+     because both carry real text (captions, tab labels). text-faint is for
+     placeholders and decoration only. */
+  --text-3: #6e665c;
+  --text-muted: #776c5c;
+  --text-faint: #a0978a;
   --accent: #5a8a5e;
   --accent-hover: #487049;
   --accent-soft: #d8e9d3;
@@ -46,9 +50,16 @@
   --cat-6-bg: #c6e0d8; --cat-6-fg: #3f7a66;
   --cat-7-bg: #cbdcec; --cat-7-fg: #45709c;
   --cat-8-bg: #e2d9c8; --cat-8-fg: #6e6450;
-  --radius: 14px;
-  --radius-sm: 10px;
-  --radius-lg: 18px;
+  --radius: 20px;       /* cards, grouped sections (fixed shape) */
+  --radius-sm: 12px;    /* fields */
+  --radius-lg: 26px;    /* sheets */
+  --r-capsule: 999px;   /* every touch control: radius = half the height */
+  /* Glass, for the functional layer only (tab bar, floating controls) */
+  --glass-tint: color-mix(in srgb, var(--surface) 62%, transparent);
+  --glass-edge: rgba(255, 255, 255, 0.6);
+  --glass-highlight: rgba(255, 255, 255, 0.75);
+  --lens: rgba(118, 118, 128, 0.12);   /* the selected tab's pill, tertiarySystemFill */
+  --fill-2: rgba(120, 120, 128, 0.16); /* secondarySystemFill: switch track when off */
   --shadow-sm: none;
   --shadow: none;
   --shadow-lg: 0 6px 20px rgba(80, 70, 40, 0.08), 0 18px 48px -16px rgba(80, 70, 40, 0.14);
@@ -96,41 +107,42 @@
 [data-theme="garden-night"] {
   color-scheme: dark;
   --bg: #161412; --bg-deep: #0e0d0b; --surface: #1f1c19; --surface-2: #25221e; --surface-3: #2d2924; --surface-4: #3a352e;
-  --border: #2c2823; --border-2: #423d34; --hover: #25221e; --sep: rgba(235, 235, 245, 0.16);
-  --text: #d6cfbf; --text-bright: #f0e7d2; --text-2: #b0a895; --text-3: #87806f; --text-muted: #6a6354; --text-faint: #463f35;
+  --border: #2c2823; --border-2: #423d34; --hover: #25221e; --sep: rgba(235, 235, 245, 0.16); --sep-strong: rgba(235, 235, 245, 0.2);
+  --text: #d6cfbf; --text-bright: #f0e7d2; --text-2: #b0a895; --text-3: #989182; --text-muted: #918874; --text-faint: #6c6152;
   --accent: #8fbf86; --accent-hover: #a5d09a; --accent-soft: #2a3826; --accent-ink: #b8d8af; --on-accent: #10180f;
   --ok: #8fbf86; --ok-soft: #2a3826; --warn: #d4a85e; --warn-soft: #3a2d18; --danger: #e08778; --danger-soft: #3b1f1a; --info: #7fa9c8; --info-soft: #1b2c39;
   --cat-1-bg: #314030; --cat-1-fg: #b9d6ad; --cat-2-bg: #443a1e; --cat-2-fg: #ead8a0; --cat-3-bg: #443122; --cat-3-fg: #e8c4a4; --cat-4-bg: #432a2a; --cat-4-fg: #ecbaba;
   --cat-5-bg: #322a48; --cat-5-fg: #ccc0e8; --cat-6-bg: #243a34; --cat-6-fg: #b4dcc9; --cat-7-bg: #243343; --cat-7-fg: #b6cfe4; --cat-8-bg: #3a342a; --cat-8-fg: #d8cdb4;
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.3); --shadow: 0 2px 8px rgba(0,0,0,0.35), 0 8px 20px -10px rgba(0,0,0,0.4); --shadow-lg: 0 10px 32px -16px rgba(0,0,0,0.6);
+  --glass-edge: rgba(255, 255, 255, 0.12); --glass-highlight: rgba(255, 255, 255, 0.08); --lens: rgba(118, 118, 128, 0.26); --fill-2: rgba(120, 120, 128, 0.36);
 }
 /* Rose quartz */
 [data-theme="warm-dark"] {
   --bg: #f7f4f5; --bg-deep: #ede5e8; --surface: #ffffff; --surface-2: #faf6f7; --surface-3: #f1e9ec; --surface-4: #e6d8de;
   --border: #ede1e5; --border-2: #ddc9d0; --sep: rgba(60, 60, 67, 0.13); --hover: #faf5f7;
-  --text: #3d3137; --text-bright: #2c2429; --text-2: #5f4d54; --text-3: #897078; --text-muted: #a995a0; --text-faint: #d4c4cc;
-  --accent: #c98a9b; --accent-hover: #b8718a; --accent-soft: #f4e3e9; --accent-ink: #884a5d;
+  --text: #3d3137; --text-bright: #2c2429; --text-2: #5f4d54; --text-3: #7a636a; --text-muted: #816976; --text-faint: #ae909f;
+  --accent: #c98a9b; --accent-hover: #b8718a; --accent-soft: #f4e3e9; --accent-ink: #884a5d; --on-accent: #29141a;
 }
 /* Sky mist */
 [data-theme="warm-light"] {
   --bg: #f2f5f7; --bg-deep: #e2eaef; --surface: #ffffff; --surface-2: #f6f9fb; --surface-3: #eaf0f4; --surface-4: #d4e0e8;
   --border: #e5edf2; --border-2: #d1dde4; --sep: rgba(60, 60, 67, 0.13); --hover: #f6f9fb;
-  --text: #34404a; --text-bright: #232a30; --text-2: #556270; --text-3: #7d8a96; --text-muted: #9eaab5; --text-faint: #c5d0d9;
-  --accent: #6fa3c0; --accent-hover: #538cab; --accent-soft: #def0f8; --accent-ink: #356b89;
+  --text: #34404a; --text-bright: #232a30; --text-2: #556270; --text-3: #5e6a75; --text-muted: #627281; --text-faint: #849caf;
+  --accent: #6fa3c0; --accent-hover: #538cab; --accent-soft: #def0f8; --accent-ink: #356b89; --on-accent: #142229;
 }
 /* Sage paper */
 [data-theme="cool-dark"] {
   --bg: #f3f6f2; --bg-deep: #e4eae3; --surface: #ffffff; --surface-2: #f7faf6; --surface-3: #ebf0ea; --surface-4: #d6e0d5;
   --border: #e6ede4; --border-2: #d2ddd0; --sep: rgba(60, 60, 67, 0.13); --hover: #f7faf6;
-  --text: #364036; --text-bright: #262d26; --text-2: #586458; --text-3: #7f8b80; --text-muted: #a3ada4; --text-faint: #cad3cb;
-  --accent: #7faa84; --accent-hover: #6a9670; --accent-soft: #e6f0e7; --accent-ink: #4a7251;
+  --text: #364036; --text-bright: #262d26; --text-2: #586458; --text-3: #616b62; --text-muted: #677468; --text-faint: #8a9e8c;
+  --accent: #7faa84; --accent-hover: #6a9670; --accent-soft: #e6f0e7; --accent-ink: #4a7251; --on-accent: #19241a;
 }
 /* Lavender */
 [data-theme="midnight"] {
   --bg: #f5f4f8; --bg-deep: #e7e4ee; --surface: #ffffff; --surface-2: #f9f8fb; --surface-3: #eeebf3; --surface-4: #dad3e4;
   --border: #e9e4ee; --border-2: #d6cee0; --sep: rgba(60, 60, 67, 0.13); --hover: #f9f8fb;
-  --text: #383540; --text-bright: #28252e; --text-2: #5a5567; --text-3: #807a8d; --text-muted: #a39daf; --text-faint: #cac4d3;
-  --accent: #9a8fc4; --accent-hover: #8474b3; --accent-soft: #ece8f5; --accent-ink: #6a5b9c;
+  --text: #383540; --text-bright: #28252e; --text-2: #5a5567; --text-3: #6b6576; --text-muted: #746c84; --text-faint: #9f94af;
+  --accent: #9a8fc4; --accent-hover: #8474b3; --accent-soft: #ece8f5; --accent-ink: #6a5b9c; --on-accent: #1a1627;
 }
 
 html, body, #root { height: 100%; }
@@ -150,13 +162,12 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-body);
-  letter-spacing: -0.006em;
   -webkit-font-smoothing: antialiased;
   touch-action: manipulation;
   overscroll-behavior: none;
   line-height: var(--lh-body);
 }
-h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0.022em; font-weight: 700; line-height: var(--lh-title); }
+h1, h2, h3, .font-display { font-family: var(--font-display); font-weight: 700; line-height: var(--lh-title); }
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 /* Seen dozens of times a day, so it only bridges the content swap — no travel,
    nothing to wait through. */
@@ -166,8 +177,8 @@ h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0
 /* ---- Buttons ---- */
 .btn {
   min-height: var(--tap); padding: 11px 18px; border: none; background: var(--surface-3); color: var(--accent-ink);
-  border-radius: var(--radius-sm); cursor: pointer; font: 600 var(--t-subhead)/1.2 var(--font-body); display: inline-flex;
-  align-items: center; justify-content: center; gap: 6px; letter-spacing: -0.01em;
+  border-radius: var(--r-capsule); cursor: pointer; font: 600 var(--t-subhead)/1.2 var(--font-body); display: inline-flex;
+  align-items: center; justify-content: center; gap: 6px; position: relative;
   transition: transform var(--press) var(--ease-out), background var(--press) var(--ease-out);
 }
 .btn:active { transform: scale(0.97); }
@@ -175,7 +186,13 @@ h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0
 .btn svg { width: 16px; height: 16px; }
 .btn-primary { background: var(--accent); color: var(--on-accent); }
 .btn-danger { background: var(--danger); color: #fff; }
-.btn-sm { min-height: 34px; padding: 7px 13px; font-size: var(--t-footnote); border-radius: 9px; }
+.btn-sm { min-height: 34px; padding: 7px 14px; font-size: var(--t-footnote); }
+/* Small controls keep their look but get a 44pt hit area (Apple's minimum target). */
+.btn-sm::after, .nst-check::after, .nst-del::after, .nst-stepper button::after { content: ''; position: absolute; }
+.btn-sm::after { inset: -5px 0; }
+.nst-check::after { inset: -8px; border-radius: 50%; }
+.nst-del::after { inset: -4px 0; }
+.nst-stepper button::after { inset: -6px 0; }
 .btn-block { width: 100%; }
 
 /* ---- Form controls (16px prevents iOS focus-zoom) ---- */
@@ -207,16 +224,19 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .alert { padding: 14px 16px; border-radius: var(--radius-sm); font-size: 13px; display: flex; gap: 10px; align-items: flex-start; line-height: 1.5; font-weight: 500; }
 .alert svg { width: 17px; height: 17px; flex: none; margin-top: 1px; }
 .alert-info { background: var(--info-soft); color: var(--text-2); }
-.empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-faint); font-weight: 500; }
+.empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-3); font-weight: 500; }
 .empty-state .icon { margin-bottom: 1rem; opacity: 0.45; display: flex; justify-content: center; }
 
 /* ---- Toggle ---- */
 .toggle { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
 .toggle input[type="checkbox"] { position: absolute; opacity: 0; width: 0; height: 0; }
-.toggle-track { position: relative; flex: none; width: 44px; height: 26px; background: var(--surface-3); border-radius: 999px; transition: background 200ms var(--ease-out); box-shadow: inset 0 0 0 1px var(--border-2); }
-.toggle-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; background: var(--surface); border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.18); transition: transform 200ms var(--ease-out); }
-.toggle input:checked ~ .toggle-track { background: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.toggle input:checked ~ .toggle-track::after { transform: translateX(18px); }
+.toggle-track { position: relative; flex: none; width: 51px; height: 31px; background: var(--fill-2); border-radius: var(--r-capsule); transition: background 200ms var(--ease-out); }
+.toggle-track::after { content: ''; position: absolute; top: 2px; right: 2px; width: 27px; height: 27px; background: #fff; border-radius: 50%; box-shadow: 0 3px 8px rgba(0,0,0,0.15), 0 3px 1px rgba(0,0,0,0.06); transition: transform 220ms var(--ease-out); }
+.toggle input:checked ~ .toggle-track { background: var(--ok); }
+/* RTL: the knob rests on the leading (right) side and travels left when on */
+.toggle input:checked ~ .toggle-track::after { transform: translateX(-20px); }
+.toggle input:disabled ~ .toggle-track { opacity: .45; }
+.toggle input:focus-visible ~ .toggle-track { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---- Theme picker ---- */
 .theme-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
@@ -232,7 +252,7 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .nst-logo-tile { width: 40px; height: 40px; border-radius: 12px; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; flex: none; color: var(--accent-ink); }
 .nst-card { background: var(--surface); border-radius: var(--radius); box-shadow: inset 0 0 0 1px var(--sep); padding: var(--sp-4); }
 .nst-row { display: flex; align-items: center; gap: 12px; background: var(--surface); border-radius: var(--radius); padding: 11px 14px; min-height: var(--tap); box-shadow: inset 0 0 0 1px var(--sep); }
-.nst-check { flex: none; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--border-2); background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: transparent;
+.nst-check { position: relative; flex: none; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--border-2); background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: transparent;
   transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out), color 160ms var(--ease-out), transform var(--press) var(--ease-out); }
 .nst-check.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .nst-check svg { width: 14px; height: 14px; transition: transform 160ms var(--ease-out); }
@@ -242,11 +262,11 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .nst-meter { height: 7px; border-radius: 99px; background: var(--surface-3); overflow: hidden; flex: 1; }
 .nst-meter > i { display: block; height: 100%; border-radius: 99px; background: var(--ok); transition: width 250ms var(--ease-in-out); }
 .nst-meter.done > i { background: var(--ok); }
-.nst-stepper { display: flex; align-items: center; gap: 2px; background: var(--surface-2); border-radius: 10px; padding: 2px; box-shadow: inset 0 0 0 1px var(--border-2); flex: none; }
-.nst-stepper button { width: 30px; height: 30px; border: none; background: transparent; color: var(--text-2); cursor: pointer; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.nst-stepper { display: flex; align-items: center; gap: 2px; background: var(--surface-3); border-radius: var(--r-capsule); padding: 2px; flex: none; }
+.nst-stepper button { position: relative; width: 34px; height: 32px; border: none; background: transparent; color: var(--text-2); cursor: pointer; border-radius: var(--r-capsule); display: flex; align-items: center; justify-content: center; }
 .nst-stepper button svg { width: 15px; height: 15px; }
 .nst-stepper .val { min-width: 24px; text-align: center; font: 600 14px var(--font-body); color: var(--text-bright); }
-.nst-del { border: none; background: transparent; color: var(--text-faint); cursor: pointer; padding: 10px; border-radius: 9px; flex: none; display: inline-flex; align-items: center; justify-content: center; }
+.nst-del { position: relative; border: none; background: transparent; color: var(--text-3); cursor: pointer; padding: 10px; border-radius: var(--r-capsule); flex: none; display: inline-flex; align-items: center; justify-content: center; }
 .nst-del svg { width: 17px; height: 17px; }
 .reorder-btn { border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 0 2px; line-height: 0; display: flex; }
 .reorder-btn:disabled { opacity: 0.3; cursor: default; }
@@ -254,24 +274,24 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .nst-grip:active { cursor: grabbing; color: var(--text-muted); }
 .nst-tag { display: inline-flex; align-items: center; gap: 4px; font: 500 var(--t-caption) var(--font-body); letter-spacing: 0; padding: 3px 8px; border-radius: 6px; background: var(--surface-3); color: var(--text-3); }
 .nst-tag svg { width: 11px; height: 11px; }
-.nst-seg { display: flex; gap: 2px; background: var(--surface-3); padding: 2px; border-radius: 9px; }
-.nst-seg button { flex: 1; min-height: 32px; padding: 7px 10px; border: none; background: transparent; color: var(--text-2); font: 500 var(--t-subhead) var(--font-body); border-radius: 7px; cursor: pointer; }
-.nst-seg button.active { background: var(--surface); color: var(--text-bright); box-shadow: 0 1px 3px rgba(0,0,0,.09); font-weight: 600; }
+.nst-seg { display: flex; gap: 2px; background: var(--surface-3); padding: 2px; border-radius: var(--r-capsule); }
+.nst-seg button { flex: 1; min-height: 32px; padding: 7px 10px; border: none; background: transparent; color: var(--text-2); font: 500 var(--t-subhead) var(--font-body); border-radius: var(--r-capsule); cursor: pointer; }
+.nst-seg button.active { background: var(--surface); color: var(--text-bright); box-shadow: 0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04); font-weight: 600; }
 .nst-daypick { display: flex; align-items: stretch; gap: 8px; }
 .nst-day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px; min-height: var(--tap); border-radius: var(--radius-sm); border: none; background: var(--surface-2); color: var(--text-3); cursor: pointer; }
 .nst-day .dow { font: 500 var(--t-caption) var(--font-body); letter-spacing: 0; }
-.nst-day .dnum { font: 600 var(--t-headline) var(--font-display); color: var(--text-2); letter-spacing: -0.02em; }
+.nst-day .dnum { font: 600 var(--t-headline) var(--font-display); color: var(--text-2); }
 .nst-day.today { box-shadow: inset 0 0 0 2px var(--accent); }
 .nst-day.today .dnum { color: var(--accent-ink); }
 .nst-day.sel { background: var(--accent); }
 .nst-day.sel .dow, .nst-day.sel .dnum { color: var(--on-accent); }
 .nst-day .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
-.nst-day.sel .dot { background: #fff; }
+.nst-day.sel .dot { background: var(--on-accent); }
 .nst-chip { display: inline-flex; align-items: center; gap: 5px; padding: 8px 14px; border-radius: 30px; font: 500 var(--t-subhead) var(--font-body); border: none; cursor: pointer; white-space: nowrap; background: var(--surface); color: var(--text-2); box-shadow: inset 0 0 0 1px var(--sep); }
 .nst-chip.active { background: var(--accent); color: var(--on-accent); box-shadow: none; font-weight: 600; }
 .nst-chip svg { width: 14px; height: 14px; }
 .nst-avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--accent); color: var(--on-accent); flex: none; display: flex; align-items: center; justify-content: center; font: 700 15px var(--font-body); }
-.nst-iconbtn { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; background: var(--surface-2); border: none; border-radius: 11px; color: var(--text-2); cursor: pointer; box-shadow: inset 0 0 0 1px var(--border-2); flex: none; }
+.nst-iconbtn { display: inline-flex; align-items: center; justify-content: center; width: var(--tap); height: var(--tap); background: var(--surface-2); border: none; border-radius: 50%; color: var(--text-2); cursor: pointer; flex: none; }
 .nst-iconbtn.plain { background: transparent; box-shadow: none; }
 .nst-iconbtn svg { width: 18px; height: 18px; }
 
@@ -281,8 +301,8 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .next-action-ico svg { width: 24px; height: 24px; }
 .next-action-body { flex: 1; min-width: 0; }
 .next-action-kicker { font-size: var(--t-footnote); font-weight: 400; letter-spacing: 0; opacity: 0.7; margin-bottom: 2px; }
-.next-action-title { font-family: var(--font-display); font-size: var(--t-title3); font-weight: 600; line-height: 1.25; letter-spacing: -0.02em; color: var(--accent-ink); }
-.next-action-cta { background: var(--accent); color: var(--on-accent); border: none; padding: 9px 16px; border-radius: 10px; font: 700 12.5px var(--font-body); cursor: pointer; white-space: nowrap; flex: none; box-shadow: var(--shadow-sm); }
+.next-action-title { font-family: var(--font-display); font-size: var(--t-title3); font-weight: 600; line-height: 1.25; color: var(--accent-ink); }
+.next-action-cta { background: var(--accent); color: var(--on-accent); border: none; min-height: 36px; padding: 8px 16px; border-radius: var(--r-capsule); font: 600 var(--t-footnote) var(--font-body); cursor: pointer; white-space: nowrap; flex: none; }
 .next-action.is-calm { background: var(--surface); box-shadow: inset 0 0 0 1px var(--sep); }
 .next-action.is-calm .next-action-title { color: var(--text-bright); }
 .next-action.is-calm .next-action-ico { color: var(--accent); }
@@ -293,11 +313,56 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .sec-tile:active { transform: scale(0.975); }
 .sec-tile-ico { opacity: .8; margin-bottom: 2px; }
 .sec-tile-ico svg { width: 20px; height: 20px; }
-.sec-tile-count { font-family: var(--font-display); font-size: var(--t-title1); font-weight: 600; line-height: 1; margin-top: auto; letter-spacing: -0.028em; }
+.sec-tile-count { font-family: var(--font-display); font-size: var(--t-title1); font-weight: 600; line-height: 1; margin-top: auto; }
 .sec-tile-label { font-size: var(--t-footnote); font-weight: 500; opacity: 0.85; }
 
 /* task item */
 .task-item { background: var(--surface); padding: 11px 14px; border-radius: var(--radius); display: flex; gap: 12px; align-items: center; min-height: var(--tap); box-shadow: inset 0 0 0 1px var(--sep); }
+
+/* ---- Inset grouped list ----
+   A run of rows is one rounded section with hairlines between them — the
+   iOS list — not a stack of separately bordered cards. Rows keep an opaque
+   background (a row lifted for dragging must not turn see-through), so the
+   end rows take the section's corners instead of the container clipping. */
+.nst-group { position: relative; display: flex; flex-direction: column; background: var(--surface); border-radius: var(--radius); }
+/* The outline is an overlay: an inset shadow on the group would sit *under* the
+   rows' opaque backgrounds and vanish. A lifted row (z-index 5) still rises above it. */
+.nst-group::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--sep); pointer-events: none; }
+.nst-group > .nst-row, .nst-group > .task-item { position: relative; border-radius: 0; box-shadow: none; }
+.nst-group > :first-child { border-start-start-radius: var(--radius); border-start-end-radius: var(--radius); }
+.nst-group > :last-child { border-end-start-radius: var(--radius); border-end-end-radius: var(--radius); }
+/* The separator starts where the row's text starts, and runs to the trailing edge.
+   The offset is summed from the same tokens that size the leading pieces, so
+   resizing a check or a tile moves the hairline with it. */
+:root { --row-pad: 14px; --row-gap: 12px; --check: 28px; --grip-w: 29px; --bar-w: 5px; --tile: 42px; }
+.nst-group > * { --lead: var(--row-pad); }
+.nst-group > :has(> .nst-check:first-child) { --lead: calc(var(--row-pad) + var(--check) + var(--row-gap)); }
+.nst-group > :has(> span:first-child:empty + .nst-check) { --lead: calc(var(--row-pad) + var(--bar-w) + var(--check) + 2 * var(--row-gap)); }
+.nst-group > :has(> .nst-grip:first-child + span:empty + .nst-check) { --lead: calc(var(--row-pad) + var(--grip-w) + var(--bar-w) + var(--check) + 3 * var(--row-gap)); }
+.nst-group > :has(> .nst-tile:first-child),
+.nst-group > :has(> button:first-child > .nst-tile:first-child) { --lead: calc(var(--row-pad) + var(--tile) + var(--row-gap)); }
+.nst-tile { width: var(--tile); height: var(--tile); border-radius: 13px; display: flex; align-items: center; justify-content: center; flex: none; }
+.nst-group > * + *::before {
+  content: ''; position: absolute; top: 0; inset-inline: var(--lead) 0;
+  height: 1px; transform: scaleY(0.5); transform-origin: top; background: var(--sep-strong, var(--sep));
+  pointer-events: none;
+}
+/* A row lifted for dragging is its own card for the moment: no hairline across it. */
+[data-lifted]::before { opacity: 0; }
+/* Already inside a card or a sheet: the container is the section, so the group
+   dissolves into it and only the hairlines remain. The negative margin lines the
+   row text up with the container's own content edge. */
+.nst-card .nst-group, .nst-modal .nst-group { background: transparent; margin-inline: -14px; }
+.nst-card .nst-group::after, .nst-modal .nst-group::after { display: none; }
+.nst-group-header { margin: 0 16px 6px; font: 400 var(--t-footnote) var(--font-body); color: var(--text-3); display: flex; align-items: center; gap: 6px; }
+/* Rows inside a room card (cleaning) get the same hairlines. */
+.nst-line { background: var(--surface); }  /* opaque, so a row lifted for dragging hides what it passes over */
+.nst-line + .nst-line { position: relative; }
+.nst-line + .nst-line::before {
+  content: ''; position: absolute; top: -5px; inset-inline: 36px 0;       /* check + gap */
+  height: 1px; transform: scaleY(0.5); transform-origin: top; background: var(--sep-strong, var(--sep));
+}
+.nst-line + .nst-line:has(> .nst-grip:first-child)::before { inset-inline-start: 73px; }   /* grip + check */
 
 /* modal (bottom sheet) */
 /* The sheet arrives from the bottom edge and leaves through it. Symmetry is
@@ -342,8 +407,9 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .nst-modal[data-draggable="true"] { padding-top: 0.6rem; }
 .nst-modal[data-draggable="true"] .nst-modal-head { touch-action: none; }
 
-.nst-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; }
-.nst-modal-head h3 { font: 600 var(--t-title3) var(--font-display); color: var(--text-bright); letter-spacing: -0.022em; margin: 0; }
+.nst-modal-head { display: grid; grid-template-columns: var(--tap) 1fr var(--tap); align-items: center; gap: 8px; margin: 0 -6px 1rem; }
+.nst-modal-head h3 { font: 600 var(--t-headline) var(--font-display); color: var(--text-bright); margin: 0; text-align: center; }
+.nst-modal-head .nst-close { width: var(--tap); height: var(--tap); border-radius: 50%; background: var(--surface-3); color: var(--text-2); }
 .nst-fields { display: flex; flex-direction: column; gap: 12px; }
 .nst-dropdown {
   position: absolute; top: calc(100% + 8px); inset-inline-end: 0; min-width: 200px;
@@ -352,7 +418,7 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
   transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
   @starting-style { opacity: 0; transform: scale(0.96); }
 }
-.nst-dropdown button { display: block; width: 100%; text-align: right; padding: 11px 14px; border: none; background: transparent; color: var(--text-2); font: 600 13.5px var(--font-body); border-radius: 10px; cursor: pointer; }
+.nst-dropdown button { display: block; width: 100%; min-height: var(--tap); text-align: right; padding: 11px 14px; border: none; background: transparent; color: var(--text-2); font: 500 var(--t-subhead) var(--font-body); border-radius: 12px; cursor: pointer; }
 .nst-dropdown button.on { color: var(--accent-ink); font-weight: 700; }
 
 .nst-collapse { display: grid; grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows 200ms var(--ease-out), opacity 200ms var(--ease-out); }
@@ -364,8 +430,8 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 
 /* section title inside cards */
 .nst-card-title { font: 600 19px var(--font-display); color: var(--text-bright); display: flex; align-items: center; gap: 9px; margin: 0; }
-.nst-card-title svg { color: var(--accent); width: 19px; height: 19px; }
-.page-title { font: 700 var(--t-large-title) var(--font-display); color: var(--text-bright); letter-spacing: -0.032em; line-height: 1.12; margin: 0; }
+.nst-card-title svg { color: var(--text-3); width: 19px; height: 19px; }
+.page-title { font: 700 var(--t-large-title) var(--font-display); color: var(--text-bright); line-height: 1.12; margin: 0; }
 
 /* ============================================================
    Layout — sidebar (desktop) + bottom nav (mobile)
@@ -380,7 +446,7 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .nst-sidebar { position: fixed; top: 0; bottom: 0; inset-inline-end: 0; width: 252px; background: var(--surface); border-inline-start: 1px solid var(--border); box-shadow: var(--shadow); display: flex; flex-direction: column; z-index: 80; }
 .nst-side-head { display: flex; align-items: center; gap: 11px; padding: 20px 16px 14px; }
 .nst-nav { flex: 1; overflow-y: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; }
-.nst-nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 13px; border-radius: 11px; border: none; background: transparent; color: var(--text-2); font: 500 var(--t-callout) var(--font-body); cursor: pointer; text-align: right; position: relative; letter-spacing: -.01em; width: 100%; min-height: var(--tap); }
+.nst-nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 13px; border-radius: 11px; border: none; background: transparent; color: var(--text-2); font: 500 var(--t-callout) var(--font-body); cursor: pointer; text-align: right; position: relative; width: 100%; min-height: var(--tap); }
 .nst-nav-item.active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
 .nst-nav-item.active::before { content: ''; position: absolute; inset-inline-end: -12px; top: 50%; transform: translateY(-50%); width: 3px; height: 19px; border-radius: 3px 0 0 3px; background: var(--accent); }
 .nst-nav-item svg { width: 19px; height: 19px; flex: none; }
@@ -402,23 +468,35 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
   -webkit-backdrop-filter: blur(20px) saturate(1.8);
   border-bottom-color: var(--sep);
 }
-.nst-topbar-title { font: 600 var(--t-headline) var(--font-display); color: var(--text-bright); letter-spacing: -.02em; white-space: nowrap; }
+.nst-topbar-title { font: 600 var(--t-headline) var(--font-display); color: var(--text-bright); white-space: nowrap; opacity: 1; transition: opacity 200ms var(--ease-out); }
+.nst-topbar[data-title="hidden"] .nst-topbar-title { opacity: 0; }
 .nst-content { flex: 1; max-width: 920px; width: 100%; margin: 0 auto; padding: var(--sp-5) var(--sp-4) 6rem; }
 .nst-bottomnav { display: none; }
 .user-chip { display: flex; align-items: center; gap: 11px; background: var(--surface-2); padding: 8px 12px 8px 8px; border-radius: 12px; border: none; cursor: pointer; width: 100%; }
-.user-chip strong { display: block; font: 600 13.5px var(--font-body); color: var(--text-bright); }
+.user-chip strong { display: block; font: 600 var(--t-subhead) var(--font-body); color: var(--text-bright); }
 .user-chip span.sub { display: block; font: 500 11px var(--font-body); color: var(--text-muted); }
 
 @media (max-width: 1024px) {
   .nst-sidebar { display: none; }
   .nst-main { margin-inline-end: 0; }
-  .nst-content { padding: var(--sp-4) var(--sp-4) 6.5rem; }
-  .nst-bottomnav { display: block; position: fixed; inset-inline: 0; bottom: 0; z-index: 80; background: color-mix(in srgb, var(--surface) 80%, transparent); backdrop-filter: blur(20px) saturate(1.8); -webkit-backdrop-filter: blur(20px) saturate(1.8); border-top: 0.5px solid var(--sep); }
+  .nst-content { padding: var(--sp-4) var(--sp-4) calc(96px + env(safe-area-inset-bottom)); }
+  /* The tab bar floats above the content on glass, inset from the screen's
+     rounded corners, so the page scrolls visibly underneath it. */
+  .nst-bottomnav {
+    display: block; position: fixed; z-index: 80;
+    inset-inline: 12px; bottom: max(10px, env(safe-area-inset-bottom));
+    padding: 4px; border-radius: var(--r-capsule);
+    background: var(--glass-tint);
+    backdrop-filter: blur(14px) saturate(1.8); -webkit-backdrop-filter: blur(14px) saturate(1.8);
+    border: 0.5px solid var(--glass-edge);
+    box-shadow: inset 0 1px 0 var(--glass-highlight), 0 10px 30px -10px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.06);
+  }
   .nst-bn-grid { display: flex; max-width: 760px; margin: 0 auto; }
   .nst-bn-grid::-webkit-scrollbar { display: none; }
-  .nst-bn { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 4px calc(7px + env(safe-area-inset-bottom)); border: none; background: transparent; color: var(--text-muted); font: 500 10px var(--font-body); letter-spacing: 0; cursor: pointer; white-space: nowrap; }
-  .nst-bn.active { color: var(--accent-ink); }
-  .nst-bn svg { width: 25px; height: 25px; stroke-width: 1.8; }
+  .nst-bn { flex: 1 1 0; min-width: 0; min-height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 6px 4px; border: none; border-radius: var(--r-capsule); background: transparent; color: var(--text-2); font: 600 11px var(--font-body); cursor: pointer; white-space: nowrap; text-decoration: none; }
+  .nst-bn.active { color: var(--accent-ink); background: var(--lens); }  /* the selection lens */
+  .nst-bn svg { width: 24px; height: 24px; stroke-width: 1.9; }
+  .nst-bn.active svg { stroke-width: 2.4; }
 }
 @media (min-width: 600px) {
   /* Centred, so it has no edge to come from: the modal recipe, not the sheet. */
@@ -557,9 +635,11 @@ input, textarea, p, li, h1, h2, h3, .nst-card-title, .page-title {
 /* Contrast up: the hairlines that carry the layout get real weight, and muted
    text stops being muted. */
 @media (prefers-contrast: more) {
-  :root { --sep: rgba(60, 60, 67, 0.5); --text-3: var(--text-2); --text-muted: var(--text-3); }
-  [data-theme="garden-night"] { --sep: rgba(235, 235, 245, 0.55); }
+  :root { --sep: rgba(60, 60, 67, 0.5); --sep-strong: rgba(60, 60, 67, 0.6); --text-3: var(--text-2); --text-muted: var(--text-3); }
+  [data-theme="garden-night"] { --sep: rgba(235, 235, 245, 0.55); --sep-strong: rgba(235, 235, 245, 0.6); }
+  .nst-bottomnav { border-color: var(--sep); }
   .nst-card, .nst-row, .task-item, .nst-chip { box-shadow: inset 0 0 0 1.5px var(--sep); }
+  .nst-group::after { box-shadow: inset 0 0 0 1.5px var(--sep); }
   .nst-topbar { border-bottom-color: var(--sep); }
   .nst-check { border-width: 2px; }
 }

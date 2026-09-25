@@ -291,17 +291,15 @@ export default function Shopping() {
 
   const takenSection =
     taken.length > 0 ? (
-      <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 6 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 4px" }}>
-          <span style={{ color: "var(--text-3)", font: "400 13px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            <ShoppingCart size={12} style={{ verticalAlign: -2, marginInlineEnd: 4 }} /> נלקחו · {taken.length}
-          </span>
+      <div style={{ marginTop: 6 }}>
+        <div className="nst-group-header">
+          <ShoppingCart size={12} /> נלקחו · {taken.length}
           <span style={{ flex: 1 }} />
-          <button className="reorder-btn" style={{ color: "var(--danger)", fontSize: 12, fontWeight: 700, gap: 4, alignItems: "center" }} onClick={clearChecked}>
+          <button className="reorder-btn" style={{ color: "var(--danger)", font: "600 13px var(--font-body)", gap: 4, alignItems: "center", minHeight: 32 }} onClick={clearChecked}>
             <Eraser size={14} /> ניקוי
           </button>
         </div>
-        {taken.map(renderRow)}
+        <div className="nst-group">{taken.map(renderRow)}</div>
       </div>
     ) : null;
 
@@ -451,17 +449,17 @@ export default function Shopping() {
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {groupedSections.map(([cat, catItems]) => (
             <div key={cat}>
-              <div style={{ margin: "0 4px 0.5rem", color: "var(--text-3)", font: "400 13px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              <div className="nst-group-header">
                 {cat} · {catItems.length}
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>{catItems.map(renderRow)}</div>
+              <div className="nst-group">{catItems.map(renderRow)}</div>
             </div>
           ))}
           {takenSection}
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-          {active.map(renderRow)}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {active.length > 0 && <div className="nst-group">{active.map(renderRow)}</div>}
           {takenSection}
         </div>
       )}

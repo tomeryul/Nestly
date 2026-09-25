@@ -162,7 +162,7 @@ export default function Dashboard() {
         {todayTasks.length === 0 ? (
           <p style={{ color: "var(--text-muted)", fontSize: 13, textAlign: "center", padding: "0.5rem 0" }}>אין משימות להיום 🎉</p>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+          <div className="nst-group">
             {todayTasks.map((t) => {
               const cat = TASK_CATEGORIES[t.category as TaskCategory] ?? TASK_CATEGORIES.general;
               return (

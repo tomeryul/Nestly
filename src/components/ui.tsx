@@ -193,11 +193,13 @@ export function Modal({
         onClick={(e) => e.stopPropagation()}
       >
         {draggable && <div className="nst-grabber" aria-hidden {...sheet.handleProps} />}
+        {/* iOS sheet bar: Close on the leading edge, the task's name centred. */}
         <div className="nst-modal-head" {...(draggable ? sheet.handleProps : {})}>
-          <h3>{title}</h3>
-          <button className="nst-del" onClick={() => leave()} aria-label="סגירה">
-            <X size={20} />
+          <button className="nst-del nst-close" onClick={() => leave()} aria-label="סגירה">
+            <X size={18} />
           </button>
+          <h3>{title}</h3>
+          <span aria-hidden="true" />
         </div>
         {children}
       </div>

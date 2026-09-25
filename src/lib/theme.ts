@@ -11,15 +11,31 @@ export const THEMES: { key: ThemeKey; name: string; swatches: [string, string, s
 
 const KEY = "nestly.theme";
 
+const systemDark = () => typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+/** The stored choice, or — until the person makes one — whatever the system is set to. */
 export function getTheme(): ThemeKey {
   const t = localStorage.getItem(KEY) as ThemeKey | null;
-  return t && THEMES.some((x) => x.key === t) ? t : "garden";
+  if (t && THEMES.some((x) => x.key === t)) return t;
+  return systemDark() ? "garden-night" : "garden";
 }
+
+const EVENT = "nestly:theme";
 
 export function applyTheme(t: ThemeKey) {
   document.documentElement.dataset.theme = t;
   const bg = THEMES.find((x) => x.key === t)?.bg ?? "#f5f1e6";
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg);
+  // The theme can change without any navigation (system appearance, Settings),
+  // so anything that displays it listens rather than re-reading on route change.
+  window.dispatchEvent(new CustomEvent<ThemeKey>(EVENT, { detail: t }));
+}
+
+/** Subscribe to theme changes; returns the unsubscribe function. */
+export function onThemeChange(cb: (t: ThemeKey) => void) {
+  const fn = (e: Event) => cb((e as CustomEvent<ThemeKey>).detail);
+  window.addEventListener(EVENT, fn);
+  return () => window.removeEventListener(EVENT, fn);
 }
 
 export function setTheme(t: ThemeKey) {
@@ -29,6 +45,15 @@ export function setTheme(t: ThemeKey) {
 
 export function initTheme() {
   applyTheme(getTheme());
+  // Keep following the system (e.g. automatic evening switch) while no explicit choice exists.
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  const follow = () => {
+    if (!localStorage.getItem(KEY)) applyTheme(getTheme());
+  };
+  // Safari before 14 only has addListener; calling the missing method would
+  // throw before the app renders.
+  if (mq.addEventListener) mq.addEventListener("change", follow);
+  else mq.addListener(follow);
 }
 
 /**

@@ -323,9 +323,9 @@ function RoomSection({
           </span>
         )}
         <button onClick={toggleCollapsed} title={collapsed ? "הרחבה" : "צמצום"} style={{ border: "none", background: "transparent", cursor: "pointer", color: "var(--accent)", display: "flex", padding: 0, lineHeight: 0 }}>
-          <ChevronDown size={18} style={{ transition: "transform 200ms var(--ease-out)", transform: collapsed ? "rotate(-90deg)" : "none" }} />
+          <ChevronDown size={18} style={{ transition: "transform 200ms var(--ease-out)", transform: collapsed ? "rotate(90deg)" : "none" }} />
         </button>
-        <DoorOpen size={16} style={{ color: "var(--accent)" }} />
+        <DoorOpen size={16} style={{ color: "var(--text-3)" }} />
         {editing ? (
           <>
             <input
@@ -344,7 +344,7 @@ function RoomSection({
           </>
         ) : (
           <>
-            <h2 onClick={toggleCollapsed} style={{ font: "600 20px var(--font-display)", letterSpacing: "-0.022em", color: "var(--text-bright)", margin: 0, flex: 1, cursor: "pointer" }}>{name}</h2>
+            <h2 onClick={toggleCollapsed} style={{ font: "600 20px var(--font-display)", color: "var(--text-bright)", margin: 0, flex: 1, cursor: "pointer" }}>{name}</h2>
             {tasks.length > 0 && (
               <span className="badge b-wt" style={{ borderRadius: 30 }}>
                 {done}/{tasks.length}
@@ -381,7 +381,7 @@ function RoomSection({
         if (!t) return null;
         const isDone = doneIds.has(t.id);
         return (
-          <div key={t.id} ref={dr.setItemRef(t.id)} style={{ display: "flex", alignItems: "center", gap: 8, opacity: isDone ? 0.55 : 1, ...dr.itemStyle(t.id) }}>
+          <div key={t.id} className="nst-line" ref={dr.setItemRef(t.id)} style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 44, opacity: isDone ? 0.55 : 1, ...dr.itemStyle(t.id) }}>
             {editingTask === t.id ? (
               <>
                 <input

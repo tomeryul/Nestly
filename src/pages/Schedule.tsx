@@ -151,7 +151,7 @@ export default function Schedule() {
       {dayTasks.length === 0 ? (
         <EmptyState icon={<CalendarDays size={42} />} title="אין משימות ליום זה" />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+        <div className="nst-group">
           {dr.order.map((id) => {
             const t = byId.get(id);
             if (!t) return null;
@@ -306,7 +306,7 @@ function TaskDetailModal({ task, onEdit, onClose }: { task: Task; onEdit: (t: Ta
       {subs.length === 0 ? (
         <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: "0.5rem 0" }}>אין תת‑משימות עדיין</p>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="nst-group">
           {subs.map((s) => (
             <div className="nst-row" key={s.id} style={{ opacity: s.is_done ? 0.55 : 1 }}>
               <button className={`nst-check ${s.is_done ? "on" : ""}`} onClick={() => toggle(s)}>
