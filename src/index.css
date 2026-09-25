@@ -55,7 +55,9 @@
   --radius-lg: 26px;    /* sheets */
   --r-capsule: 999px;   /* every touch control: radius = half the height */
   /* Glass, for the functional layer only (tab bar, floating controls) */
-  --glass-tint: color-mix(in srgb, var(--surface) 62%, transparent);
+  /* Light enough that what's underneath stays visible. At 62% white with an 18px
+     blur, a white card behind the bar came out as solid white: no glass at all. */
+  --glass-tint: color-mix(in srgb, var(--surface) 30%, transparent);
   --glass-edge: rgba(255, 255, 255, 0.6);        /* light inner ring */
   --glass-rim: rgba(0, 0, 0, 0.14);               /* iOS 27: the darkened edge around glass */
   --glass-highlight: rgba(255, 255, 255, 0.95);   /* iOS 27: brighter specular highlight */
@@ -497,7 +499,7 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
     padding: 4px; border-radius: var(--r-capsule);
     background: var(--glass-tint);
     /* iOS 27 glass: stronger diffusion, a darkened rim, a bright specular top edge */
-    backdrop-filter: blur(18px) saturate(1.8); -webkit-backdrop-filter: blur(18px) saturate(1.8);
+    backdrop-filter: blur(6px) saturate(1.9); -webkit-backdrop-filter: blur(6px) saturate(1.9);
     border: 0.5px solid var(--glass-rim);
     box-shadow: inset 0 1px 0 var(--glass-highlight), inset 0 0 0 1px var(--glass-edge),
                 0 10px 30px -10px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.06);
