@@ -237,15 +237,12 @@ export default function Settings() {
       </button>
 
       {editName && (
-        <Modal open onClose={() => setEditName(false)} title="עריכת שם">
+        <Modal open onClose={() => setEditName(false)} title="עריכת שם" done={{ label: "שמירה", onClick: saveName, disabled: !displayName.trim() }}>
           <div className="nst-fields">
             <div>
               <label>שם לתצוגה</label>
               <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
             </div>
-            <button className="btn btn-primary btn-block" style={{ padding: 12 }} onClick={saveName}>
-              שמירה
-            </button>
           </div>
         </Modal>
       )}
@@ -268,7 +265,7 @@ function InviteModal({ homeId, userId, onClose, onCreated }: { homeId: string; u
   };
 
   return (
-    <Modal open onClose={onClose} title="הזמנת שותף לבית">
+    <Modal open onClose={onClose} title="הזמנת שותף לבית" done={{ label: busy ? "יוצר…" : "יצירה", onClick: create, disabled: busy }}>
       <div className="nst-fields">
         <div>
           <p className="section-sub" style={{ marginBottom: 10 }}>אילו תחומים באחריות השותף? (אפשר לשנות בהמשך)</p>
@@ -280,9 +277,7 @@ function InviteModal({ homeId, userId, onClose, onCreated }: { homeId: string; u
             ))}
           </div>
         </div>
-        <button className="btn btn-primary btn-block" style={{ padding: 12 }} onClick={create} disabled={busy}>
-          יצירת קישור הזמנה
-        </button>
+        <p className="section-sub">ייווצר קישור הזמנה שאפשר לשלוח לשותף.</p>
       </div>
     </Modal>
   );

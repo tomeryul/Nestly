@@ -407,8 +407,13 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .nst-modal[data-draggable="true"] { padding-top: 0.6rem; }
 .nst-modal[data-draggable="true"] .nst-modal-head { touch-action: none; }
 
-.nst-modal-head { display: grid; grid-template-columns: var(--tap) 1fr var(--tap); align-items: center; gap: 8px; margin: 0 -6px 1rem; }
-.nst-modal-head h3 { font: 600 var(--t-headline) var(--font-display); color: var(--text-bright); margin: 0; text-align: center; }
+.nst-modal-head { display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(0, max-content) minmax(max-content, 1fr); align-items: center; gap: 8px; margin: 0 -6px 1rem; }
+/* Close on the leading edge, Done on the trailing edge, the title held in the centre
+   however wide the two side buttons are. */
+.nst-modal-head > :first-child { justify-self: start; }
+.nst-modal-head > :last-child { justify-self: end; }
+.nst-done { min-height: 36px; padding: 6px 16px; font-size: var(--t-subhead); white-space: nowrap; }
+.nst-modal-head h3 { font: 600 var(--t-headline) var(--font-display); color: var(--text-bright); margin: 0; text-align: center; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nst-modal-head .nst-close { width: var(--tap); height: var(--tap); border-radius: 50%; background: var(--surface-3); color: var(--text-2); }
 .nst-fields { display: flex; flex-direction: column; gap: 12px; }
 .nst-dropdown {

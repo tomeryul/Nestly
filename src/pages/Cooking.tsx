@@ -526,7 +526,7 @@ function AddMealModal({
   }
 
   return (
-    <Modal open onClose={onClose} title="הוספת מאכל לשבוע">
+    <Modal open onClose={onClose} title="מאכל לשבוע" done={{ label: "הוספה", onClick: save }}>
       <div className="nst-fields">
         <div>
           <label>מאכל</label>
@@ -580,9 +580,6 @@ function AddMealModal({
         <p className="alert alert-info">
           <Info /> שיבוץ מאכל ישלח התראה לאחראי הקניות לקבוע יום ושעה לקנייה.
         </p>
-        <button className="btn btn-primary btn-block" style={{ padding: 12 }} onClick={save}>
-          הוספה לשבוע
-        </button>
       </div>
     </Modal>
   );

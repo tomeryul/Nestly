@@ -71,11 +71,19 @@ export function Modal({
   open,
   onClose,
   title,
+  done,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
+  /**
+   * The sheet's primary action (Create / Save / Add). It sits on the trailing
+   * edge of the sheet's top bar, opposite Close — where iOS puts Done — so the
+   * action is always in reach without scrolling to the end of the form.
+   * Management sheets that save as you go leave it out and keep Close only.
+   */
+  done?: { label: string; onClick: () => void; disabled?: boolean };
   children: ReactNode;
 }) {
   const [present, setPresent] = useState(open);
@@ -199,7 +207,13 @@ export function Modal({
             <X size={18} />
           </button>
           <h3>{title}</h3>
-          <span aria-hidden="true" />
+          {done ? (
+            <button className="btn btn-primary btn-sm nst-done" onClick={done.onClick} disabled={done.disabled}>
+              {done.label}
+            </button>
+          ) : (
+            <span aria-hidden="true" />
+          )}
         </div>
         {children}
       </div>

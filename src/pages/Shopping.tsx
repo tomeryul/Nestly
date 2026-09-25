@@ -636,15 +636,12 @@ function NewListModal({ homeId, onClose, onCreated }: { homeId: string; onClose:
     if (data) onCreated(data.id);
   };
   return (
-    <Modal open onClose={onClose} title="רשימה חדשה">
+    <Modal open onClose={onClose} title="רשימה חדשה" done={{ label: "יצירה", onClick: create, disabled: !name.trim() }}>
       <div className="nst-fields">
         <div>
           <label>שם הרשימה</label>
           <input placeholder="למשל: פארם" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
-        <button className="btn btn-primary btn-block" style={{ padding: 12 }} onClick={create}>
-          יצירה
-        </button>
       </div>
     </Modal>
   );

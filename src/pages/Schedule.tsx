@@ -496,7 +496,7 @@ function TaskModal({ homeId, dateIso, initial, positionFor, templates, onClose, 
   };
 
   return (
-    <Modal open onClose={onClose} title={initial ? "עריכת משימה" : "משימה חדשה"}>
+    <Modal open onClose={onClose} title={initial ? "עריכת משימה" : "משימה חדשה"} done={{ label: "שמירה", onClick: save }}>
       <div className="nst-fields">
         <div>
           <label>כותרת המשימה</label>
@@ -563,9 +563,6 @@ function TaskModal({ homeId, dateIso, initial, positionFor, templates, onClose, 
           <label>אחראי</label>
           <MemberSelect value={assigned} onChange={setAssigned} />
         </div>
-        <button className="btn btn-primary btn-block" style={{ padding: 12 }} onClick={save}>
-          שמירה
-        </button>
       </div>
     </Modal>
   );
