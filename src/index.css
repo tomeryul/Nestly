@@ -306,11 +306,13 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
    mid-flight. */
 .nst-modal-bg {
   position: fixed; inset: 0; background: rgba(30,25,30,.34);
-  backdrop-filter: blur(20px) saturate(1.3); -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  /* Enough to push the page back, not so much that you lose what you are on
+     top of — a scrim you cannot see through may as well be opaque. */
+  backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3);
   z-index: 200; display: flex; align-items: flex-end; justify-content: center;
   opacity: 1; transition: opacity 250ms var(--ease-out);
 }
-.nst-modal-bg[data-state="closed"] { opacity: 0; }
+.nst-modal-bg[data-state="closed"] { opacity: 0; transition-duration: 200ms; }
 .nst-modal {
   background: var(--surface); border-radius: 16px 16px 0 0;
   padding: 1.5rem 1.4rem calc(1.5rem + env(safe-area-inset-bottom));
@@ -324,7 +326,7 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
   transition: transform 500ms var(--ease-drawer);
   will-change: transform;
 }
-.nst-modal[data-state="closed"] { transform: translateY(100%); }
+.nst-modal[data-state="closed"] { transform: translateY(100%); transition-duration: 300ms; }
 /* While a finger owns it nothing else may: the transform is written straight to
    the element on every move so it tracks one-to-one. */
 .nst-modal[data-dragging="true"], .nst-drawer[data-dragging="true"] { transition: none; }
@@ -425,18 +427,18 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
     border-radius: 26px; transform-origin: center;
     transition: opacity 250ms var(--ease-out), transform 250ms var(--ease-out);
   }
-  .nst-modal[data-state="closed"] { opacity: 0; transform: scale(0.96); }
+  .nst-modal[data-state="closed"] { opacity: 0; transform: scale(0.96); transition-duration: 200ms; }
   .nst-grabber { display: none; }
 }
 
 /* ---- Hamburger menu ---- */
 .nst-burger { display: none; }
 .nst-drawer-wrap { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.38); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; justify-content: flex-end; opacity: 1; transition: opacity 250ms var(--ease-out); }
-.nst-drawer-wrap[data-state="closed"] { opacity: 0; }
+.nst-drawer-wrap[data-state="closed"] { opacity: 0; transition-duration: 200ms; }
 /* pan-y leaves vertical scrolling to the browser and keeps the horizontal
    gesture for us — the drawer is a scroller and a draggable panel at once. */
 .nst-drawer { width: min(310px, 86vw); background: var(--surface); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; transform: translateX(0); transition: transform 320ms var(--ease-drawer); will-change: transform; }
-.nst-drawer[data-state="closed"] { transform: translateX(-100%); }
+.nst-drawer[data-state="closed"] { transform: translateX(-100%); transition-duration: 240ms; }
 .nst-drawer-head { display: flex; align-items: center; gap: 11px; padding: 1.1rem 1rem 0.9rem; }
 .nst-drawer-nav { display: flex; flex-direction: column; gap: 2px; padding: 0 0.6rem; }
 .nst-drawer-item { display: flex; align-items: center; gap: 11px; width: 100%; padding: 12px 12px; border: none; background: transparent; color: var(--text-2); font: 600 14px var(--font-body); border-radius: 12px; cursor: pointer; text-align: right; text-decoration: none; }

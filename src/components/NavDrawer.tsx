@@ -63,7 +63,7 @@ export default function NavDrawer({
       }
       setShown(false);
       // Give the exit its run before the parent takes the element away.
-      setTimeout(onClose, reduce ? 200 : 320);
+      setTimeout(onClose, reduce ? 200 : 260); // matches the exit duration in CSS
     },
     [drawer.ref, onClose, reduce],
   );
