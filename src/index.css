@@ -55,9 +55,12 @@
   --radius-lg: 26px;    /* sheets */
   --r-capsule: 999px;   /* every touch control: radius = half the height */
   /* Glass, for the functional layer only (tab bar, floating controls) */
-  /* Light enough that what's underneath stays visible. At 62% white with an 18px
-     blur, a white card behind the bar came out as solid white: no glass at all. */
-  --glass-tint: color-mix(in srgb, var(--surface) 30%, transparent);
+  /* Real Liquid Glass (compared against a native app's tab bar frame by frame) is
+     almost clear: text behind it stays readable, only softened. The glassiness
+     comes from the rim — a thick bright lip all round, like the edge of a lens —
+     not from frosting. So: a faint tint, a small blur, and a strong rim. */
+  --glass-tint: color-mix(in srgb, var(--surface) 14%, transparent);
+  --glass-glow: rgba(255, 255, 255, 0.55);       /* the lens lip, all round the inside */
   --glass-edge: rgba(255, 255, 255, 0.6);        /* light inner ring */
   --glass-rim: rgba(0, 0, 0, 0.14);               /* iOS 27: the darkened edge around glass */
   --glass-highlight: rgba(255, 255, 255, 0.95);   /* iOS 27: brighter specular highlight */
@@ -117,7 +120,7 @@
   --cat-1-bg: #314030; --cat-1-fg: #b9d6ad; --cat-2-bg: #443a1e; --cat-2-fg: #ead8a0; --cat-3-bg: #443122; --cat-3-fg: #e8c4a4; --cat-4-bg: #432a2a; --cat-4-fg: #ecbaba;
   --cat-5-bg: #322a48; --cat-5-fg: #ccc0e8; --cat-6-bg: #243a34; --cat-6-fg: #b4dcc9; --cat-7-bg: #243343; --cat-7-fg: #b6cfe4; --cat-8-bg: #3a342a; --cat-8-fg: #d8cdb4;
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.3); --shadow: 0 2px 8px rgba(0,0,0,0.35), 0 8px 20px -10px rgba(0,0,0,0.4); --shadow-lg: 0 10px 32px -16px rgba(0,0,0,0.6);
-  --glass-edge: rgba(255, 255, 255, 0.12); --glass-rim: rgba(0, 0, 0, 0.55); --glass-highlight: rgba(255, 255, 255, 0.22); --lens: rgba(118, 118, 128, 0.26); --fill-2: rgba(120, 120, 128, 0.36);
+  --glass-edge: rgba(255, 255, 255, 0.12); --glass-rim: rgba(0, 0, 0, 0.55); --glass-highlight: rgba(255, 255, 255, 0.22); --glass-glow: rgba(255, 255, 255, 0.10); --lens: rgba(118, 118, 128, 0.26); --fill-2: rgba(120, 120, 128, 0.36);
 }
 /* Rose quartz */
 [data-theme="warm-dark"] {
@@ -498,16 +501,26 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
     inset-inline: 12px; bottom: max(10px, env(safe-area-inset-bottom));
     padding: 4px; border-radius: var(--r-capsule);
     background: var(--glass-tint);
-    /* iOS 27 glass: stronger diffusion, a darkened rim, a bright specular top edge */
-    backdrop-filter: blur(6px) saturate(1.9); -webkit-backdrop-filter: blur(6px) saturate(1.9);
-    border: 0.5px solid var(--glass-rim);
-    box-shadow: inset 0 1px 0 var(--glass-highlight), inset 0 0 0 1px var(--glass-edge),
-                0 10px 30px -10px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.06);
+    /* Almost clear, slightly brightened and saturated — what's behind stays legible. */
+    backdrop-filter: blur(2.5px) saturate(1.8) brightness(1.06);
+    -webkit-backdrop-filter: blur(2.5px) saturate(1.8) brightness(1.06);
+    border: 0.5px solid var(--glass-rim);                        /* iOS 27 darkened edge */
+    box-shadow:
+      inset 0 1.5px 1px var(--glass-highlight),                  /* specular top */
+      inset 0 -1px 1px var(--glass-edge),                        /* catch-light at the bottom */
+      inset 0 0 0 1px var(--glass-edge),                         /* crisp inner ring */
+      inset 0 0 16px 2px var(--glass-glow),                      /* the thick lens lip */
+      0 10px 30px -10px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.06);
   }
   .nst-bn-grid { display: flex; max-width: 760px; margin: 0 auto; }
   .nst-bn-grid::-webkit-scrollbar { display: none; }
   .nst-bn { flex: 1 1 0; min-width: 0; min-height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 6px 4px; border: none; border-radius: var(--r-capsule); background: transparent; color: var(--text-2); font: 600 11px var(--font-body); cursor: pointer; white-space: nowrap; text-decoration: none; }
-  .nst-bn.active { color: var(--accent-ink); background: var(--lens); }  /* the selection lens */
+  /* The selected tab is its own small lens of glass: grey over white, milky over colour. */
+  .nst-bn.active {
+    color: var(--accent-ink);
+    background: linear-gradient(var(--lens), var(--lens)), color-mix(in srgb, var(--surface) 30%, transparent);
+    box-shadow: inset 0 1px 1px var(--glass-highlight), inset 0 0 0 1px var(--glass-edge), inset 0 0 10px var(--glass-glow);
+  }
   .nst-bn svg { width: 24px; height: 24px; stroke-width: 1.9; }
   .nst-bn.active svg { stroke-width: 2.4; }
 }
@@ -569,8 +582,15 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .nst-nav-item:active, .nst-drawer-item:active,
 .nst-dropdown button:active, .user-chip:active { background-color: var(--hover); }
 /* A tab bar item has no plate to tint, so it answers by dimming. */
-.nst-bn:active { opacity: 0.45; }
-.nst-bn { transition: opacity var(--press) var(--ease-out), color var(--press) var(--ease-out); }
+.nst-bn { position: relative; transition: transform 380ms var(--spring-settle), background 200ms var(--ease-out), box-shadow 200ms var(--ease-out), color var(--press) var(--ease-out); }
+/* Pressed: the tab swells into a glass bubble that rises out of the bar, then
+   settles back on release (on a spring) — the Liquid Glass touch response. */
+.nst-bn:active {
+  z-index: 1; transform: scale(1.14); transition-duration: 160ms;
+  background: color-mix(in srgb, var(--surface) 45%, transparent);
+  box-shadow: inset 0 1.5px 1px var(--glass-highlight), inset 0 0 0 1px var(--glass-edge),
+              inset 0 0 14px var(--glass-glow), 0 8px 22px -8px rgba(0,0,0,.28);
+}
 .btn, .nst-chip, .nst-iconbtn, .nst-check, .nst-del, .sec-tile, .nst-day,
 .nst-seg button, .nst-stepper button, .login-tab, .theme-option,
 .next-action-cta, .reorder-btn {
@@ -618,6 +638,7 @@ input, textarea, p, li, h1, h2, h3, .nst-card-title, .page-title {
   }
   .nst-modal[data-state="closed"], .nst-drawer[data-state="closed"] { opacity: 0; }
   .nst-meter > i { transition: none; }
+  .nst-bn:active { transform: none; }  /* no swelling; the glass background still marks the press */
   /* The section still opens and closes — it just stops sliding open. */
   .nst-collapse { transition: opacity 200ms var(--ease-out); }
   /* Keep the fade, drop the growing-out-of-the-corner. */
