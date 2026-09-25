@@ -49,8 +49,6 @@
   --radius: 14px;
   --radius-sm: 10px;
   --radius-lg: 18px;
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
   --shadow-sm: none;
   --shadow: none;
   --shadow-lg: 0 6px 20px rgba(80, 70, 40, 0.08), 0 18px 48px -16px rgba(80, 70, 40, 0.14);
@@ -80,21 +78,17 @@
   --lh-body: 1.45;
 
   /* ---- Motion ----
-     Springs rather than ease curves. A spring's velocity is continuous, so an
-     animation that gets interrupted mid-flight still reads as one movement
-     instead of a restart — the thing that makes native UI feel alive. These
-     curves are sampled from the classic spring solution using Apple's own
-     (damping, response) pairs: damping 1.0 never overshoots and is the default;
-     0.8 overshoots slightly and is reserved for sheets and for anything a
-     gesture handed momentum to. */
-  --spring-move: linear(0, 0.0215, 0.0745, 0.1456, 0.2252, 0.3073, 0.3875, 0.4634, 0.5335, 0.597, 0.6538, 0.704, 0.7479, 0.7862, 0.8192, 0.8476, 0.8718, 0.8925, 0.91, 0.9248, 0.9373, 0.9478, 0.9566, 0.964, 0.9702, 0.9753, 0.9796, 0.9831, 0.9861, 0.9885, 0.9905, 0.9922, 0.9936, 0.9947, 0.9957, 0.9965, 0.9971, 0.9976, 0.9981, 0.9984, 0.9987);
-  --spring-move-dur: 569ms;
-  --spring-sheet: linear(0, 0.0198, 0.0707, 0.1418, 0.2248, 0.3131, 0.4019, 0.4877, 0.5682, 0.6418, 0.7078, 0.7659, 0.8162, 0.859, 0.8948, 0.9243, 0.9482, 0.9673, 0.9821, 0.9933, 1.0016, 1.0074, 1.0113, 1.0137, 1.0149, 1.0152, 1.0148, 1.014, 1.0129, 1.0116, 1.0102, 1.0089, 1.0076, 1.0064, 1.0053, 1.0043, 1.0034, 1.0027, 1.0021, 1.0015, 1.0011);
-  --spring-sheet-dur: 402ms;
-  --spring-quick: linear(0, 0.0219, 0.0758, 0.1477, 0.2283, 0.3111, 0.392, 0.4682, 0.5385, 0.6021, 0.6588, 0.7088, 0.7526, 0.7905, 0.8232, 0.8513, 0.8752, 0.8955, 0.9127, 0.9273, 0.9395, 0.9497, 0.9583, 0.9655, 0.9714, 0.9764, 0.9805, 0.9839, 0.9868, 0.9891, 0.9911, 0.9927, 0.994, 0.9951, 0.996, 0.9967, 0.9973, 0.9978, 0.9982, 0.9985, 0.9988);
-  --spring-quick-dur: 359ms;
-  --ease-out: cubic-bezier(0.2, 0, 0, 1);
-  --press: 120ms; /* press and release — short enough to read as contact */
+     Published curves, not hand-rolled ones. The built-in CSS easings are too
+     weak to read as deliberate. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);      /* entering, exiting, default */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);  /* moving on screen */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);   /* the iOS sheet curve */
+  /* Springs are for gestures only: a released drag has velocity, and a spring
+     is what carries it through instead of restarting from rest. Sampled from
+     the spring solution at damping 0.8, response 0.3s — Apple's sheet values. */
+  --spring-settle: linear(0, 0.0198, 0.0707, 0.1418, 0.2248, 0.3131, 0.4019, 0.4877, 0.5682, 0.6418, 0.7078, 0.7659, 0.8162, 0.859, 0.8948, 0.9243, 0.9482, 0.9673, 0.9821, 0.9933, 1.0016, 1.0074, 1.0113, 1.0137, 1.0149, 1.0152, 1.0148, 1.014, 1.0129, 1.0116, 1.0102, 1.0089, 1.0076, 1.0064, 1.0053, 1.0043, 1.0034, 1.0027, 1.0021, 1.0015, 1.0011);
+  --spring-settle-dur: 402ms;
+  --press: 160ms;
 }
 
 /* ---- Alternate skins (data-theme on <html>) ---- */
@@ -164,8 +158,10 @@ body {
 }
 h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0.022em; font-weight: 700; line-height: var(--lh-title); }
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-.tab-content { animation: fadeIn 0.24s var(--ease-out); }
+/* Seen dozens of times a day, so it only bridges the content swap — no travel,
+   nothing to wait through. */
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+.tab-content { animation: fadeIn 0.16s var(--ease-out); }
 
 /* ---- Buttons ---- */
 .btn {
@@ -174,7 +170,7 @@ h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0
   align-items: center; justify-content: center; gap: 6px; letter-spacing: -0.01em;
   transition: transform var(--press) var(--ease-out), background var(--press) var(--ease-out);
 }
-.btn:active { transform: scale(0.96); }
+.btn:active { transform: scale(0.97); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn svg { width: 16px; height: 16px; }
 .btn-primary { background: var(--accent); color: var(--on-accent); }
@@ -217,8 +213,8 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 /* ---- Toggle ---- */
 .toggle { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
 .toggle input[type="checkbox"] { position: absolute; opacity: 0; width: 0; height: 0; }
-.toggle-track { position: relative; flex: none; width: 44px; height: 26px; background: var(--surface-3); border-radius: 999px; transition: background .2s var(--ease-soft); box-shadow: inset 0 0 0 1px var(--border-2); }
-.toggle-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; background: var(--surface); border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.18); transition: transform .2s var(--ease); }
+.toggle-track { position: relative; flex: none; width: 44px; height: 26px; background: var(--surface-3); border-radius: 999px; transition: background 200ms var(--ease-out); box-shadow: inset 0 0 0 1px var(--border-2); }
+.toggle-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; background: var(--surface); border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.18); transition: transform 200ms var(--ease-out); }
 .toggle input:checked ~ .toggle-track { background: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .toggle input:checked ~ .toggle-track::after { transform: translateX(18px); }
 
@@ -242,7 +238,7 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 
 /* progress meter (cleaning) */
 .nst-meter { height: 7px; border-radius: 99px; background: var(--surface-3); overflow: hidden; flex: 1; }
-.nst-meter > i { display: block; height: 100%; border-radius: 99px; background: var(--ok); transition: width .25s ease; }
+.nst-meter > i { display: block; height: 100%; border-radius: 99px; background: var(--ok); transition: width 250ms var(--ease-in-out); }
 .nst-meter.done > i { background: var(--ok); }
 .nst-stepper { display: flex; align-items: center; gap: 2px; background: var(--surface-2); border-radius: 10px; padding: 2px; box-shadow: inset 0 0 0 1px var(--border-2); flex: none; }
 .nst-stepper button { width: 30px; height: 30px; border: none; background: transparent; color: var(--text-2); cursor: pointer; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
@@ -254,7 +250,6 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .reorder-btn:disabled { opacity: 0.3; cursor: default; }
 .nst-grip { border: none; background: transparent; color: var(--text-faint); cursor: grab; padding: 11px 6px; line-height: 0; display: flex; align-items: center; flex: none; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .nst-grip:active { cursor: grabbing; color: var(--text-muted); }
-.nst-dragging { transition: none !important; }
 .nst-tag { display: inline-flex; align-items: center; gap: 4px; font: 500 var(--t-caption) var(--font-body); letter-spacing: 0; padding: 3px 8px; border-radius: 6px; background: var(--surface-3); color: var(--text-3); }
 .nst-tag svg { width: 11px; height: 11px; }
 .nst-seg { display: flex; gap: 2px; background: var(--surface-3); padding: 2px; border-radius: 9px; }
@@ -292,7 +287,7 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 
 /* stat / category tiles */
 .section-overview { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-.sec-tile { border-radius: 16px; padding: 14px 14px 12px; background: var(--cat-bg, var(--surface-3)); color: var(--cat-fg, var(--text-2)); display: flex; flex-direction: column; gap: 4px; cursor: pointer; min-height: 92px; border: 1px solid transparent; text-align: right; transition: transform .15s var(--ease), box-shadow .2s var(--ease-soft); }
+.sec-tile { border-radius: 16px; padding: 14px 14px 12px; background: var(--cat-bg, var(--surface-3)); color: var(--cat-fg, var(--text-2)); display: flex; flex-direction: column; gap: 4px; cursor: pointer; min-height: 92px; border: 1px solid transparent; text-align: right; transition: transform var(--press) var(--ease-out); }
 .sec-tile:active { transform: scale(0.975); }
 .sec-tile-ico { opacity: .8; margin-bottom: 2px; }
 .sec-tile-ico svg { width: 20px; height: 20px; }
@@ -303,11 +298,17 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .task-item { background: var(--surface); padding: 11px 14px; border-radius: var(--radius); display: flex; gap: 12px; align-items: center; min-height: var(--tap); box-shadow: inset 0 0 0 1px var(--sep); }
 
 /* modal (bottom sheet) */
-@keyframes dimIn { from { opacity: 0 } to { opacity: 1 } }
-/* The sheet rises from the edge it will leave by, on a spring that overshoots
-   a hair (damping 0.8) so it arrives with weight instead of just appearing. */
-@keyframes sheetIn { from { transform: translateY(100%) } to { transform: none } }
-.nst-modal-bg { position: fixed; inset: 0; background: rgba(30,25,30,.34); backdrop-filter: blur(20px) saturate(1.3); -webkit-backdrop-filter: blur(20px) saturate(1.3); z-index: 200; display: flex; align-items: flex-end; justify-content: center; animation: dimIn .22s var(--ease-out); }
+/* The sheet arrives from the bottom edge and leaves through it. Symmetry is
+   what makes pull-to-dismiss obvious before anyone has tried it. Transitions
+   rather than keyframes, because a finger has to be able to retarget them
+   mid-flight. */
+.nst-modal-bg {
+  position: fixed; inset: 0; background: rgba(30,25,30,.34);
+  backdrop-filter: blur(20px) saturate(1.3); -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  z-index: 200; display: flex; align-items: flex-end; justify-content: center;
+  opacity: 1; transition: opacity 250ms var(--ease-out);
+}
+.nst-modal-bg[data-state="closed"] { opacity: 0; }
 .nst-modal {
   background: var(--surface); border-radius: 16px 16px 0 0;
   padding: 1.5rem 1.4rem calc(1.5rem + env(safe-area-inset-bottom));
@@ -317,9 +318,26 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
      hands the gesture to the page behind and drags it too. */
   overscroll-behavior: contain;
   box-shadow: var(--shadow-lg);
-  animation: sheetIn var(--spring-sheet-dur) var(--spring-sheet);
+  transform: translateY(0);
+  transition: transform 500ms var(--ease-drawer);
   will-change: transform;
 }
+.nst-modal[data-state="closed"] { transform: translateY(100%); }
+/* While a finger owns it nothing else may: the transform is written straight to
+   the element on every move so it tracks one-to-one. */
+.nst-modal[data-dragging="true"], .nst-drawer[data-dragging="true"] { transition: none; }
+/* Released short of the threshold — settle on the spring, which keeps the
+   velocity the finger left behind. */
+.nst-modal[data-settling="true"], .nst-drawer[data-settling="true"] {
+  transition: transform var(--spring-settle-dur) var(--spring-settle);
+}
+/* The grabber is the affordance: it says "pull me" before anyone tries. */
+.nst-grabber { display: flex; justify-content: center; padding: 8px 0 12px; touch-action: none; cursor: grab; }
+.nst-grabber::before { content: ''; width: 36px; height: 5px; border-radius: 3px; background: var(--text-faint); }
+.nst-grabber:active { cursor: grabbing; }
+.nst-modal[data-draggable="true"] { padding-top: 0.6rem; }
+.nst-modal[data-draggable="true"] .nst-modal-head { touch-action: none; }
+
 .nst-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; }
 .nst-modal-head h3 { font: 600 var(--t-title3) var(--font-display); color: var(--text-bright); letter-spacing: -0.022em; margin: 0; }
 .nst-fields { display: flex; flex-direction: column; gap: 12px; }
@@ -386,21 +404,30 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
   .nst-bn svg { width: 25px; height: 25px; stroke-width: 1.8; }
 }
 @media (min-width: 600px) {
+  /* Centred, so it has no edge to come from: the modal recipe, not the sheet. */
   .nst-modal-bg { align-items: center; }
-  .nst-modal { border-radius: 26px; }
+  .nst-modal {
+    border-radius: 26px; transform-origin: center;
+    transition: opacity 250ms var(--ease-out), transform 250ms var(--ease-out);
+  }
+  .nst-modal[data-state="closed"] { opacity: 0; transform: scale(0.96); }
+  .nst-grabber { display: none; }
 }
 
 /* ---- Hamburger menu ---- */
 .nst-burger { display: none; }
-.nst-drawer-wrap { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.38); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; justify-content: flex-end; animation: dimIn .22s var(--ease-out); }
-.nst-drawer { width: min(310px, 86vw); background: var(--surface); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); overflow-y: auto; overscroll-behavior: contain; animation: nst-slide-in var(--spring-quick-dur) var(--spring-quick); will-change: transform; }
+.nst-drawer-wrap { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.38); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; justify-content: flex-end; opacity: 1; transition: opacity 250ms var(--ease-out); }
+.nst-drawer-wrap[data-state="closed"] { opacity: 0; }
+/* pan-y leaves vertical scrolling to the browser and keeps the horizontal
+   gesture for us — the drawer is a scroller and a draggable panel at once. */
+.nst-drawer { width: min(310px, 86vw); background: var(--surface); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; transform: translateX(0); transition: transform 320ms var(--ease-drawer); will-change: transform; }
+.nst-drawer[data-state="closed"] { transform: translateX(-100%); }
 .nst-drawer-head { display: flex; align-items: center; gap: 11px; padding: 1.1rem 1rem 0.9rem; }
 .nst-drawer-nav { display: flex; flex-direction: column; gap: 2px; padding: 0 0.6rem; }
 .nst-drawer-item { display: flex; align-items: center; gap: 11px; width: 100%; padding: 12px 12px; border: none; background: transparent; color: var(--text-2); font: 600 14px var(--font-body); border-radius: 12px; cursor: pointer; text-align: right; text-decoration: none; }
 .nst-drawer-item.active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
 .nst-drawer-item.picked { color: var(--text-bright); }
 .nst-drawer-item svg { width: 19px; height: 19px; flex: none; }
-@keyframes nst-slide-in { from { transform: translateX(-100%) } to { transform: none } }
 @media (max-width: 860px) {
   .nst-burger { display: flex; }
 }
@@ -470,16 +497,19 @@ input, textarea, p, li, h1, h2, h3, .nst-card-title, .page-title {
 
 /* --- Accessibility settings are three independent switches, not one --- */
 
-/* Motion off: nothing travels, nothing scales. Things still change state, they
-   just cross-fade, so the UI never appears to freeze. */
+/* Motion off means fewer and gentler, not nothing: colour and opacity still
+   carry every state change, and the spinner still spins — only travel and
+   scale are dropped. A blanket rule over * would take the loading indicator
+   with it. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  html { scroll-behavior: auto; }
+  .tab-content { animation-name: none; }
+  .nst-modal, .nst-drawer {
+    transform: none !important;
+    transition: opacity 200ms var(--ease-out) !important;
   }
-  .nst-modal, .nst-drawer { animation: dimIn 0.15s linear !important; }
+  .nst-modal[data-state="closed"], .nst-drawer[data-state="closed"] { opacity: 0; }
+  .nst-meter > i { transition: none; }
   .btn:active, .sec-tile:active, .nst-chip:active, .nst-iconbtn:active,
   .nst-check:active, .nst-del:active, .nst-day:active, .nst-seg button:active,
   .nst-stepper button:active, .login-tab:active, .theme-option:active,

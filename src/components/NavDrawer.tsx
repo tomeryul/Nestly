@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { NavLink } from "react-router-dom";
 import { Home, X, Check, SlidersHorizontal } from "lucide-react";
 import { NAV } from "../lib/nav";
+import { useDragDismiss } from "../lib/dragDismiss";
+import { clamp, presentedOffset, useReducedMotion } from "../lib/motion";
 
 /**
  * Full-height menu listing every section, plus an edit mode for choosing which
@@ -21,12 +23,72 @@ export default function NavDrawer({
   onBottomChange: (next: string[]) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  // Mounted at the closed position for one frame, then opened, so there is
+  // something to animate from; the exit plays before the parent unmounts us.
+  const [shown, setShown] = useState(false);
+  const backdropRef = useRef<HTMLDivElement | null>(null);
+  const closing = useRef(false);
+  const leaveRef = useRef<(velocity: number) => void>(() => {});
+  const reduce = useReducedMotion();
+
+  const drawer = useDragDismiss({
+    axis: "x",
+    direction: -1, // it lives on the inline-start edge and leaves through it
+    enabled: !reduce,
+    onDismiss: (v) => leaveRef.current(v),
+    onProgress: (p) => {
+      const b = backdropRef.current;
+      if (!b) return;
+      b.style.transition = p > 0 ? "none" : "";
+      b.style.opacity = p > 0 ? String(1 - p) : "";
+    },
+  });
+
+  const leave = useCallback(
+    (velocity = 0) => {
+      if (closing.current) return;
+      closing.current = true;
+      const el = drawer.ref.current;
+      if (el) {
+        if (velocity > 0) {
+          const remaining = Math.max(el.offsetWidth + presentedOffset(el, "x"), 0);
+          el.style.transitionDuration = `${clamp(remaining / velocity, 160, 380)}ms`;
+        }
+        el.style.transform = "";
+      }
+      const b = backdropRef.current;
+      if (b) {
+        b.style.transition = "";
+        b.style.opacity = "0";
+      }
+      setShown(false);
+      // Give the exit its run before the parent takes the element away.
+      setTimeout(onClose, reduce ? 200 : 320);
+    },
+    [drawer.ref, onClose, reduce],
+  );
+  leaveRef.current = leave;
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    // Both frames cancellable — unmounting inside the window must not leave a
+    // stale open queued.
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setShown(true));
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      if (inner) cancelAnimationFrame(inner);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && leaveRef.current(0);
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
+
+  const state = shown ? "open" : "closed";
 
   const full = bottom.length >= max;
   // Keep at least one tab: an empty bar would still occupy space, and the stored
@@ -41,8 +103,15 @@ export default function NavDrawer({
   };
 
   return createPortal(
-    <div className="nst-drawer-wrap" onClick={onClose}>
-      <aside className="nst-drawer" onClick={(e) => e.stopPropagation()} dir="rtl">
+    <div className="nst-drawer-wrap" data-state={state} ref={backdropRef} onClick={() => leave()}>
+      <aside
+        className="nst-drawer"
+        data-state={state}
+        ref={drawer.ref as React.RefObject<HTMLElement>}
+        onClick={(e) => e.stopPropagation()}
+        dir="rtl"
+        {...drawer.handleProps}
+      >
         <div className="nst-drawer-head">
           <span className="nst-logo-tile">
             <Home size={20} />
@@ -53,7 +122,7 @@ export default function NavDrawer({
               כל הסקשנים
             </div>
           </div>
-          <button className="nst-del" onClick={onClose} aria-label="סגירה">
+          <button className="nst-del" onClick={() => leave()} aria-label="סגירה">
             <X size={18} />
           </button>
         </div>
@@ -92,7 +161,7 @@ export default function NavDrawer({
               );
             }
             return (
-              <NavLink key={to} to={to} end={end} onClick={onClose} className={({ isActive }) => `nst-drawer-item ${isActive ? "active" : ""}`}>
+              <NavLink key={to} to={to} end={end} onClick={() => leave()} className={({ isActive }) => `nst-drawer-item ${isActive ? "active" : ""}`}>
                 <Icon />
                 <span style={{ flex: 1 }}>{label}</span>
                 {picked && <span className="nst-tag">בתחתית</span>}

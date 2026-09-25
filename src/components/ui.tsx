@@ -1,6 +1,8 @@
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { useDragDismiss } from "../lib/dragDismiss";
+import { clamp, presentedOffset, useReducedMotion, useWideViewport } from "../lib/motion";
 
 export function Spinner({ className = "" }: { className?: string }) {
   return (
@@ -29,6 +31,14 @@ export function EmptyState({ icon, title, hint }: { icon?: ReactNode; title: str
   );
 }
 
+/**
+ * Bottom sheet (a centred dialog from 600px up).
+ *
+ * It leaves through the edge it arrived from, and it can be pulled down and
+ * thrown away — the grabber says so before anyone tries. The exit has to play
+ * before the element is removed, so the component keeps its own presence state
+ * rather than unmounting the moment `open` flips.
+ */
 export function Modal({
   open,
   onClose,
@@ -40,22 +50,124 @@ export function Modal({
   title: string;
   children: ReactNode;
 }) {
+  const [present, setPresent] = useState(open);
+  const [shown, setShown] = useState(false);
+  const backdropRef = useRef<HTMLDivElement | null>(null);
+  const closing = useRef(false);
+  const leaveRef = useRef<(velocity: number) => void>(() => {});
+  const reduce = useReducedMotion();
+  const wide = useWideViewport();
+
+  // Pulling a centred dialog downwards means nothing, and someone who asked for
+  // less motion should not have to drag anything to get out.
+  const draggable = !wide && !reduce;
+
+  const sheet = useDragDismiss({
+    axis: "y",
+    direction: 1,
+    enabled: draggable,
+    onDismiss: (v) => leaveRef.current(v),
+    onProgress: (p) => {
+      // Scrim and sheet are one surface, so the scrim follows the finger too —
+      // which means it must not be running its own transition while it does.
+      const b = backdropRef.current;
+      if (!b) return;
+      b.style.transition = p > 0 ? "none" : "";
+      b.style.opacity = p > 0 ? String(1 - p * 0.75) : "";
+    },
+  });
+
+  const leave = useCallback(
+    (velocity = 0) => {
+      if (closing.current) return;
+      closing.current = true;
+      const el = sheet.ref.current;
+      if (el) {
+        if (velocity > 0) {
+          // Velocity handoff: a hard flick finishes fast, a gentle one doesn't.
+          const remaining = Math.max(el.offsetHeight - presentedOffset(el, "y"), 0);
+          el.style.transitionDuration = `${clamp(remaining / velocity, 160, 380)}ms`;
+        }
+        el.style.transform = ""; // hand the exit back to the stylesheet
+      }
+      const b = backdropRef.current;
+      if (b) {
+        // Fade out from wherever the drag left it rather than snapping to full.
+        b.style.transition = "";
+        b.style.opacity = "0";
+      }
+      setShown(false);
+      onClose();
+    },
+    [onClose, sheet.ref],
+  );
+  leaveRef.current = leave;
+
   useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    if (open) {
+      closing.current = false;
+      setPresent(true);
+      const b = backdropRef.current;
+      if (b) {
+        b.style.transition = "";
+        b.style.opacity = "";
+      }
+      // One frame at the closed position first, or there is nothing to animate
+      // from and the sheet simply appears. Both frames have to be cancellable:
+      // closing inside that window must not let a stale open land.
+      let inner = 0;
+      const outer = requestAnimationFrame(() => {
+        inner = requestAnimationFrame(() => setShown(true));
+      });
+      return () => {
+        cancelAnimationFrame(outer);
+        if (inner) cancelAnimationFrame(inner);
+      };
+    }
+    setShown(false);
+  }, [open]);
+
+  useEffect(() => {
+    if (open || !present) return;
+    // transitionend is the real signal; this covers the case where the sheet
+    // never painted and so never transitions.
+    const t = setTimeout(() => setPresent(false), 700);
+    return () => clearTimeout(t);
+  }, [open, present]);
+
+  useEffect(() => {
+    if (!present) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && leaveRef.current(0);
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [present]);
 
-  if (!open) return null;
+  if (!present) return null;
+  const state = shown ? "open" : "closed";
   // Portal to <body> so the sheet escapes the app's stacking context and sits
   // above the bottom nav (otherwise the last field / save button is hidden).
   return createPortal(
-    <div className="nst-modal-bg" dir="rtl" onClick={onClose}>
-      <div className="nst-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="nst-modal-head">
+    <div
+      className="nst-modal-bg"
+      dir="rtl"
+      data-state={state}
+      ref={backdropRef}
+      onClick={() => leave()}
+      onTransitionEnd={(e) => {
+        if (e.target === e.currentTarget && e.propertyName === "opacity" && !open) setPresent(false);
+      }}
+    >
+      <div
+        className="nst-modal"
+        data-state={state}
+        data-draggable={draggable}
+        ref={sheet.ref as React.RefObject<HTMLDivElement>}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {draggable && <div className="nst-grabber" aria-hidden {...sheet.handleProps} />}
+        <div className="nst-modal-head" {...(draggable ? sheet.handleProps : {})}>
           <h3>{title}</h3>
-          <button className="nst-del" onClick={onClose}>
+          <button className="nst-del" onClick={() => leave()} aria-label="סגירה">
             <X size={20} />
           </button>
         </div>
