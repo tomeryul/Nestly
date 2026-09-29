@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthContext";
+import { readCache, writeCache } from "../lib/cache";
 import type { Tables } from "../types/database";
 
 export type Member = Tables<"home_members"> & {
@@ -40,8 +41,9 @@ export function HomeProvider({ children }: { children: ReactNode }) {
   const [homeId, setHomeId] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
 
+  const userId = user?.id ?? null;
   const loadHomes = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setHomes([]);
       setHomeId(null);
       // Keep loading=true while we still have no user, so the router never sees
@@ -49,11 +51,22 @@ export function HomeProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       return;
     }
-    setLoading(true);
+    // Paint from this device's last copy straight away; only a first-ever load
+    // waits on the network. `loading` is never raised again once something is
+    // showing — it unmounts the whole app, which is what made every return to
+    // the app reload every screen from scratch.
+    const cached = readCache<{ homes: Tables<"homes">[]; members: Member[] }>(`home.${userId}`);
+    if (cached?.homes.length) {
+      setHomes(cached.homes);
+      const stored = localStorage.getItem(STORAGE_KEY);
+      setHomeId(cached.homes.find((h) => h.id === stored)?.id ?? cached.homes[0].id);
+      setMembers(cached.members ?? []);
+      setLoading(false);
+    }
     const { data: memberships } = await supabase
       .from("home_members")
       .select("home_id, homes(*)")
-      .eq("user_id", user.id);
+      .eq("user_id", userId);
 
     const list = (memberships ?? [])
       .map((m) => (m as unknown as { homes: Tables<"homes"> }).homes)
@@ -64,7 +77,9 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     const next = list.find((h) => h.id === stored)?.id ?? list[0]?.id ?? null;
     setHomeId(next);
     setLoading(false);
-  }, [user]);
+    const prev = readCache<{ homes: Tables<"homes">[]; members: Member[] }>(`home.${userId}`);
+    writeCache(`home.${userId}`, { homes: list, members: prev?.members ?? [] });
+  }, [userId]);
 
   const loadMembers = useCallback(async () => {
     if (!homeId) {
@@ -75,8 +90,13 @@ export function HomeProvider({ children }: { children: ReactNode }) {
       .from("home_members")
       .select("*, profile:profiles(display_name)")
       .eq("home_id", homeId);
-    setMembers((data as unknown as Member[]) ?? []);
-  }, [homeId]);
+    const list = (data as unknown as Member[]) ?? [];
+    setMembers(list);
+    if (userId) {
+      const prev = readCache<{ homes: Tables<"homes">[]; members: Member[] }>(`home.${userId}`);
+      if (prev) writeCache(`home.${userId}`, { ...prev, members: list });
+    }
+  }, [homeId, userId]);
 
   useEffect(() => {
     loadHomes();

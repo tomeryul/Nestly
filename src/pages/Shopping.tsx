@@ -3,6 +3,7 @@ import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBaske
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
+import { readCache, useOnResume, writeCache } from "../lib/cache";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
 import { CATEGORIES, DAYS_HE } from "../lib/constants";
 import { bgWrite, newId } from "../lib/optimistic";
@@ -17,17 +18,18 @@ type Recurring = Tables<"recurring_shopping_items">;
 export default function Shopping() {
   const { homeId } = useHome();
   const { user } = useAuth();
-  const [lists, setLists] = useState<List[]>([]);
-  const [activeList, setActiveList] = useState<string | null>(null);
-  const [items, setItems] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Open on what this phone showed last time; the network copy replaces it quietly.
+  const [lists, setLists] = useState<List[]>(() => readCache<List[]>(homeId && `lists.${homeId}`) ?? []);
+  const [activeList, setActiveList] = useState<string | null>(() => readCache<string>(homeId && `activeList.${homeId}`) ?? null);
+  const [items, setItems] = useState<Item[]>(() => readCache<Item[]>(activeList && `items.${activeList}`) ?? []);
+  const [loading, setLoading] = useState(() => !readCache<Item[]>(activeList && `items.${activeList}`));
   const [name, setName] = useState("");
   const [qty, setQty] = useState(1);
   const [category, setCategory] = useState<string>(CATEGORIES[0]);
   const [showRecurring, setShowRecurring] = useState(false);
   const [showNewList, setShowNewList] = useState(false);
   const [grouped, setGrouped] = useState(() => localStorage.getItem("nestly.shopGrouped") === "1");
-  const [customCats, setCustomCats] = useState<string[]>([]);
+  const [customCats, setCustomCats] = useState<string[]>(() => readCache<string[]>(homeId && `cats.${homeId}`) ?? []);
   const [showCats, setShowCats] = useState(false);
 
   // King Store prices (public price-transparency data, via the `prices` edge function)
@@ -64,7 +66,9 @@ export default function Shopping() {
   const loadCats = useCallback(async () => {
     if (!homeId) return;
     const { data } = await supabase.from("shopping_categories").select("name").eq("home_id", homeId).order("position").order("created_at");
-    setCustomCats((data ?? []).map((c) => c.name));
+    const names = (data ?? []).map((c) => c.name);
+    setCustomCats(names);
+    writeCache(`cats.${homeId}`, names);
   }, [homeId]);
   useEffect(() => {
     loadCats();
@@ -83,7 +87,7 @@ export default function Shopping() {
   };
 
   // product memory: distinct products the home has ever added (for autocomplete)
-  const [catalog, setCatalog] = useState<{ name: string; category: string | null; quantity: number }[]>([]);
+  const [catalog, setCatalog] = useState<{ name: string; category: string | null; quantity: number }[]>(() => readCache(homeId && `catalog.${homeId}`) ?? []);
   const [focused, setFocused] = useState(false);
   const loadCatalog = useCallback(async () => {
     if (!homeId) return;
@@ -97,6 +101,7 @@ export default function Shopping() {
       out.push({ name: it.name, category: it.category, quantity: it.quantity });
     }
     setCatalog(out);
+    writeCache(`catalog.${homeId}`, out);
   }, [homeId]);
   useEffect(() => {
     loadCatalog();
@@ -120,7 +125,8 @@ export default function Shopping() {
     if (!homeId) return;
     const { data } = await supabase.from("shopping_lists").select("*").eq("home_id", homeId).order("is_default", { ascending: false }).order("created_at");
     setLists(data ?? []);
-    setActiveList((prev) => prev ?? data?.[0]?.id ?? null);
+    setActiveList((prev) => (prev && data?.some((l) => l.id === prev) ? prev : data?.[0]?.id ?? null));
+    writeCache(`lists.${homeId}`, data ?? []);
   }, [homeId]);
 
   const loadItems = useCallback(async () => {
@@ -137,9 +143,30 @@ export default function Shopping() {
   useEffect(() => {
     loadLists();
   }, [loadLists]);
+  // Switching lists: show that list's last copy at once, then the fresh one.
+  useEffect(() => {
+    if (!activeList) return;
+    writeCache(`activeList.${homeId}`, activeList);
+    const cached = readCache<Item[]>(`items.${activeList}`);
+    if (cached) {
+      setItems(cached);
+      setLoading(false);
+    }
+  }, [activeList, homeId]);
   useEffect(() => {
     loadItems();
   }, [loadItems]);
+  // Keep the device copy in step with what's on screen, including ticks made
+  // offline-first. Only rows of the current list, in case a switch is mid-flight.
+  useEffect(() => {
+    if (!activeList || loading) return;
+    writeCache(`items.${activeList}`, items.filter((i) => i.list_id === activeList));
+  }, [items, activeList, loading]);
+  // Back after a while: catch up on changes made on another phone, silently.
+  useOnResume(() => {
+    loadLists();
+    loadItems();
+  });
   useEffect(() => {
     if (!activeList) return;
     const ch = supabase

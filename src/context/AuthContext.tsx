@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
+import { clearCache } from "../lib/cache";
 
 type AuthValue = {
   session: Session | null;
@@ -31,12 +32,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // Supabase re-checks the session whenever the app returns to the foreground
+  // and reports it as a fresh sign-in, with a brand-new user object. Keying the
+  // user on its id keeps it the *same* object for the same person, so nothing
+  // downstream mistakes "came back from another app" for "a different user"
+  // and reloads everything.
+  const userId = session?.user?.id ?? null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const user = useMemo(() => session?.user ?? null, [userId]);
+
   const signOut = async () => {
+    clearCache(); // this device's copy of the home's data goes with the account
     await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, signOut }}>
+    <AuthContext.Provider value={{ session, user, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   );

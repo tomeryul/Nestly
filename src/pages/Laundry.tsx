@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Check, WashingMachine, Wind, Shirt, ArrowLeft, X, Settings2, PackageOpen, GripVertical } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { useOnResume } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
@@ -44,6 +45,7 @@ export default function Laundry() {
   useEffect(() => {
     load();
   }, [load]);
+  useOnResume(load);
   useEffect(() => {
     if (user && !assignee) setAssignee(user.id);
   }, [user, assignee]);

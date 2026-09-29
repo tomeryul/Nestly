@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Check, X, User, Globe, GripVertical, Pencil } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { useOnResume } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { EmptyState, FullPageSpinner } from "../components/ui";
@@ -25,6 +26,7 @@ export default function Personal() {
   useEffect(() => {
     load();
   }, [load]);
+  useOnResume(load);
 
   const add = (scope: "personal" | "general", ownerId: string | null, title: string) => {
     if (!title.trim() || !homeId) return;

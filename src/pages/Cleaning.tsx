@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Check, Sparkles, DoorOpen, X, GripVertical, ChevronDown, Printer, Pencil } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { useOnResume } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { Collapse, EmptyState, FullPageSpinner } from "../components/ui";
@@ -53,6 +54,7 @@ export default function Cleaning() {
   useEffect(() => {
     load();
   }, [load]);
+  useOnResume(load);
 
   const addRoom = () => {
     if (!newRoom.trim() || !homeId) return;

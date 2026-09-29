@@ -8,6 +8,7 @@ import { AREAS, DAYS_HE, TASK_CATEGORIES, type AreaKey, type TaskCategory } from
 import { formatTime, toISODate, startOfWeek } from "../lib/dates";
 import { periodKeyFor } from "./Cleaning";
 import { enablePush, pushEnabled, pushSupported } from "../lib/push";
+import { readCache, useOnResume, writeCache } from "../lib/cache";
 import type { Tables } from "../types/database";
 
 type Task = Tables<"schedule_tasks">;
@@ -16,10 +17,14 @@ export default function Dashboard() {
   const { homeId, myResponsibilities, members } = useHome();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [todayTasks, setTodayTasks] = useState<Task[]>([]);
-  const [shopCount, setShopCount] = useState(0);
-  const [mealCount, setMealCount] = useState(0);
-  const [cleanLeft, setCleanLeft] = useState(0);
+  // Last time's numbers for today, straight from the device, until fresh ones land.
+  type Snap = { todayTasks: Task[]; shopCount: number; mealCount: number; cleanLeft: number };
+  const snapKey = homeId ? `dash.${homeId}.${toISODate(new Date())}` : null;
+  const [snap] = useState(() => readCache<Snap>(snapKey));
+  const [todayTasks, setTodayTasks] = useState<Task[]>(snap?.todayTasks ?? []);
+  const [shopCount, setShopCount] = useState(snap?.shopCount ?? 0);
+  const [mealCount, setMealCount] = useState(snap?.mealCount ?? 0);
+  const [cleanLeft, setCleanLeft] = useState(snap?.cleanLeft ?? 0);
   const [pushOn, setPushOn] = useState<boolean | null>(null);
   const [pushBusy, setPushBusy] = useState(false);
 
@@ -38,6 +43,7 @@ export default function Dashboard() {
     setTodayTasks(t.data ?? []);
     setShopCount(s.count ?? 0);
     setMealCount(m.count ?? 0);
+    let left = 0;
 
     // cleaning: count tasks not yet completed for the current week/month
     const { data: ct } = await supabase.from("cleaning_tasks").select("id, frequency").eq("home_id", homeId);
@@ -52,16 +58,16 @@ export default function Dashboard() {
         .in("period_key", [weekKey, monthKey]);
       const doneW = new Set((comps ?? []).filter((c) => c.period_key === weekKey).map((c) => c.cleaning_task_id));
       const doneM = new Set((comps ?? []).filter((c) => c.period_key === monthKey).map((c) => c.cleaning_task_id));
-      const left = all.filter((x) => (x.frequency === "weekly" ? !doneW.has(x.id) : !doneM.has(x.id))).length;
-      setCleanLeft(left);
-    } else {
-      setCleanLeft(0);
+      left = all.filter((x) => (x.frequency === "weekly" ? !doneW.has(x.id) : !doneM.has(x.id))).length;
     }
+    setCleanLeft(left);
+    writeCache(`dash.${homeId}.${todayIso}`, { todayTasks: t.data ?? [], shopCount: s.count ?? 0, mealCount: m.count ?? 0, cleanLeft: left });
   }, [homeId, todayIso, weekIso]);
 
   useEffect(() => {
     load();
   }, [load]);
+  useOnResume(load);
   useEffect(() => {
     if (pushSupported()) pushEnabled().then(setPushOn);
     else setPushOn(false);

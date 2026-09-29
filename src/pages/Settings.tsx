@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Copy, LogOut, UserPlus, Bell, Check, Users, Pencil, Trash2, House, Palette } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { useOnResume } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { AREAS, type AreaKey } from "../lib/constants";
@@ -34,6 +35,7 @@ export default function Settings() {
   useEffect(() => {
     loadInvites();
   }, [loadInvites]);
+  useOnResume(loadInvites);
   useEffect(() => {
     if (pushSupported()) pushEnabled().then(setPushOn);
     const me = members.find((m) => m.user_id === user?.id);

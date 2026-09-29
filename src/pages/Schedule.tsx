@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, ChevronRight, ChevronLeft, Check, Clock, Repeat, X, CalendarDays, ListChecks, Pencil, GripVertical, Library } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { useOnResume } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
@@ -55,6 +56,7 @@ export default function Schedule() {
   useEffect(() => {
     load();
   }, [load]);
+  useOnResume(load);
 
   const loadTemplates = useCallback(async () => {
     if (!homeId) return;

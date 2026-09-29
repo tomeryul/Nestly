@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Check, Package, MapPin, Clock, X, GripVertical, Store, AlertTriangle, ShoppingBag, PackageCheck, ArrowLeft, Navigation } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { useOnResume } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { EmptyState, FullPageSpinner } from "../components/ui";
@@ -61,6 +62,7 @@ export default function Deliveries() {
   useEffect(() => {
     load();
   }, [load]);
+  useOnResume(load);
   // Drop staged selections whose pickup point was deleted, so a card never
   // submits a dangling id that would fail the foreign key.
   useEffect(() => {
