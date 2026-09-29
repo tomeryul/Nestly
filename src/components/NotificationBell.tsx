@@ -5,10 +5,11 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import type { Tables } from "../types/database";
 import { formatRelative } from "../lib/dates";
+import { readCache, useOnResume, writeCache } from "../lib/cache";
 
 export default function NotificationBell() {
   const { user } = useAuth();
-  const [items, setItems] = useState<Tables<"notifications">[]>([]);
+  const [items, setItems] = useState<Tables<"notifications">[]>(() => readCache(user && `notif.${user.id}`) ?? []);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -22,7 +23,10 @@ export default function NotificationBell() {
       .order("created_at", { ascending: false })
       .limit(30);
     setItems(data ?? []);
+    writeCache(`notif.${user.id}`, data ?? []);
   };
+  // The realtime channel can lapse while the phone sleeps; catch up on return.
+  useOnResume(() => load());
 
   useEffect(() => {
     load();

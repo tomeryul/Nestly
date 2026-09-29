@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 /**
  * A small on-device copy of what the app last showed.
@@ -59,4 +59,20 @@ export function useOnResume(refresh: () => void, minAwayMs = 15000) {
     document.addEventListener("visibilitychange", onChange);
     return () => document.removeEventListener("visibilitychange", onChange);
   }, [minAwayMs]);
+}
+
+/**
+ * Seed a screen from its device copy before it first paints (and again whenever
+ * the key changes — another tab, another week), so it opens on content instead
+ * of a spinner. The screen's own loader then saves the fresh snapshot with
+ * `writeCache` under the key *it* computed, so a slow answer for the previous
+ * tab can never be filed under the new one.
+ */
+export function useSeedFromCache<T>(key: string | null | undefined, seed: (snapshot: T) => void) {
+  const seedRef = useRef(seed);
+  seedRef.current = seed;
+  useLayoutEffect(() => {
+    const snap = readCache<T>(key);
+    if (snap !== undefined) seedRef.current(snap);
+  }, [key]);
 }

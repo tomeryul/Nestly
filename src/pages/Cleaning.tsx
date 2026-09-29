@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Check, Sparkles, DoorOpen, X, GripVertical, ChevronDown, Printer, Pencil } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import { useOnResume } from "../lib/cache";
+import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { Collapse, EmptyState, FullPageSpinner } from "../components/ui";
@@ -42,14 +42,21 @@ export default function Cleaning() {
     setRooms(r.data ?? []);
     const list = t.data ?? [];
     setTasks(list);
+    let done: string[] = [];
     if (list.length) {
       const { data: comps } = await supabase.from("cleaning_completions").select("cleaning_task_id").eq("period_key", periodKey).in("cleaning_task_id", list.map((x) => x.id));
-      setDoneIds(new Set((comps ?? []).map((c) => c.cleaning_task_id)));
-    } else {
-      setDoneIds(new Set());
+      done = (comps ?? []).map((c) => c.cleaning_task_id);
     }
+    setDoneIds(new Set(done));
     setLoading(false);
+    writeCache(`clean.${homeId}.${tab}.${periodKey}`, { rooms: r.data ?? [], tasks: list, done });
   }, [homeId, tab, periodKey]);
+  useSeedFromCache<{ rooms: Room[]; tasks: CleaningTask[]; done: string[] }>(homeId && `clean.${homeId}.${tab}.${periodKey}`, (c) => {
+    setRooms(c.rooms);
+    setTasks(c.tasks);
+    setDoneIds(new Set(c.done));
+    setLoading(false);
+  });
 
   useEffect(() => {
     load();

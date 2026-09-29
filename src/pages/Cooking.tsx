@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2, ChevronRight, ChevronLeft, ShoppingCart, Check, X, CalendarPlus, ChefHat, UtensilsCrossed, Info, ArrowDownAZ, Clock, Repeat } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import { useOnResume } from "../lib/cache";
+import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
@@ -51,7 +51,13 @@ function DishesTab() {
     (ings ?? []).forEach((i) => (c[i.dish_id] = (c[i.dish_id] ?? 0) + 1));
     setCounts(c);
     setLoading(false);
+    writeCache(`dishes.${homeId}`, { dishes: data ?? [], counts: c });
   }, [homeId]);
+  useSeedFromCache<{ dishes: Dish[]; counts: Record<string, number> }>(homeId && `dishes.${homeId}`, (s) => {
+    setDishes(s.dishes);
+    setCounts(s.counts);
+    setLoading(false);
+  });
   useEffect(() => {
     load();
   }, [load]);
@@ -240,10 +246,18 @@ function WeekTab() {
     setDishes(d.data ?? []);
     setLists(l.data ?? []);
     setLoading(false);
+    writeCache(`week.${homeId}.${weekIso}`, { meals: m.data ?? [], dishes: d.data ?? [], lists: l.data ?? [] });
   }, [homeId, weekIso]);
   useEffect(() => {
     load();
   }, [load]);
+  useOnResume(load);
+  useSeedFromCache<{ meals: Meal[]; dishes: Dish[]; lists: List[] }>(homeId && `week.${homeId}.${weekIso}`, (c) => {
+    setMeals(c.meals);
+    setDishes(c.dishes);
+    setLists(c.lists);
+    setLoading(false);
+  });
 
   const removeMeal = (id: string) => {
     setMeals((prev) => prev.filter((m) => m.id !== id));

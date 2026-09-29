@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Check, X, User, Globe, GripVertical, Pencil } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import { useOnResume } from "../lib/cache";
+import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { EmptyState, FullPageSpinner } from "../components/ui";
@@ -22,7 +22,12 @@ export default function Personal() {
     const { data } = await supabase.from("personal_tasks").select("*").eq("home_id", homeId).order("is_done").order("position").order("created_at");
     setTasks(data ?? []);
     setLoading(false);
+    writeCache(`personal.${homeId}`, data ?? []);
   }, [homeId]);
+  useSeedFromCache<PTask[]>(homeId && `personal.${homeId}`, (c) => {
+    setTasks(c);
+    setLoading(false);
+  });
   useEffect(() => {
     load();
   }, [load]);

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Check, WashingMachine, Wind, Shirt, ArrowLeft, X, Settings2, PackageOpen, GripVertical } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import { useOnResume } from "../lib/cache";
+import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
@@ -41,7 +41,13 @@ export default function Laundry() {
     setLoads(l.data ?? []);
     setTypes(t.data ?? []);
     setLoading(false);
+    writeCache(`laundry.${homeId}.${weekStart}`, { loads: l.data ?? [], types: t.data ?? [] });
   }, [homeId, weekStart]);
+  useSeedFromCache<{ loads: Load[]; types: LType[] }>(homeId && `laundry.${homeId}.${weekStart}`, (c) => {
+    setLoads(c.loads);
+    setTypes(c.types);
+    setLoading(false);
+  });
   useEffect(() => {
     load();
   }, [load]);

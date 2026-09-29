@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, ChevronRight, ChevronLeft, Check, Clock, Repeat, X, CalendarDays, ListChecks, Pencil, GripVertical, Library } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import { useOnResume } from "../lib/cache";
+import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
@@ -39,6 +39,7 @@ export default function Schedule() {
     const list = data ?? [];
     setTasks(list);
     const ids = list.map((t) => t.id);
+    let counts: Record<string, { done: number; total: number }> = {};
     if (ids.length) {
       const { data: subs } = await supabase.from("task_subtasks").select("task_id, is_done").in("task_id", ids);
       const c: Record<string, { done: number; total: number }> = {};
@@ -47,12 +48,17 @@ export default function Schedule() {
         c[s.task_id].total++;
         if (s.is_done) c[s.task_id].done++;
       });
-      setSubCounts(c);
-    } else {
-      setSubCounts({});
+      counts = c;
     }
+    setSubCounts(counts);
     setLoading(false);
+    writeCache(`sched.${homeId}.${weekFrom}`, { tasks: list, subCounts: counts });
   }, [homeId, weekFrom, weekTo]);
+  useSeedFromCache<{ tasks: Task[]; subCounts: Record<string, { done: number; total: number }> }>(homeId && `sched.${homeId}.${weekFrom}`, (c) => {
+    setTasks(c.tasks);
+    setSubCounts(c.subCounts);
+    setLoading(false);
+  });
   useEffect(() => {
     load();
   }, [load]);
@@ -62,7 +68,9 @@ export default function Schedule() {
     if (!homeId) return;
     const { data } = await supabase.from("task_templates").select("*").eq("home_id", homeId).order("position").order("created_at");
     setTemplates(data ?? []);
+    writeCache(`tmpl.${homeId}`, data ?? []);
   }, [homeId]);
+  useSeedFromCache<Tables<"task_templates">[]>(homeId && `tmpl.${homeId}`, setTemplates);
   useEffect(() => {
     loadTemplates();
   }, [loadTemplates]);

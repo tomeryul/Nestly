@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Check, Package, MapPin, Clock, X, GripVertical, Store, AlertTriangle, ShoppingBag, PackageCheck, ArrowLeft, Navigation } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import { useOnResume } from "../lib/cache";
+import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { EmptyState, FullPageSpinner } from "../components/ui";
@@ -58,7 +58,13 @@ export default function Deliveries() {
     setPoints(p.data ?? []);
     setDeliveries(d.data ?? []);
     setLoading(false);
+    writeCache(`deliv.${homeId}`, { points: p.data ?? [], deliveries: d.data ?? [] });
   }, [homeId]);
+  useSeedFromCache<{ points: Point[]; deliveries: Delivery[] }>(homeId && `deliv.${homeId}`, (c) => {
+    setPoints(c.points);
+    setDeliveries(c.deliveries);
+    setLoading(false);
+  });
   useEffect(() => {
     load();
   }, [load]);

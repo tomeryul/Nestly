@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Copy, LogOut, UserPlus, Bell, Check, Users, Pencil, Trash2, House, Palette } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import { useOnResume } from "../lib/cache";
+import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { AREAS, type AreaKey } from "../lib/constants";
@@ -30,7 +30,9 @@ export default function Settings() {
     if (!homeId) return;
     const { data } = await supabase.from("home_invites").select("*").eq("home_id", homeId).is("accepted_by", null).order("created_at", { ascending: false });
     setInvites(data ?? []);
+    writeCache(`invites.${homeId}`, data ?? []);
   }, [homeId]);
+  useSeedFromCache<Tables<"home_invites">[]>(homeId && `invites.${homeId}`, setInvites);
 
   useEffect(() => {
     loadInvites();
