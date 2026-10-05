@@ -1,3 +1,5 @@
+import { toast } from "sonner";
+
 /**
  * Fire a Supabase write in the background without blocking the UI.
  *
@@ -11,14 +13,23 @@ export function bgWrite(op: PromiseLike<{ error: unknown }>, onError?: () => voi
     (res) => {
       if (res && res.error) {
         console.error("[nestly] background write failed", res.error);
+        failed();
         onError?.();
       }
     },
     (err) => {
       console.error("[nestly] background write threw", err);
+      failed();
       onError?.();
     }
   );
+}
+
+// The screen already showed the change, so a failure has to be said out loud —
+// otherwise the row just quietly snaps back on the next refresh. One id, so a
+// burst of failures (offline) is one toast, not a stack.
+function failed() {
+  toast.error("השינוי לא נשמר", { id: "bg-write-failed", description: "בדקו את החיבור — מציגים שוב את המצב השמור." });
 }
 
 /** A client-side UUID for optimistic inserts (so the row has a stable id before the DB confirms). */

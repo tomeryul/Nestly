@@ -6,6 +6,7 @@ import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { EmptyState, FullPageSpinner } from "../components/ui";
 import { useDragReorder } from "../lib/dragReorder";
+import { reinsert, removeWithUndo } from "../lib/undo";
 import { bgWrite, newId } from "../lib/optimistic";
 import type { Tables } from "../types/database";
 
@@ -49,8 +50,18 @@ export default function Personal() {
     bgWrite(supabase.from("personal_tasks").update({ is_done: !t.is_done }).eq("id", t.id), load);
   };
   const remove = (id: string) => {
+    const at = tasks.findIndex((x) => x.id === id);
+    const row = tasks[at];
+    if (!row) return;
     setTasks((prev) => prev.filter((x) => x.id !== id));
-    bgWrite(supabase.from("personal_tasks").delete().eq("id", id), load);
+    removeWithUndo({
+      message: "המשימה נמחקה",
+      description: row.title,
+      remove: () => supabase.from("personal_tasks").delete().eq("id", id),
+      undoLocal: () => setTasks((prev) => reinsert(prev, [row], at)),
+      restore: () => supabase.from("personal_tasks").insert(row),
+      reload: load,
+    });
   };
   const rename = (id: string, title: string) => {
     const n = title.trim();

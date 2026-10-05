@@ -192,7 +192,7 @@ h1, h2, h3, .font-display { font-family: var(--font-display); font-weight: 700; 
 .btn svg { width: 16px; height: 16px; }
 .btn-primary { background: var(--accent); color: var(--on-accent); }
 .btn-danger { background: var(--danger); color: #fff; }
-.btn-sm { min-height: 34px; padding: 7px 14px; font-size: var(--t-footnote); }
+.btn-sm { min-height: 34px; padding: 7px 14px; font-size: var(--t-footnote); white-space: nowrap; }
 /* Small controls keep their look but get a 44pt hit area (Apple's minimum target). */
 .btn-sm::after, .nst-check::after, .nst-del::after, .nst-stepper button::after { content: ''; position: absolute; }
 .btn-sm::after { inset: -5px 0; }
@@ -258,6 +258,9 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .nst-logo-tile { width: 40px; height: 40px; border-radius: 12px; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; flex: none; color: var(--accent-ink); }
 .nst-card { background: var(--surface); border-radius: var(--radius); box-shadow: inset 0 0 0 1px var(--sep); padding: var(--sp-4); }
 .nst-row { display: flex; align-items: center; gap: 12px; background: var(--surface); border-radius: var(--radius); padding: 11px 14px; min-height: var(--tap); box-shadow: inset 0 0 0 1px var(--sep); }
+/* Pasted links and tracking numbers have no spaces to break at; without this
+   one of them widens the whole page and it scrolls sideways. */
+.nst-row p, .task-item p, .nst-card p { overflow-wrap: anywhere; }
 .nst-check { position: relative; flex: none; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--border-2); background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: transparent;
   transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out), color 160ms var(--ease-out), transform var(--press) var(--ease-out); }
 .nst-check.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
@@ -266,7 +269,11 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 
 /* progress meter (cleaning) */
 .nst-meter { height: 7px; border-radius: 99px; background: var(--surface-3); overflow: hidden; flex: 1; }
-.nst-meter > i { display: block; height: 100%; border-radius: 99px; background: var(--ok); transition: width 250ms var(--ease-in-out); }
+.nst-meter { position: relative; }
+/* The fill is always full width and slides in from the right edge (inline
+   transform: translateX(100% - progress)), so a tick moves it on the compositor
+   instead of re-laying it out — and its rounded leading end never squashes. */
+.nst-meter > i { display: block; width: 100%; height: 100%; border-radius: 99px; background: var(--ok); transform: translateX(100%); transition: transform 250ms var(--ease-in-out); }
 .nst-meter.done > i { background: var(--ok); }
 .nst-stepper { display: flex; align-items: center; gap: 2px; background: var(--surface-3); border-radius: var(--r-capsule); padding: 2px; flex: none; }
 .nst-stepper button { position: relative; width: 34px; height: 32px; border: none; background: transparent; color: var(--text-2); cursor: pointer; border-radius: var(--r-capsule); display: flex; align-items: center; justify-content: center; }
@@ -278,11 +285,25 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .reorder-btn:disabled { opacity: 0.3; cursor: default; }
 .nst-grip { border: none; background: transparent; color: var(--text-faint); cursor: grab; padding: 11px 6px; line-height: 0; display: flex; align-items: center; flex: none; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .nst-grip:active { cursor: grabbing; color: var(--text-muted); }
-.nst-tag { display: inline-flex; align-items: center; gap: 4px; font: 500 var(--t-caption) var(--font-body); letter-spacing: 0; padding: 3px 8px; border-radius: 6px; background: var(--surface-3); color: var(--text-3); }
+.nst-tag { display: inline-flex; align-items: center; gap: 4px; font: 500 var(--t-caption) var(--font-body); letter-spacing: 0; padding: 3px 8px; border-radius: 6px; background: var(--surface-3); color: var(--text-3);
+  /* A badge stays one line; a long custom category gives way at its end. */
+  white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.nst-tag svg { flex: none; }
 .nst-tag svg { width: 11px; height: 11px; }
-.nst-seg { display: flex; gap: 2px; background: var(--surface-3); padding: 2px; border-radius: var(--r-capsule); }
+.nst-seg { position: relative; display: flex; gap: 2px; background: var(--surface-3); padding: 2px; border-radius: var(--r-capsule); }
 .nst-seg button { flex: 1; min-height: 32px; padding: 7px 10px; border: none; background: transparent; color: var(--text-2); font: 500 var(--t-subhead) var(--font-body); border-radius: var(--r-capsule); cursor: pointer; }
-.nst-seg button.active { background: var(--surface); color: var(--text-bright); box-shadow: 0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04); font-weight: 600; }
+.nst-seg button { position: relative; z-index: 1; }
+.nst-seg button.active { color: var(--text-bright); font-weight: 600; }
+/* The thumb is one element (<SegLens/>) that slides between segments, so the
+   selection travels instead of blinking from one button to the next. */
+.nst-seg-lens {
+  position: absolute; top: 2px; bottom: 2px; left: 0; width: 0; opacity: 0; pointer-events: none;
+  border-radius: var(--r-capsule); background: var(--surface);
+  box-shadow: 0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04);
+  /* Segments are equal width, so only the position travels. */
+  transition: transform var(--spring-settle-dur) var(--spring-settle), opacity 150ms var(--ease-out);
+  will-change: transform;
+}
 .nst-daypick { display: flex; align-items: stretch; gap: 8px; }
 .nst-day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px; min-height: var(--tap); border-radius: var(--radius-sm); border: none; background: var(--surface-2); color: var(--text-3); cursor: pointer; }
 .nst-day .dow { font: 500 var(--t-caption) var(--font-body); letter-spacing: 0; }
@@ -324,6 +345,30 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 
 /* task item */
 .task-item { background: var(--surface); padding: 11px 14px; border-radius: var(--radius); display: flex; gap: 12px; align-items: center; min-height: var(--tap); box-shadow: inset 0 0 0 1px var(--sep); }
+/* A ticked row dims with its tick rather than a frame ahead of it. */
+.nst-row, .task-item { transition: opacity 200ms var(--ease-out); }
+
+/* Time · category · person under a task title. Each piece stays whole; a long
+   name takes its own line and ends in an ellipsis instead of stacking word by word. */
+.nst-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.nst-meta > * { flex: none; }
+/* dir="auto" on the name: a Latin name in Hebrew text then loses its end, not its start. */
+.nst-meta > .nst-meta-who { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nst-clamp-3 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+
+/* Shopping row. On a narrow phone the quantity and delete controls step down
+   under the name together, so the name keeps a readable measure; from ~370px up
+   every row is one line. The basis is fixed, not content-sized, so all rows in a
+   list make the same choice and the steppers stay aligned. */
+.shop-row { flex-wrap: wrap; row-gap: 8px; }
+.shop-row > .shop-row-text { flex: 1 1 110px; min-width: 0; }
+.shop-row > .shop-row-ctrl { display: flex; align-items: center; gap: 12px; flex: none; margin-inline-start: auto; }
+
+/* Cleaning room header: content-sized, so a short name stays on one line with
+   its controls and only a long one sends them to the next line. */
+.room-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.room-head-lead { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; }
+.room-head-ctrl { display: flex; align-items: center; gap: 8px; flex: none; margin-inline-start: auto; }
 
 /* ---- Inset grouped list ----
    A run of rows is one rounded section with hairlines between them — the
@@ -475,7 +520,8 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 
 /* section title inside cards */
 .nst-card-title { font: 600 19px var(--font-display); color: var(--text-bright); display: flex; align-items: center; gap: 9px; margin: 0; }
-.nst-card-title svg { color: var(--text-3); width: 19px; height: 19px; }
+.nst-card-title svg { color: var(--text-3); width: 19px; height: 19px; flex: none; }
+.nst-card-title { overflow-wrap: anywhere; }
 .page-title { font: 700 var(--t-large-title) var(--font-display); color: var(--text-bright); line-height: 1.12; margin: 0; }
 
 /* ============================================================
@@ -504,20 +550,31 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
   position: sticky; top: 0; z-index: 60; display: flex; align-items: center; gap: 10px;
   padding: 10px 16px; padding-top: calc(10px + env(safe-area-inset-top));
   background: transparent; border-bottom: 0.5px solid transparent;
-  transition: background .25s var(--ease-out), border-color .25s var(--ease-out),
-              backdrop-filter .25s var(--ease-out);
+  /* The blur is always on — at the top nothing is under the bar yet, so it
+     blurs nothing — and only the tint and hairline fade in. Transitioning
+     backdrop-filter itself re-rasterises the blur every frame, which Safari
+     drops frames on in the middle of a scroll. */
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  transition: background .25s var(--ease-out), border-color .25s var(--ease-out);
 }
 /* iOS 27: a bar carrying a title and several controls firms into a uniform,
    mostly opaque band once content is beneath it, so its text stays legible over
    whatever scrolls past (a thin translucent fade let busy rows show through). */
 .nst-topbar[data-scrolled="true"] {
   background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: blur(20px) saturate(1.8);
-  -webkit-backdrop-filter: blur(20px) saturate(1.8);
   border-bottom-color: var(--sep);
 }
 .nst-topbar-title { font: 600 var(--t-headline) var(--font-display); color: var(--text-bright); white-space: nowrap; opacity: 1; transition: opacity 200ms var(--ease-out); }
-.nst-topbar[data-title="hidden"] .nst-topbar-title { opacity: 0; }
+.nst-topbar[data-title="hidden"] .nst-topbar-title { opacity: 0; max-width: 0; } /* hidden, it gives its room to the home name */
+/* A long home name ("בית משפחת וייסברג־אבוחצירה — דירה 14…") must not push the
+   controls off the screen: the name gives way with an ellipsis (the full name is
+   in its title and in the switcher), the controls never shrink. */
+.nst-topbar-title { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; }
+.nst-topbar-home { position: relative; min-width: 0; max-width: 52%; }
+.nst-topbar-home > .nst-chip { max-width: 100%; }
+.nst-chip-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.nst-topbar .nst-bar-group { flex: none; }
 .nst-content { flex: 1; max-width: 920px; width: 100%; margin: 0 auto; padding: var(--sp-5) var(--sp-4) 6rem; }
 .nst-bottomnav { display: none; }
 .user-chip { display: flex; align-items: center; gap: 11px; background: var(--surface-2); padding: 8px 12px 8px 8px; border-radius: 12px; border: none; cursor: pointer; width: 100%; }
@@ -650,6 +707,11 @@ input, textarea, p, li, h1, h2, h3, .nst-card-title, .page-title {
   .nst-drawer-item:hover { background: var(--surface-2); color: var(--text-bright); }
 }
 
+/* Toasts (Sonner): the headline carries the weight, the name under it recedes.
+   Sonner's own stylesheet wins the cascade, hence the two !importants. */
+[data-sonner-toast] [data-title] { font-weight: 600 !important; }
+[data-sonner-toast] [data-description] { color: var(--text-3) !important; font-size: var(--t-footnote) !important; }
+
 /* Keyboard focus must stay visible even though the pointer states are quiet. */
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 
@@ -669,7 +731,7 @@ input, textarea, p, li, h1, h2, h3, .nst-card-title, .page-title {
   .nst-modal[data-state="closed"], .nst-drawer[data-state="closed"] { opacity: 0; }
   .nst-meter > i { transition: none; }
   .nst-bn:active, .nst-bar-group .nst-iconbtn:active { transform: none; }
-  .nst-bn-lens { transition: opacity 150ms var(--ease-out); }  /* it moves, but doesn't travel */  /* no swelling; the glass background still marks the press */
+  .nst-bn-lens, .nst-seg-lens { transition: opacity 150ms var(--ease-out); }  /* it moves, but doesn't travel */  /* no swelling; the glass background still marks the press */
   /* The section still opens and closes — it just stops sliding open. */
   .nst-collapse { transition: opacity 200ms var(--ease-out); }
   /* Keep the fade, drop the growing-out-of-the-corner. */
@@ -688,7 +750,7 @@ input, textarea, p, li, h1, h2, h3, .nst-card-title, .page-title {
 /* Transparency off: the frosted bars and the sheet scrim become solid. Blur is
    expensive to read through for some people, and the setting exists to say so. */
 @media (prefers-reduced-transparency: reduce) {
-  .nst-topbar[data-scrolled="true"], .nst-bottomnav, .nst-modal-bg, .nst-drawer-wrap {
+  .nst-topbar, .nst-bottomnav, .nst-modal-bg, .nst-drawer-wrap {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }

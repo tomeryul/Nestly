@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
 import { startOfWeek, toISODate } from "../lib/dates";
 import { useDragReorder } from "../lib/dragReorder";
+import { reinsert, removeWithUndo } from "../lib/undo";
 import { bgWrite, newId } from "../lib/optimistic";
 import type { Tables } from "../types/database";
 
@@ -74,8 +75,18 @@ export default function Laundry() {
     bgWrite(supabase.from("laundry_tasks").update({ stage }).eq("id", l.id), load);
   };
   const removeLoad = (id: string) => {
+    const at = loads.findIndex((l) => l.id === id);
+    const row = loads[at];
+    if (!row) return;
     setLoads((prev) => prev.filter((l) => l.id !== id));
-    bgWrite(supabase.from("laundry_tasks").delete().eq("id", id), load);
+    removeWithUndo({
+      message: "הכביסה נמחקה",
+      description: row.name,
+      remove: () => supabase.from("laundry_tasks").delete().eq("id", id),
+      undoLocal: () => setLoads((prev) => reinsert(prev, [row], at)),
+      restore: () => supabase.from("laundry_tasks").insert(row),
+      reload: load,
+    });
   };
   const nameFor = (uid: string | null) => members.find((m) => m.user_id === uid)?.profile?.display_name ?? "";
 

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { HomeProvider, useHome } from "./context/HomeContext";
 import { FullPageSpinner } from "./components/ui";
+import { AppToaster } from "./components/Toaster";
 import { supabase } from "./lib/supabase";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
@@ -85,6 +86,7 @@ export default function App() {
     <AuthProvider>
       <HomeProvider>
         <Gate />
+        <AppToaster />
       </HomeProvider>
     </AuthProvider>
   );

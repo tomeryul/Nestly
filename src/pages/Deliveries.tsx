@@ -4,8 +4,9 @@ import { supabase } from "../lib/supabase";
 import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
-import { EmptyState, FullPageSpinner } from "../components/ui";
+import { EmptyState, FullPageSpinner, SegLens } from "../components/ui";
 import { useDragReorder } from "../lib/dragReorder";
+import { reinsert, removeWithUndo } from "../lib/undo";
 import { bgWrite, newId } from "../lib/optimistic";
 import { formatTime, toISODate } from "../lib/dates";
 import type { Tables } from "../types/database";
@@ -126,8 +127,18 @@ export default function Deliveries() {
   };
 
   const removeDelivery = (id: string) => {
+    const at = deliveries.findIndex((x) => x.id === id);
+    const row = deliveries[at];
+    if (!row) return;
     setDeliveries((prev) => prev.filter((x) => x.id !== id));
-    bgWrite(supabase.from("deliveries").delete().eq("id", id), load);
+    removeWithUndo({
+      message: "המשלוח נמחק",
+      description: row.name,
+      remove: () => supabase.from("deliveries").delete().eq("id", id),
+      undoLocal: () => setDeliveries((prev) => reinsert(prev, [row], at)),
+      restore: () => supabase.from("deliveries").insert(row),
+      reload: load,
+    });
   };
   const addPoint = (p: { name: string; location: string; closing: string; hold: number }) => {
     if (!p.name.trim() || !homeId) return;
@@ -306,6 +317,8 @@ export default function Deliveries() {
       <h1 className="page-title">משלוחים</h1>
 
       <div className="nst-seg">
+
+        <SegLens />
         <button className={tab === "open" ? "active" : ""} onClick={() => setTab("open")}>
           לאיסוף{open.length > 0 ? ` (${open.length})` : ""}
         </button>

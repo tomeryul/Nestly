@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { ShoppingCart, ChefHat, CalendarDays, Users, BellRing, Check, Clock, Sparkles } from "lucide-react";
 import { supabase } from "../lib/supabase";
@@ -79,7 +80,7 @@ export default function Dashboard() {
     const res = await enablePush(user.id);
     setPushBusy(false);
     if (res.ok) setPushOn(true);
-    else alert(res.error);
+    else toast.error(res.error);
   };
 
   const dow = new Date().getDay();
@@ -132,11 +133,11 @@ export default function Dashboard() {
             <CalendarDays />
           </span>
           <div className="next-action-body">
-            <div className="next-action-kicker">המשימה הבאה</div>
-            <div className="next-action-title">
-              {nextTask.title}
-              {nextTask.start_time ? ` · ${formatTime(nextTask.start_time)}` : ""}
+            {/* The time rides in the kicker so clamping a long title can never cut it off. */}
+            <div className="next-action-kicker">
+              המשימה הבאה{nextTask.start_time ? ` · ${formatTime(nextTask.start_time)}` : ""}
             </div>
+            <div className="next-action-title nst-clamp-3">{nextTask.title}</div>
           </div>
           <button className="next-action-cta" onClick={() => navigate("/schedule")}>
             ללוז
@@ -179,7 +180,7 @@ export default function Dashboard() {
                   </button>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ font: "400 17px var(--font-body)", color: "var(--text-bright)", textDecoration: t.is_done ? "line-through" : "none" }}>{t.title}</p>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
+                    <div className="nst-meta" style={{ marginTop: 2 }}>
                       {t.start_time && (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
                           <Clock size={12} />
@@ -187,7 +188,7 @@ export default function Dashboard() {
                         </span>
                       )}
                       <span className="nst-tag" style={{ color: cat.color, background: cat.color + "1f" }}>{cat.label}</span>
-                      {nameFor(t.assigned_to) && <span>{nameFor(t.assigned_to)}</span>}
+                      {nameFor(t.assigned_to) && <span className="nst-meta-who" dir="auto" title={nameFor(t.assigned_to)}>{nameFor(t.assigned_to)}</span>}
                     </div>
                   </div>
                 </div>

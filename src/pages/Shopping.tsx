@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter, Tags, Tag, ShoppingCart } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
@@ -6,7 +6,9 @@ import { useAuth } from "../context/AuthContext";
 import { readCache, useOnResume, writeCache } from "../lib/cache";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
 import { CATEGORIES, DAYS_HE } from "../lib/constants";
+import { reinsert, removeWithUndo } from "../lib/undo";
 import { bgWrite, newId } from "../lib/optimistic";
+import { useFlip } from "../lib/flip";
 import { searchCatalog } from "../lib/products";
 import { fetchStores, getStoreId, getStoreName, priceMany, setStoreId, setStoreName, type PriceItem, type PriceStore } from "../lib/prices";
 import type { Tables } from "../types/database";
@@ -41,6 +43,15 @@ export default function Shopping() {
   const [pickFor, setPickFor] = useState<string | null>(null);
   const [catFor, setCatFor] = useState<Item | null>(null);
   const [storeName, setStoreNameState] = useState(getStoreName());
+  const listRef = useRef<HTMLDivElement>(null);
+  const flip = useFlip(listRef);
+  // A ticked row stays put — showing its tick — until the shopper stops
+  // tapping, then everything ticked moves together. Moving each row the instant
+  // it is ticked hid the tick and slid the next item out from under the finger.
+  // Maps id → the section the row is still shown in.
+  const [held, setHeld] = useState<Map<string, boolean>>(() => new Map());
+  const holdTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(holdTimer.current), []);
 
   const loadPrices = async (list: Item[]) => {
     const storeId = getStoreId();
@@ -178,6 +189,19 @@ export default function Shopping() {
     };
   }, [activeList, loadItems]);
 
+  // Back onto the list from "taken" — straight away, since it was asked for by name.
+  const untick = (id: string) => {
+    flip();
+    setHeld((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, is_checked: false } : i)));
+    bgWrite(supabase.from("shopping_items").update({ is_checked: false }).eq("id", id), loadItems);
+  };
+
   const addItem = () => {
     if (!name.trim() || !homeId || !activeList) return;
 
@@ -185,10 +209,7 @@ export default function Shopping() {
     // already bought, tick it back on instead; if it is still pending, leave it.
     const existing = items.find((i) => i.name.trim().toLowerCase() === name.trim().toLowerCase());
     if (existing) {
-      if (existing.is_checked) {
-        setItems((prev) => prev.map((i) => (i.id === existing.id ? { ...i, is_checked: false } : i)));
-        bgWrite(supabase.from("shopping_items").update({ is_checked: false }).eq("id", existing.id), loadItems);
-      }
+      if (existing.is_checked) untick(existing.id);
       setName("");
       setQty(1);
       setFocused(false);
@@ -201,6 +222,7 @@ export default function Shopping() {
       source: "manual", is_checked: false, position: items.length, created_by: user?.id ?? null,
       created_at: new Date().toISOString(), dish_id: null, note: null, unit: null,
     };
+    flip();
     setItems((prev) => [...prev, row]);
     setName("");
     setQty(1);
@@ -212,6 +234,18 @@ export default function Shopping() {
     loadCatalog();
   };
   const toggle = (item: Item) => {
+    setHeld((prev) => {
+      const next = new Map(prev);
+      const shownIn = prev.get(item.id) ?? item.is_checked;
+      if (shownIn === !item.is_checked) next.delete(item.id); // ticked back: it never moved
+      else next.set(item.id, shownIn);
+      return next;
+    });
+    clearTimeout(holdTimer.current);
+    holdTimer.current = setTimeout(() => {
+      flip();
+      setHeld(new Map());
+    }, 900);
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, is_checked: !i.is_checked } : i)));
     bgWrite(supabase.from("shopping_items").update({ is_checked: !item.is_checked }).eq("id", item.id), loadItems);
   };
@@ -221,26 +255,55 @@ export default function Shopping() {
     bgWrite(supabase.from("shopping_items").update({ quantity }).eq("id", item.id), loadItems);
   };
   const remove = (id: string) => {
+    const at = items.findIndex((i) => i.id === id);
+    const row = items[at];
+    if (!row) return;
+    flip();
     setItems((prev) => prev.filter((i) => i.id !== id));
-    bgWrite(supabase.from("shopping_items").delete().eq("id", id), loadItems);
+    removeWithUndo({
+      message: "המוצר נמחק",
+      description: row.name,
+      remove: () => supabase.from("shopping_items").delete().eq("id", id),
+      undoLocal: () => {
+        flip();
+        setItems((prev) => reinsert(prev, [row], at));
+      },
+      restore: () => supabase.from("shopping_items").insert(row),
+      reload: loadItems,
+    });
   };
   const changeCategory = (item: Item, category: string) => {
+    flip();
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, category } : i)));
     bgWrite(supabase.from("shopping_items").update({ category }).eq("id", item.id), loadItems);
     setCatFor(null);
   };
   const clearChecked = () => {
     if (!activeList) return;
+    const rows = items.filter((i) => i.is_checked);
+    if (!rows.length) return;
+    const listId = activeList;
+    flip();
     setItems((prev) => prev.filter((i) => !i.is_checked));
-    bgWrite(supabase.from("shopping_items").delete().eq("list_id", activeList).eq("is_checked", true), loadItems);
+    removeWithUndo({
+      message: rows.length === 1 ? "מוצר אחד נוקה מהרשימה" : `${rows.length} מוצרים נוקו מהרשימה`,
+      remove: () => supabase.from("shopping_items").delete().in("id", rows.map((r) => r.id)).eq("list_id", listId),
+      undoLocal: () => {
+        flip();
+        setItems((prev) => reinsert(prev, rows));
+      },
+      restore: () => supabase.from("shopping_items").insert(rows),
+      reload: loadItems,
+    });
   };
 
   if (loading && !lists.length) return <FullPageSpinner />;
 
   const collator = new Intl.Collator("he");
   const byName = (a: Item, b: Item) => collator.compare(a.name, b.name);
-  const active = items.filter((i) => !i.is_checked).sort(byName);
-  const taken = items.filter((i) => i.is_checked).sort(byName);
+  const shownTaken = (i: Item) => held.get(i.id) ?? i.is_checked;
+  const active = items.filter((i) => !shownTaken(i)).sort(byName);
+  const taken = items.filter(shownTaken).sort(byName);
 
   // when grouped, order categories by the CATEGORIES list (others last); items א־ב within each
   const groupedSections: [string, Item[]][] = (() => {
@@ -259,11 +322,11 @@ export default function Shopping() {
   })();
 
   const renderRow = (item: Item) => (
-    <div className="nst-row" key={item.id} style={{ opacity: item.is_checked ? 0.55 : 1 }}>
+    <div className="nst-row shop-row" key={item.id} data-flip={item.id} style={{ opacity: item.is_checked ? 0.55 : 1 }}>
       <button className={`nst-check ${item.is_checked ? "on" : ""}`} onClick={() => toggle(item)}>
         <Check size={14} />
       </button>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="shop-row-text">
         <p style={{ font: "400 17px var(--font-body)", color: "var(--text-bright)", textDecoration: item.is_checked ? "line-through" : "none" }}>{item.name}</p>
         <div style={{ display: "flex", gap: 7, alignItems: "center", marginTop: 3, flexWrap: "wrap" }}>
           {priceMap[item.name.trim()] && (
@@ -301,25 +364,27 @@ export default function Shopping() {
           )}
         </div>
       </div>
-      <div className="nst-stepper">
-        <button onClick={() => changeQty(item, -1)}>
-          <Minus />
-        </button>
-        <span className="val">{item.quantity}</span>
-        <button onClick={() => changeQty(item, 1)}>
-          <Plus />
+      <div className="shop-row-ctrl">
+        <div className="nst-stepper">
+          <button onClick={() => changeQty(item, -1)}>
+            <Minus />
+          </button>
+          <span className="val">{item.quantity}</span>
+          <button onClick={() => changeQty(item, 1)}>
+            <Plus />
+          </button>
+        </div>
+        <button className="nst-del" onClick={() => remove(item.id)}>
+          <Trash2 />
         </button>
       </div>
-      <button className="nst-del" onClick={() => remove(item.id)}>
-        <Trash2 />
-      </button>
     </div>
   );
 
   const takenSection =
     taken.length > 0 ? (
       <div style={{ marginTop: 6 }}>
-        <div className="nst-group-header">
+        <div className="nst-group-header" data-flip="h:taken">
           <ShoppingCart size={12} /> נלקחו · {taken.length}
           <span style={{ flex: 1 }} />
           <button className="reorder-btn" style={{ color: "var(--danger)", font: "600 13px var(--font-body)", gap: 4, alignItems: "center", minHeight: 32 }} onClick={clearChecked}>
@@ -384,10 +449,7 @@ export default function Shopping() {
                     // Already on the list: don't duplicate it. Un-tick it if it was
                     // bought, otherwise leave it exactly as it is.
                     if (cur) {
-                      if (cur.is_checked) {
-                        setItems((prev) => prev.map((i) => (i.id === cur.id ? { ...i, is_checked: false } : i)));
-                        bgWrite(supabase.from("shopping_items").update({ is_checked: false }).eq("id", cur.id), loadItems);
-                      }
+                      if (cur.is_checked) untick(cur.id);
                       setName("");
                       setQty(1);
                       setFocused(false);
@@ -473,10 +535,10 @@ export default function Shopping() {
       {items.length === 0 ? (
         <EmptyState icon={<ShoppingBasket size={42} />} title="הרשימה ריקה" hint="הוסיפו מצרך ראשון למעלה" />
       ) : grouped ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div ref={listRef} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {groupedSections.map(([cat, catItems]) => (
             <div key={cat}>
-              <div className="nst-group-header">
+              <div className="nst-group-header" data-flip={`h:${cat}`}>
                 {cat} · {catItems.length}
               </div>
               <div className="nst-group">{catItems.map(renderRow)}</div>
@@ -485,7 +547,7 @@ export default function Shopping() {
           {takenSection}
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div ref={listRef} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {active.length > 0 && <div className="nst-group">{active.map(renderRow)}</div>}
           {takenSection}
         </div>

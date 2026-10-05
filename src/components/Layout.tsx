@@ -136,10 +136,10 @@ export default function Layout() {
           >
             <div className="nst-topbar-title">{current?.title ?? "Nestly"}</div>
             <div style={{ flex: 1 }} />
-            <div style={{ position: "relative" }}>
-              <button className="nst-chip nst-glass" onClick={() => homes.length > 1 && setSwitcher((s) => !s)}>
+            <div className="nst-topbar-home">
+              <button className="nst-chip nst-glass" title={homeName ?? undefined} onClick={() => homes.length > 1 && setSwitcher((s) => !s)}>
                 {homes.length > 1 && <ChevronDown size={14} />}
-                {homeName ?? "הבית שלי"}
+                <span className="nst-chip-label" dir="auto">{homeName ?? "הבית שלי"}</span>
               </button>
               {switcher && (
                 <div className="nst-dropdown">

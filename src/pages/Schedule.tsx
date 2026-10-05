@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
 import { DAYS_HE, DAYS_HE_SHORT, TASK_CATEGORIES, type TaskCategory } from "../lib/constants";
 import { addDays, formatTime, isToday, startOfWeek, toISODate, weekDates } from "../lib/dates";
+import { reinsert, removeWithUndo } from "../lib/undo";
 import { bgWrite, newId } from "../lib/optimistic";
 import { useDragReorder } from "../lib/dragReorder";
 import type { Tables } from "../types/database";
@@ -91,8 +92,26 @@ export default function Schedule() {
     bgWrite(supabase.from("schedule_tasks").update({ is_done: !t.is_done }).eq("id", t.id), load);
   };
   const remove = (id: string) => {
+    const at = tasks.findIndex((x) => x.id === id);
+    const row = tasks[at];
+    if (!row) return;
     setTasks((prev) => prev.filter((x) => x.id !== id));
-    bgWrite(supabase.from("schedule_tasks").delete().eq("id", id), load);
+    // The delete cascades over the task's checklist, so keep a copy to put back.
+    let subs: Tables<"task_subtasks">[] = [];
+    removeWithUndo({
+      message: "המשימה נמחקה",
+      description: row.title,
+      remove: async () => {
+        subs = (await supabase.from("task_subtasks").select("*").eq("task_id", id)).data ?? [];
+        return supabase.from("schedule_tasks").delete().eq("id", id);
+      },
+      undoLocal: () => setTasks((prev) => reinsert(prev, [row], at)),
+      restore: async () => {
+        const r = await supabase.from("schedule_tasks").insert(row);
+        return r.error || !subs.length ? r : supabase.from("task_subtasks").insert(subs);
+      },
+      reload: load,
+    });
   };
 
   const reorder = useCallback(
@@ -120,7 +139,7 @@ export default function Schedule() {
 
   return (
     <section className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <h1 className="page-title">לוז שבועי</h1>
         <button className="btn btn-sm" onClick={() => setShowRecurring(true)}>
           <Repeat size={15} /> משימות קבועות
@@ -183,7 +202,7 @@ export default function Schedule() {
                   style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", textAlign: "right", cursor: "pointer" }}
                 >
                   <p style={{ font: "400 17px var(--font-body)", color: "var(--text-bright)", textDecoration: t.is_done ? "line-through" : "none" }}>{t.title}</p>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--text-muted)", fontWeight: 600, marginTop: 3, flexWrap: "wrap" }}>
+                  <div className="nst-meta" style={{ marginTop: 3 }}>
                     {t.start_time && (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
                         <Clock size={12} />
@@ -198,7 +217,7 @@ export default function Schedule() {
                         {subCounts[t.id].done}/{subCounts[t.id].total}
                       </span>
                     )}
-                    {who && <span>{who}</span>}
+                    {who && <span className="nst-meta-who" dir="auto" title={who}>{who}</span>}
                   </div>
                 </button>
                 <button className="nst-del" onClick={() => remove(t.id)}>

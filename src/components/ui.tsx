@@ -1,8 +1,9 @@
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useDragDismiss } from "../lib/dragDismiss";
 import { clamp, presentedOffset, useReducedMotion, useWideViewport } from "../lib/motion";
+import { useTabLens } from "../lib/tabLens";
 
 export function Spinner({ className = "" }: { className?: string }) {
   return (
@@ -49,6 +50,18 @@ export function Collapse({ open, children }: { open: boolean; children: ReactNod
   );
 }
 
+/**
+ * The thumb of a segmented control (`.nst-seg`). Put it first inside the
+ * control: it slides to whichever button is `.active` on the same spring as the
+ * tab bar's lens, instead of the selection jumping from one segment to the next.
+ */
+export function SegLens() {
+  const lens = useRef<HTMLSpanElement>(null);
+  const control = useMemo(() => ({ get current() { return lens.current?.parentElement ?? null; } }), []);
+  useTabLens(control, lens);
+  return <span className="nst-seg-lens" ref={lens} aria-hidden />;
+}
+
 export function EmptyState({ icon, title, hint }: { icon?: ReactNode; title: string; hint?: string }) {
   return (
     <div className="empty-state">
@@ -59,13 +72,55 @@ export function EmptyState({ icon, title, hint }: { icon?: ReactNode; title: str
   );
 }
 
+/** Where a sheet was, visually, at the moment it was told to go. */
+type ExitFrom = { offset: number; backdrop: string; scroll: number; duration: string };
+
+/**
+ * Plays a sheet's exit on an inert copy of it. The parent has already unmounted
+ * the real one, so without this a sheet slid up nicely and then vanished — and a
+ * sheet flicked away by a finger stopped dead in mid-air. The copy starts from
+ * exactly where the real one was (mid-drag, mid-open, scrolled) and the
+ * stylesheet's closed state takes it from there.
+ */
+function playExitCopy(backdrop: HTMLElement, from: ExitFrom) {
+  const g = backdrop.cloneNode(true) as HTMLElement;
+  const s = g.querySelector<HTMLElement>(".nst-modal");
+  if (!s) return;
+  g.setAttribute("aria-hidden", "true");
+  g.style.pointerEvents = "none"; // the page underneath is live again at once
+  delete s.dataset.dragging;
+  delete s.dataset.settling;
+  g.dataset.state = s.dataset.state = "open";
+  g.style.transition = s.style.transition = "none";
+  g.style.opacity = from.backdrop;
+  s.style.transform = from.offset ? `translateY(${from.offset}px)` : "";
+  document.body.appendChild(g);
+  s.scrollTop = from.scroll;
+  void g.offsetWidth; // commit the starting frame
+  g.style.transition = s.style.transition = "";
+  g.style.opacity = s.style.transform = "";
+  s.style.transitionDuration = from.duration;
+  g.dataset.state = s.dataset.state = "closed";
+  let gone = false;
+  const remove = () => {
+    if (gone) return;
+    gone = true;
+    g.remove();
+  };
+  const running = g.getAnimations?.({ subtree: true }) ?? [];
+  if (running.length) Promise.all(running.map((a) => a.finished)).then(remove, remove);
+  setTimeout(remove, 700); // never outlive the longest exit, whatever happens
+}
+
 /**
  * Bottom sheet (a centred dialog from 600px up).
  *
  * It leaves through the edge it arrived from, and it can be pulled down and
  * thrown away — the grabber says so before anyone tries. The exit has to play
  * before the element is removed, so the component keeps its own presence state
- * rather than unmounting the moment `open` flips.
+ * rather than unmounting the moment `open` flips — and when the parent removes
+ * it outright (`{x && <Modal open …/>}`, which is how every caller uses it), the
+ * exit plays on a detached copy instead of being skipped.
  */
 export function Modal({
   open,
@@ -90,6 +145,7 @@ export function Modal({
   const [shown, setShown] = useState(false);
   const backdropRef = useRef<HTMLDivElement | null>(null);
   const closing = useRef(false);
+  const exitFrom = useRef<ExitFrom | null>(null);
   const leaveRef = useRef<(velocity: number) => void>(() => {});
   const reduce = useReducedMotion();
   const wide = useWideViewport();
@@ -118,15 +174,18 @@ export function Modal({
       if (closing.current) return;
       closing.current = true;
       const el = sheet.ref.current;
+      const b = backdropRef.current;
       if (el) {
+        const offset = presentedOffset(el, "y");
         if (velocity > 0) {
           // Velocity handoff: a hard flick finishes fast, a gentle one doesn't.
-          const remaining = Math.max(el.offsetHeight - presentedOffset(el, "y"), 0);
+          const remaining = Math.max(el.offsetHeight - offset, 0);
           el.style.transitionDuration = `${clamp(remaining / velocity, 160, 380)}ms`;
         }
+        // Recorded before anything moves, for the copy if the parent unmounts us.
+        exitFrom.current = { offset, backdrop: b?.style.opacity ?? "", scroll: el.scrollTop, duration: el.style.transitionDuration };
         el.style.transform = ""; // hand the exit back to the stylesheet
       }
-      const b = backdropRef.current;
       if (b) {
         // Fade out from wherever the drag left it rather than snapping to full.
         b.style.transition = "";
@@ -142,6 +201,7 @@ export function Modal({
   useEffect(() => {
     if (open) {
       closing.current = false;
+      exitFrom.current = null;
       setPresent(true);
       const b = backdropRef.current;
       if (b) {
@@ -170,6 +230,22 @@ export function Modal({
     const t = setTimeout(() => setPresent(false), 700);
     return () => clearTimeout(t);
   }, [open, present]);
+
+  // Unmounted by the parent while on screen: hand the exit to a copy. Layout
+  // cleanups run before React detaches the DOM, so the nodes are still readable.
+  useLayoutEffect(
+    () => () => {
+      const b = backdropRef.current;
+      const el = sheet.ref.current;
+      if (!b || !el || b.dataset.state !== "open") return; // never shown, or already gone
+      playExitCopy(
+        b,
+        exitFrom.current ?? { offset: presentedOffset(el, "y"), backdrop: b.style.opacity, scroll: el.scrollTop, duration: "" },
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   useEffect(() => {
     if (!present) return;

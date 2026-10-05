@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
-import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
+import { Modal, EmptyState, FullPageSpinner, SegLens } from "../components/ui";
 import { CATEGORIES, DAYS_HE, MEAL_TYPES } from "../lib/constants";
 import { addDays, formatDayMonth, startOfWeek, toISODate } from "../lib/dates";
 import { bgWrite, newId } from "../lib/optimistic";
@@ -21,6 +21,7 @@ export default function Cooking() {
     <section className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       <h1 className="page-title">בישולים</h1>
       <div className="nst-seg">
+        <SegLens />
         <button className={tab === "week" ? "active" : ""} onClick={() => setTab("week")}>
           התפריט השבועי
         </button>
@@ -169,6 +170,7 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
     <Modal open onClose={onClose} title={`מצרכים · ${dish.name}`}>
       <div style={{ background: "var(--surface-2)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 10, marginBottom: "1rem" }}>
         <div className="nst-seg">
+          <SegLens />
           <button className={!isSpice ? "active" : ""} onClick={() => setIsSpice(false)}>
             מצרך
           </button>

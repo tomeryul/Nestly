@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Copy, LogOut, UserPlus, Bell, Check, Users, Pencil, Trash2, House, Palette } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
@@ -56,7 +57,7 @@ export default function Settings() {
     } else {
       const res = await enablePush(user.id);
       if (res.ok) setPushOn(true);
-      else alert(res.error);
+      else toast.error(res.error);
     }
     setPushBusy(false);
   };

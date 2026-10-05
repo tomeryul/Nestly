@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Plus, Trash2, Check, Sparkles, DoorOpen, X, GripVertical, ChevronDown, Printer, Pencil } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
-import { Collapse, EmptyState, FullPageSpinner } from "../components/ui";
+import { Collapse, EmptyState, FullPageSpinner, SegLens } from "../components/ui";
 import { startOfWeek, toISODate, addDays, formatDayMonth } from "../lib/dates";
 import { useDragReorder } from "../lib/dragReorder";
+import { reinsert, removeWithUndo } from "../lib/undo";
 import { bgWrite, newId } from "../lib/optimistic";
 import { exportChecklistPdf } from "../lib/checklistPdf";
 import type { Tables } from "../types/database";
@@ -72,9 +74,32 @@ export default function Cleaning() {
     bgWrite(supabase.from("cleaning_rooms").insert({ id, home_id: homeId, name: row.name, frequency: tab, position: row.position }), load);
   };
   const removeRoom = (id: string) => {
+    const at = rooms.findIndex((r) => r.id === id);
+    const room = rooms[at];
+    if (!room) return;
+    const local = tasks.filter((t) => t.room_id === id);
     setRooms((prev) => prev.filter((r) => r.id !== id));
     setTasks((prev) => prev.filter((t) => t.room_id !== id));
-    bgWrite(supabase.from("cleaning_rooms").delete().eq("id", id), load);
+    // Deleting a room un-files its tasks (room_id → null) in every period, not just
+    // the one on screen; remember which they were so Undo can file them back.
+    let filed: string[] = [];
+    removeWithUndo({
+      message: "החדר נמחק",
+      description: room.name,
+      remove: async () => {
+        filed = ((await supabase.from("cleaning_tasks").select("id").eq("room_id", id)).data ?? []).map((t) => t.id);
+        return supabase.from("cleaning_rooms").delete().eq("id", id);
+      },
+      undoLocal: () => {
+        setRooms((prev) => reinsert(prev, [room], at));
+        setTasks((prev) => reinsert(prev, local));
+      },
+      restore: async () => {
+        const r = await supabase.from("cleaning_rooms").insert(room);
+        return r.error || !filed.length ? r : supabase.from("cleaning_tasks").update({ room_id: id }).in("id", filed);
+      },
+      reload: load,
+    });
   };
   const renameRoom = (id: string, name: string) => {
     const n = name.trim();
@@ -104,8 +129,30 @@ export default function Cleaning() {
     }
   };
   const removeTask = (id: string) => {
+    const at = tasks.findIndex((t) => t.id === id);
+    const row = tasks[at];
+    if (!row) return;
+    const wasDone = doneIds.has(id);
     setTasks((prev) => prev.filter((t) => t.id !== id));
-    bgWrite(supabase.from("cleaning_tasks").delete().eq("id", id), load);
+    // The delete cascades over the task's ticks in every period; keep them.
+    let ticks: Tables<"cleaning_completions">[] = [];
+    removeWithUndo({
+      message: "המשימה נמחקה",
+      description: row.title,
+      remove: async () => {
+        ticks = (await supabase.from("cleaning_completions").select("*").eq("cleaning_task_id", id)).data ?? [];
+        return supabase.from("cleaning_tasks").delete().eq("id", id);
+      },
+      undoLocal: () => {
+        setTasks((prev) => reinsert(prev, [row], at));
+        if (wasDone) setDoneIds((prev) => new Set(prev).add(id));
+      },
+      restore: async () => {
+        const r = await supabase.from("cleaning_tasks").insert(row);
+        return r.error || !ticks.length ? r : supabase.from("cleaning_completions").insert(ticks);
+      },
+      reload: load,
+    });
   };
   const renameTask = (id: string, title: string) => {
     const n = title.trim();
@@ -170,7 +217,7 @@ export default function Cleaning() {
       });
     } catch (e) {
       console.error(e);
-      alert("אירעה שגיאה בהכנת ה-PDF. נסו שוב.");
+      toast.error("לא הצלחנו להכין את ה-PDF", { description: "נסו שוב בעוד רגע." });
     } finally {
       setExporting(false);
     }
@@ -187,6 +234,7 @@ export default function Cleaning() {
         </button>
       </div>
       <div className="nst-seg">
+        <SegLens />
         <button className={tab === "weekly" ? "active" : ""} onClick={() => setTab("weekly")}>
           משימות השבוע
         </button>
@@ -207,7 +255,7 @@ export default function Cleaning() {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 7 }}>
               <span className="nst-meter">
-                <i style={{ width: `${(doneCount / tasks.length) * 100}%` }} />
+                <i style={{ transform: `translateX(${100 - (doneCount / tasks.length) * 100}%)` }} />
               </span>
               {doneCount === tasks.length && <span style={{ fontSize: 15 }}>🎉</span>}
             </div>
@@ -325,35 +373,41 @@ function RoomSection({
 
   return (
     <div className="nst-card" ref={dragRef} style={{ padding: "1rem 1.1rem", display: "flex", flexDirection: "column", gap: 9, ...dragStyle }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        {dragHandle && (
-          <span className="nst-grip" {...dragHandle} title="גרירה לסידור החדרים">
-            <GripVertical size={17} />
-          </span>
-        )}
-        <button onClick={toggleCollapsed} title={collapsed ? "הרחבה" : "צמצום"} style={{ border: "none", background: "transparent", cursor: "pointer", color: "var(--accent)", display: "flex", padding: 0, lineHeight: 0 }}>
-          <ChevronDown size={18} style={{ transition: "transform 200ms var(--ease-out)", transform: collapsed ? "rotate(90deg)" : "none" }} />
-        </button>
-        <DoorOpen size={16} style={{ color: "var(--text-3)" }} />
-        {editing ? (
-          <>
-            <input
-              autoFocus
-              style={{ flex: 1, font: "400 17px var(--font-body)" }}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") saveEdit();
-                if (e.key === "Escape") setEditing(false);
-              }}
-            />
-            <button className="nst-check on" onClick={saveEdit} title="שמירה">
-              <Check size={14} />
-            </button>
-          </>
-        ) : (
-          <>
-            <h2 onClick={toggleCollapsed} style={{ font: "600 20px var(--font-display)", color: "var(--text-bright)", margin: 0, flex: 1, cursor: "pointer" }}>{name}</h2>
+      {/* A long room name keeps the line; the badge and actions drop beneath it
+          rather than crushing it to one word per line. */}
+      <div className="room-head">
+        <div className="room-head-lead">
+          {dragHandle && (
+            <span className="nst-grip" {...dragHandle} title="גרירה לסידור החדרים">
+              <GripVertical size={17} />
+            </span>
+          )}
+          <button onClick={toggleCollapsed} title={collapsed ? "הרחבה" : "צמצום"} style={{ border: "none", background: "transparent", cursor: "pointer", color: "var(--accent)", display: "flex", padding: 0, lineHeight: 0, flex: "none" }}>
+            <ChevronDown size={18} style={{ transition: "transform 200ms var(--ease-out)", transform: collapsed ? "rotate(90deg)" : "none" }} />
+          </button>
+          <DoorOpen size={16} style={{ color: "var(--text-3)", flex: "none" }} />
+          {editing ? (
+            <>
+              <input
+                autoFocus
+                style={{ flex: 1, minWidth: 0, font: "400 17px var(--font-body)" }}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveEdit();
+                  if (e.key === "Escape") setEditing(false);
+                }}
+              />
+              <button className="nst-check on" onClick={saveEdit} title="שמירה">
+                <Check size={14} />
+              </button>
+            </>
+          ) : (
+            <h2 onClick={toggleCollapsed} style={{ font: "600 20px var(--font-display)", color: "var(--text-bright)", margin: 0, flex: 1, minWidth: 0, overflowWrap: "anywhere", cursor: "pointer" }}>{name}</h2>
+          )}
+        </div>
+        {!editing && (
+          <div className="room-head-ctrl">
             {tasks.length > 0 && (
               <span className="badge b-wt" style={{ borderRadius: 30 }}>
                 {done}/{tasks.length}
@@ -369,14 +423,14 @@ function RoomSection({
                 <Trash2 size={16} />
               </button>
             )}
-          </>
+          </div>
         )}
       </div>
 
       {tasks.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: -2 }}>
           <span className="nst-meter">
-            <i style={{ width: `${(done / tasks.length) * 100}%` }} />
+            <i style={{ transform: `translateX(${100 - (done / tasks.length) * 100}%)` }} />
           </span>
           <span style={{ font: "400 13px var(--font-body)", color: done === tasks.length ? "var(--ok)" : "var(--text-muted)", minWidth: 34, textAlign: "left" }}>
             {Math.round((done / tasks.length) * 100)}%
