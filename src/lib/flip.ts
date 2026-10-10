@@ -14,39 +14,60 @@ const ENTER = { duration: 250, easing: "cubic-bezier(0.23, 1, 0.32, 1)" };
  * flight — so a second change mid-move retargets from where the eye is, not
  * from a jump. Nothing animates unless `capture()` was called, so background
  * refreshes from the server leave the list alone.
+ *
+ * A capture is spent on the first commit (within a moment) that actually moves
+ * something: a list fed through useDragReorder re-orders one render after its
+ * items change, and the glide has to wait for that render, not the one before.
  */
 export function useFlip(containerRef: RefObject<HTMLElement>) {
-  const first = useRef<Map<string, DOMRect> | null>(null);
+  const first = useRef<{ rects: Map<string, DOMRect>; at: number } | null>(null);
 
   const capture = useCallback(() => {
     const root = containerRef.current;
     if (!root) return;
     const map = new Map<string, DOMRect>();
     root.querySelectorAll<HTMLElement>("[data-flip]").forEach((el) => map.set(el.dataset.flip!, el.getBoundingClientRect()));
-    first.current = map;
+    first.current = { rects: map, at: performance.now() };
   }, [containerRef]);
 
   useLayoutEffect(() => {
-    const before = first.current;
-    if (!before) return;
-    first.current = null;
+    const capture = first.current;
+    if (!capture) return;
     const root = containerRef.current;
-    if (!root || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!root || performance.now() - capture.at > 250 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      first.current = null;
+      return;
+    }
+    const before = capture.rects;
     const els = [...root.querySelectorAll<HTMLElement>("[data-flip]")];
     // Cancel every glide first and only then measure, so layout is read once.
-    for (const el of els) el.getAnimations().forEach((a) => a.id === "flip" && a.cancel());
+    const running = els.flatMap((el) => el.getAnimations().filter((a) => a.id === "flip"));
+    const at = running.map((a) => a.currentTime);
+    running.forEach((a) => a.cancel());
     const now = els.map((el) => el.getBoundingClientRect());
+    const plays: (() => void)[] = [];
     els.forEach((el, i) => {
       const was = before.get(el.dataset.flip!);
       if (!was) {
-        el.animate([{ opacity: 0, transform: "scale(0.97)" }, { opacity: 1, transform: "none" }], ENTER).id = "flip";
+        plays.push(() => (el.animate([{ opacity: 0, transform: "scale(0.97)" }, { opacity: 1, transform: "none" }], ENTER).id = "flip"));
         return;
       }
       const dx = was.left - now[i].left;
       const dy = was.top - now[i].top;
       if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
-      el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], MOVE).id = "flip";
+      plays.push(() => (el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], MOVE).id = "flip"));
     });
+    const gone = before.size > els.length;
+    if (!plays.length && !gone) {
+      // Nothing moved yet: put any glide back exactly where it was and keep waiting.
+      running.forEach((a, i) => {
+        a.currentTime = at[i];
+        a.play();
+      });
+      return;
+    }
+    first.current = null;
+    plays.forEach((play) => play());
   });
 
   return capture;

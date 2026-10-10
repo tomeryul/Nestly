@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Plus, Trash2, ChevronRight, ChevronLeft, Check, Clock, Repeat, X, CalendarDays, ListChecks, Pencil, GripVertical, Library } from "lucide-react";
+import { useDoneLast } from "../lib/doneLast";
 import { supabase } from "../lib/supabase";
 import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
@@ -77,6 +78,9 @@ export default function Schedule() {
   }, [loadTemplates]);
 
   const nameFor = (uid: string | null) => members.find((m) => m.user_id === uid)?.profile?.display_name ?? "";
+  const listRef = useRef<HTMLDivElement>(null);
+  // A ticked task sinks to the bottom of the day once the ticking stops.
+  const doneLast = useDoneLast(listRef);
   // Manual order wins; tasks never dragged all sit at position 0 and fall back to time order.
   const dayTasks = useMemo(
     () =>
@@ -88,6 +92,7 @@ export default function Schedule() {
   const countFor = (iso: string) => tasks.filter((t) => t.scheduled_date === iso).length;
 
   const toggle = (t: Task) => {
+    doneLast.ticked(t.id, t.is_done);
     setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, is_done: !x.is_done } : x)));
     bgWrite(supabase.from("schedule_tasks").update({ is_done: !t.is_done }).eq("id", t.id), load);
   };
@@ -132,7 +137,8 @@ export default function Schedule() {
     },
     [tasks]
   );
-  const dr = useDragReorder(dayTasks, reorder);
+  const shownDay = useMemo(() => doneLast.sort(dayTasks, (t) => t.id, (t) => t.is_done), [dayTasks, doneLast.sort]);
+  const dr = useDragReorder(shownDay, reorder);
   const byId = useMemo(() => new Map(dayTasks.map((t) => [t.id, t])), [dayTasks]);
 
   if (loading) return <FullPageSpinner />;
@@ -180,14 +186,14 @@ export default function Schedule() {
       {dayTasks.length === 0 ? (
         <EmptyState icon={<CalendarDays size={42} />} title="אין משימות ליום זה" />
       ) : (
-        <div className="nst-group">
+        <div className="nst-group" ref={listRef}>
           {dr.order.map((id) => {
             const t = byId.get(id);
             if (!t) return null;
             const cat = TASK_CATEGORIES[t.category as TaskCategory] ?? TASK_CATEGORIES.general;
             const who = nameFor(t.assigned_to);
             return (
-              <div className="task-item" key={t.id} ref={dr.setItemRef(t.id)} style={{ opacity: t.is_done ? 0.55 : 1, ...dr.itemStyle(t.id) }}>
+              <div className="task-item" key={t.id} data-flip={t.id} ref={dr.setItemRef(t.id)} style={{ opacity: t.is_done ? 0.55 : 1, ...dr.itemStyle(t.id) }}>
                 {dayTasks.length > 1 && (
                   <span className="nst-grip" {...dr.handleProps(t.id)} title="גרירה לסידור">
                     <GripVertical size={17} />
@@ -287,6 +293,8 @@ export default function Schedule() {
 
 function TaskDetailModal({ task, onEdit, onClose }: { task: Task; onEdit: (t: Task) => void; onClose: () => void }) {
   const [subs, setSubs] = useState<Tables<"task_subtasks">[]>([]);
+  const listRef = useRef<HTMLDivElement>(null);
+  const doneLast = useDoneLast(listRef);
   const [title, setTitle] = useState("");
 
   const load = useCallback(async () => {
@@ -306,6 +314,7 @@ function TaskDetailModal({ task, onEdit, onClose }: { task: Task; onEdit: (t: Ta
     bgWrite(supabase.from("task_subtasks").insert({ id, task_id: task.id, home_id: task.home_id, title: row.title, position: row.position }), load);
   };
   const toggle = (s: Tables<"task_subtasks">) => {
+    doneLast.ticked(s.id, s.is_done);
     setSubs((prev) => prev.map((x) => (x.id === s.id ? { ...x, is_done: !x.is_done } : x)));
     bgWrite(supabase.from("task_subtasks").update({ is_done: !s.is_done }).eq("id", s.id), load);
   };
@@ -335,9 +344,9 @@ function TaskDetailModal({ task, onEdit, onClose }: { task: Task; onEdit: (t: Ta
       {subs.length === 0 ? (
         <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: "0.5rem 0" }}>אין תת‑משימות עדיין</p>
       ) : (
-        <div className="nst-group">
-          {subs.map((s) => (
-            <div className="nst-row" key={s.id} style={{ opacity: s.is_done ? 0.55 : 1 }}>
+        <div className="nst-group" ref={listRef}>
+          {doneLast.sort(subs, (s) => s.id, (s) => s.is_done).map((s) => (
+            <div className="nst-row" key={s.id} data-flip={s.id} style={{ opacity: s.is_done ? 0.55 : 1 }}>
               <button className={`nst-check ${s.is_done ? "on" : ""}`} onClick={() => toggle(s)}>
                 <Check size={14} />
               </button>

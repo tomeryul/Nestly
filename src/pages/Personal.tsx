@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Plus, Check, X, User, Globe, GripVertical, Pencil } from "lucide-react";
+import { useDoneLast } from "../lib/doneLast";
 import { supabase } from "../lib/supabase";
 import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
@@ -149,7 +150,10 @@ function Section({
   const [v, setV] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  const dr = useDragReorder(tasks, onReorder);
+  const listRef = useRef<HTMLDivElement>(null);
+  const doneLast = useDoneLast(listRef);
+  const shown = useMemo(() => doneLast.sort(tasks, (t) => t.id, (t) => t.is_done), [tasks, doneLast.sort]);
+  const dr = useDragReorder(shown, onReorder);
   const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   const submit = () => {
     onAdd(v);
@@ -178,12 +182,12 @@ function Section({
       {tasks.length === 0 ? (
         <EmptyState title="אין משימות עדיין" />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+        <div ref={listRef} style={{ display: "flex", flexDirection: "column", gap: 9 }}>
           {dr.order.map((id) => {
             const t = byId.get(id);
             if (!t) return null;
             return (
-              <div key={t.id} ref={dr.setItemRef(t.id)} style={{ display: "flex", alignItems: "center", gap: 8, opacity: t.is_done ? 0.55 : 1, ...dr.itemStyle(t.id) }}>
+              <div key={t.id} data-flip={t.id} ref={dr.setItemRef(t.id)} style={{ display: "flex", alignItems: "center", gap: 8, opacity: t.is_done ? 0.55 : 1, ...dr.itemStyle(t.id) }}>
                 {editingId === t.id ? (
                   <>
                     <input
@@ -207,7 +211,13 @@ function Section({
                         <GripVertical size={17} />
                       </span>
                     )}
-                    <button className={`nst-check ${t.is_done ? "on" : ""}`} onClick={() => onToggle(t)}>
+                    <button
+                      className={`nst-check ${t.is_done ? "on" : ""}`}
+                      onClick={() => {
+                        doneLast.ticked(t.id, t.is_done);
+                        onToggle(t);
+                      }}
+                    >
                       <Check size={14} />
                     </button>
                     <span

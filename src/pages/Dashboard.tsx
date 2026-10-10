@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties, useRef } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { ShoppingCart, ChefHat, CalendarDays, Users, BellRing, Check, Clock, Sparkles } from "lucide-react";
+import { useDoneLast } from "../lib/doneLast";
+import { bgWrite } from "../lib/optimistic";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -84,9 +86,14 @@ export default function Dashboard() {
   };
 
   const dow = new Date().getDay();
-  const toggle = async (t: Task) => {
-    await supabase.from("schedule_tasks").update({ is_done: !t.is_done }).eq("id", t.id);
-    load();
+  // Ticks show at once (the write follows in the background), and a ticked task
+  // sinks to the bottom of today's list once the ticking stops.
+  const listRef = useRef<HTMLDivElement>(null);
+  const doneLast = useDoneLast(listRef);
+  const toggle = (t: Task) => {
+    doneLast.ticked(t.id, t.is_done);
+    setTodayTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, is_done: !x.is_done } : x)));
+    bgWrite(supabase.from("schedule_tasks").update({ is_done: !t.is_done }).eq("id", t.id), load);
   };
   const nameFor = (uid: string | null) => members.find((m) => m.user_id === uid)?.profile?.display_name ?? "";
 
@@ -169,11 +176,11 @@ export default function Dashboard() {
         {todayTasks.length === 0 ? (
           <p style={{ color: "var(--text-muted)", fontSize: 13, textAlign: "center", padding: "0.5rem 0" }}>אין משימות להיום 🎉</p>
         ) : (
-          <div className="nst-group">
-            {todayTasks.map((t) => {
+          <div className="nst-group" ref={listRef}>
+            {doneLast.sort(todayTasks, (t) => t.id, (t) => t.is_done).map((t) => {
               const cat = TASK_CATEGORIES[t.category as TaskCategory] ?? TASK_CATEGORIES.general;
               return (
-                <div className="task-item" key={t.id} style={{ opacity: t.is_done ? 0.55 : 1 }}>
+                <div className="task-item" key={t.id} data-flip={t.id} style={{ opacity: t.is_done ? 0.55 : 1 }}>
                   <span style={{ width: 5, height: 34, borderRadius: 5, background: t.color ?? cat.color, flex: "none" }} />
                   <button className={`nst-check ${t.is_done ? "on" : ""}`} onClick={() => toggle(t)}>
                     <Check size={14} />

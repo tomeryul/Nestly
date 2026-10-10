@@ -8,7 +8,7 @@ import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
 import { CATEGORIES, DAYS_HE } from "../lib/constants";
 import { reinsert, removeWithUndo } from "../lib/undo";
 import { bgWrite, newId } from "../lib/optimistic";
-import { useFlip } from "../lib/flip";
+import { useDoneLast } from "../lib/doneLast";
 import { searchCatalog } from "../lib/products";
 import { fetchStores, getStoreId, getStoreName, priceMany, setStoreId, setStoreName, type PriceItem, type PriceStore } from "../lib/prices";
 import type { Tables } from "../types/database";
@@ -44,14 +44,10 @@ export default function Shopping() {
   const [catFor, setCatFor] = useState<Item | null>(null);
   const [storeName, setStoreNameState] = useState(getStoreName());
   const listRef = useRef<HTMLDivElement>(null);
-  const flip = useFlip(listRef);
-  // A ticked row stays put — showing its tick — until the shopper stops
-  // tapping, then everything ticked moves together. Moving each row the instant
-  // it is ticked hid the tick and slid the next item out from under the finger.
-  // Maps id → the section the row is still shown in.
-  const [held, setHeld] = useState<Map<string, boolean>>(() => new Map());
-  const holdTimer = useRef<ReturnType<typeof setTimeout>>();
-  useEffect(() => () => clearTimeout(holdTimer.current), []);
+  // A ticked item keeps its place, showing its tick, until the shopper stops
+  // tapping; then everything ticked moves to "taken" together.
+  const doneLast = useDoneLast(listRef);
+  const flip = doneLast.flip;
 
   const loadPrices = async (list: Item[]) => {
     const storeId = getStoreId();
@@ -191,13 +187,7 @@ export default function Shopping() {
 
   // Back onto the list from "taken" — straight away, since it was asked for by name.
   const untick = (id: string) => {
-    flip();
-    setHeld((prev) => {
-      if (!prev.has(id)) return prev;
-      const next = new Map(prev);
-      next.delete(id);
-      return next;
-    });
+    doneLast.release(id);
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, is_checked: false } : i)));
     bgWrite(supabase.from("shopping_items").update({ is_checked: false }).eq("id", id), loadItems);
   };
@@ -234,18 +224,7 @@ export default function Shopping() {
     loadCatalog();
   };
   const toggle = (item: Item) => {
-    setHeld((prev) => {
-      const next = new Map(prev);
-      const shownIn = prev.get(item.id) ?? item.is_checked;
-      if (shownIn === !item.is_checked) next.delete(item.id); // ticked back: it never moved
-      else next.set(item.id, shownIn);
-      return next;
-    });
-    clearTimeout(holdTimer.current);
-    holdTimer.current = setTimeout(() => {
-      flip();
-      setHeld(new Map());
-    }, 900);
+    doneLast.ticked(item.id, item.is_checked);
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, is_checked: !i.is_checked } : i)));
     bgWrite(supabase.from("shopping_items").update({ is_checked: !item.is_checked }).eq("id", item.id), loadItems);
   };
@@ -301,7 +280,7 @@ export default function Shopping() {
 
   const collator = new Intl.Collator("he");
   const byName = (a: Item, b: Item) => collator.compare(a.name, b.name);
-  const shownTaken = (i: Item) => held.get(i.id) ?? i.is_checked;
+  const shownTaken = (i: Item) => doneLast.shownDone(i.id, i.is_checked);
   const active = items.filter((i) => !shownTaken(i)).sort(byName);
   const taken = items.filter(shownTaken).sort(byName);
 

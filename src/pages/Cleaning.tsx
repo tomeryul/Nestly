@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, Check, Sparkles, DoorOpen, X, GripVertical, ChevronDown, Printer, Pencil } from "lucide-react";
+import { useDoneLast } from "../lib/doneLast";
 import { supabase } from "../lib/supabase";
 import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
@@ -355,7 +356,21 @@ function RoomSection({
       localStorage.setItem(storageKey, c ? "0" : "1");
       return !c;
     });
-  const dr = useDragReorder(tasks, onReorder);
+  const listRef = useRef<HTMLDivElement>(null);
+  const doneLast = useDoneLast(listRef);
+  const shown = useMemo(() => doneLast.sort(tasks, (t) => t.id, (t) => doneIds.has(t.id)), [tasks, doneIds, doneLast.sort]);
+  // Ticks reset every week/month but the order is for good, so a drag made while
+  // some tasks sit at the bottom as done must not file them there permanently:
+  // the open tasks take the new order and the done ones keep the slots they had.
+  const commitOrder = useCallback(
+    (ids: string[]) => {
+      const open = ids.filter((id) => !doneIds.has(id));
+      let next = 0;
+      onReorder(tasks.map((t) => (doneIds.has(t.id) ? t.id : open[next++])));
+    },
+    [tasks, doneIds, onReorder],
+  );
+  const dr = useDragReorder(shown, commitOrder);
   const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   const submit = () => {
     onAddTask(title);
@@ -439,12 +454,13 @@ function RoomSection({
       )}
 
       <Collapse open={!collapsed}>
+        <div ref={listRef} style={{ display: "contents" }}>
         {dr.order.map((id) => {
         const t = byId.get(id);
         if (!t) return null;
         const isDone = doneIds.has(t.id);
         return (
-          <div key={t.id} className="nst-line" ref={dr.setItemRef(t.id)} style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 44, opacity: isDone ? 0.55 : 1, ...dr.itemStyle(t.id) }}>
+          <div key={t.id} className="nst-line" data-flip={t.id} ref={dr.setItemRef(t.id)} style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 44, opacity: isDone ? 0.55 : 1, ...dr.itemStyle(t.id) }}>
             {editingTask === t.id ? (
               <>
                 <input
@@ -478,7 +494,13 @@ function RoomSection({
                     <GripVertical size={17} />
                   </span>
                 )}
-                <button className={`nst-check ${isDone ? "on" : ""}`} onClick={() => onToggle(t)}>
+                <button
+                  className={`nst-check ${isDone ? "on" : ""}`}
+                  onClick={() => {
+                    doneLast.ticked(t.id, isDone);
+                    onToggle(t);
+                  }}
+                >
                   <Check size={14} />
                 </button>
                 <span
@@ -511,6 +533,7 @@ function RoomSection({
           </div>
         );
         })}
+        </div>
 
         <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
           <input style={{ flex: 1 }} placeholder="הוספת משימה…" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
