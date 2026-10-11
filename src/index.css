@@ -307,10 +307,12 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
   transition: transform var(--spring-settle-dur) var(--spring-settle), opacity 150ms var(--ease-out);
   will-change: transform;
 }
-.nst-daypick { display: flex; align-items: stretch; gap: 8px; }
-.nst-day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px; min-height: var(--tap); border-radius: var(--radius-sm); border: none; background: var(--surface-2); color: var(--text-3); cursor: pointer; }
+/* Seven days and two arrows have to fit a 320pt phone even in a week of
+   two-digit dates, so the days may shrink below their content and close up. */
+.nst-daypick { display: flex; align-items: stretch; gap: clamp(3px, 1.6vw, 8px); min-width: 0; }
+.nst-day { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px; min-height: var(--tap); border-radius: var(--radius-sm); border: none; background: var(--surface-2); color: var(--text-3); cursor: pointer; }
 .nst-day .dow { font: 500 var(--t-caption) var(--font-body); letter-spacing: 0; }
-.nst-day .dnum { font: 600 var(--t-headline) var(--font-display); color: var(--text-2); }
+.nst-day .dnum { font: 600 var(--t-headline) var(--font-display); font-size: min(var(--t-headline), 4.6vw); color: var(--text-2); font-variant-numeric: tabular-nums; }
 .nst-day.today { box-shadow: inset 0 0 0 2px var(--accent); }
 .nst-day.today .dnum { color: var(--accent-ink); }
 .nst-day.sel { background: var(--accent); }
@@ -366,6 +368,13 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .shop-row { flex-wrap: wrap; row-gap: 8px; }
 .shop-row > .shop-row-text { flex: 1 1 110px; min-width: 0; }
 .shop-row > .shop-row-ctrl { display: flex; align-items: center; gap: 12px; flex: none; margin-inline-start: auto; }
+
+/* A small heading inside a card, over a sub-list ("בלוז" on the Tasks page). */
+.nst-subhead { display: flex; align-items: center; gap: 6px; font: 600 var(--t-footnote) var(--font-body); color: var(--text-3); padding-top: 4px; }
+/* A schedule task shown on the Tasks page: tick it here, tap it to open its day. */
+.nst-sched-row { display: flex; align-items: center; gap: 8px; }
+.nst-sched-open { flex: 1; min-width: 0; padding: 0; border: none; background: transparent; text-align: right; cursor: pointer; color: inherit; }
+.nst-sched-open p { overflow-wrap: anywhere; }
 
 /* Cleaning room header: content-sized, so a short name stays on one line with
    its controls and only a long one sends them to the next line. */

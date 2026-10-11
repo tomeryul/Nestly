@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Plus, Trash2, ChevronRight, ChevronLeft, Check, Clock, Repeat, X, CalendarDays, ListChecks, Pencil, GripVertical, Library, History } from "lucide-react";
 import { useDoneLast } from "../lib/doneLast";
+import { useLocation } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
 import { DAYS_HE, DAYS_HE_SHORT, TASK_CATEGORIES, type TaskCategory } from "../lib/constants";
-import { addDays, carriedLabel, formatTime, isToday, startOfWeek, toISODate, weekDates } from "../lib/dates";
+import { addDays, carriedLabel, formatTime, isToday, parseISODate, startOfWeek, toISODate, weekDates } from "../lib/dates";
 import { reinsert, removeWithUndo } from "../lib/undo";
 import { bgWrite, newId } from "../lib/optimistic";
 import { useDragReorder } from "../lib/dragReorder";
@@ -18,8 +19,10 @@ type RecurringTask = Tables<"recurring_tasks">;
 
 export default function Schedule() {
   const { homeId, members } = useHome();
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
-  const [selected, setSelected] = useState(() => new Date());
+  // Other screens can open the schedule on a given day (navigate state { date }).
+  const opened = (useLocation().state as { date?: string } | null)?.date;
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(opened ? parseISODate(opened) : new Date()));
+  const [selected, setSelected] = useState(() => (opened ? parseISODate(opened) : new Date()));
   const [tasks, setTasks] = useState<Task[]>([]);
   const [subCounts, setSubCounts] = useState<Record<string, { done: number; total: number }>>({});
   const [loading, setLoading] = useState(true);

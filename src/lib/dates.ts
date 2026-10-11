@@ -69,3 +69,14 @@ export function carriedLabel(carriedFrom: string | null, scheduled: string): str
   if (days < 7) return `מיום ${DAYS_HE[from.getDay()]}`;
   return `מ־${formatDayMonth(from)}`;
 }
+
+/** When a scheduled task is, in a few words: "היום · 18:00", "מחר", "יום חמישי · 09:00", "24/10". */
+export function dayLabel(iso: string, time?: string | null, today = toISODate(new Date())): string {
+  const at = time ? ` · ${formatTime(time)}` : "";
+  if (iso === today) return `היום${at}`;
+  const d = parseISODate(iso);
+  const days = Math.round((d.getTime() - parseISODate(today).getTime()) / 86400000);
+  if (days === 1) return `מחר${at}`;
+  if (days > 1 && days < 7) return `יום ${DAYS_HE[d.getDay()]}${at}`;
+  return `${formatDayMonth(d)}${at}`;
+}
