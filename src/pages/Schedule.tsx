@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { Plus, Trash2, ChevronRight, ChevronLeft, Check, Clock, Repeat, X, CalendarDays, ListChecks, Pencil, GripVertical, Library } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronLeft, Check, Clock, Repeat, X, CalendarDays, ListChecks, Pencil, GripVertical, Library, History } from "lucide-react";
 import { useDoneLast } from "../lib/doneLast";
 import { supabase } from "../lib/supabase";
 import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
@@ -7,7 +7,7 @@ import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
 import { DAYS_HE, DAYS_HE_SHORT, TASK_CATEGORIES, type TaskCategory } from "../lib/constants";
-import { addDays, formatTime, isToday, startOfWeek, toISODate, weekDates } from "../lib/dates";
+import { addDays, carriedLabel, formatTime, isToday, startOfWeek, toISODate, weekDates } from "../lib/dates";
 import { reinsert, removeWithUndo } from "../lib/undo";
 import { bgWrite, newId } from "../lib/optimistic";
 import { useDragReorder } from "../lib/dragReorder";
@@ -192,6 +192,7 @@ export default function Schedule() {
             if (!t) return null;
             const cat = TASK_CATEGORIES[t.category as TaskCategory] ?? TASK_CATEGORIES.general;
             const who = nameFor(t.assigned_to);
+            const carried = carriedLabel(t.carried_from, t.scheduled_date);
             return (
               <div className="task-item" key={t.id} data-flip={t.id} ref={dr.setItemRef(t.id)} style={{ opacity: t.is_done ? 0.55 : 1, ...dr.itemStyle(t.id) }}>
                 {dayTasks.length > 1 && (
@@ -209,6 +210,11 @@ export default function Schedule() {
                 >
                   <p style={{ font: "400 17px var(--font-body)", color: "var(--text-bright)", textDecoration: t.is_done ? "line-through" : "none" }}>{t.title}</p>
                   <div className="nst-meta" style={{ marginTop: 3 }}>
+                    {carried && (
+                      <span className="nst-tag nst-tag-carried" title="לא סומנה כבוצעה, אז עברה להיום">
+                        <History /> {carried}
+                      </span>
+                    )}
                     {t.start_time && (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
                         <Clock size={12} />
@@ -526,7 +532,9 @@ function TaskModal({ homeId, dateIso, initial, positionFor, templates, onClose, 
   const save = async () => {
     if (!title.trim()) return;
     if (initial) {
-      await supabase.from("schedule_tasks").update({ title: title.trim(), scheduled_date: date, start_time: start || null, end_time: end || null, category, assigned_to: assigned || null }).eq("id", initial.id);
+      // Moving it to a day by hand is a fresh plan, not a carry-over any more.
+      const replanned = date !== initial.scheduled_date ? { carried_from: null } : {};
+      await supabase.from("schedule_tasks").update({ title: title.trim(), scheduled_date: date, start_time: start || null, end_time: end || null, category, assigned_to: assigned || null, ...replanned }).eq("id", initial.id);
     } else {
       await supabase.from("schedule_tasks").insert({ home_id: homeId, title: title.trim(), scheduled_date: date, start_time: start || null, end_time: end || null, category, assigned_to: assigned || null, position: positionFor(date), created_by: user?.id ?? null });
     }

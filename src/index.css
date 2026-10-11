@@ -36,6 +36,7 @@
   --ok: #5a8a5e;
   --ok-soft: #d8e9d3;
   --warn: #b7821b;
+  --warn-ink: #7a5408;   /* amber text on --warn-soft: 5.4:1, where --warn itself is 2.7:1 */
   --warn-soft: #f3e4c0;
   --danger: #b85544;
   --danger-soft: #f3d8d1;
@@ -116,7 +117,7 @@
   --border: #2c2823; --border-2: #423d34; --hover: #25221e; --sep: rgba(235, 235, 245, 0.16); --sep-strong: rgba(235, 235, 245, 0.2);
   --text: #d6cfbf; --text-bright: #f0e7d2; --text-2: #b0a895; --text-3: #989182; --text-muted: #918874; --text-faint: #6c6152;
   --accent: #8fbf86; --accent-hover: #a5d09a; --accent-soft: #2a3826; --accent-ink: #b8d8af; --on-accent: #10180f;
-  --ok: #8fbf86; --ok-soft: #2a3826; --warn: #d4a85e; --warn-soft: #3a2d18; --danger: #e08778; --danger-soft: #3b1f1a; --info: #7fa9c8; --info-soft: #1b2c39;
+  --ok: #8fbf86; --ok-soft: #2a3826; --warn: #d4a85e; --warn-soft: #3a2d18; --warn-ink: #d4a85e; --danger: #e08778; --danger-soft: #3b1f1a; --info: #7fa9c8; --info-soft: #1b2c39;
   --cat-1-bg: #314030; --cat-1-fg: #b9d6ad; --cat-2-bg: #443a1e; --cat-2-fg: #ead8a0; --cat-3-bg: #443122; --cat-3-fg: #e8c4a4; --cat-4-bg: #432a2a; --cat-4-fg: #ecbaba;
   --cat-5-bg: #322a48; --cat-5-fg: #ccc0e8; --cat-6-bg: #243a34; --cat-6-fg: #b4dcc9; --cat-7-bg: #243343; --cat-7-fg: #b6cfe4; --cat-8-bg: #3a342a; --cat-8-fg: #d8cdb4;
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.3); --shadow: 0 2px 8px rgba(0,0,0,0.35), 0 8px 20px -10px rgba(0,0,0,0.4); --shadow-lg: 0 10px 32px -16px rgba(0,0,0,0.6);
@@ -289,6 +290,8 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
   /* A badge stays one line; a long custom category gives way at its end. */
   white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .nst-tag svg { flex: none; }
+/* A task that wasn't ticked and was carried over to today says where it came from. */
+.nst-tag-carried { background: var(--warn-soft); color: var(--warn-ink); font-weight: 600; }
 .nst-tag svg { width: 11px; height: 11px; }
 .nst-seg { position: relative; display: flex; gap: 2px; background: var(--surface-3); padding: 2px; border-radius: var(--r-capsule); }
 .nst-seg button { flex: 1; min-height: 32px; padding: 7px 10px; border: none; background: transparent; color: var(--text-2); font: 500 var(--t-subhead) var(--font-body); border-radius: var(--r-capsule); cursor: pointer; }

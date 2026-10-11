@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState, type CSSProperties, useRef } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { ShoppingCart, ChefHat, CalendarDays, Users, BellRing, Check, Clock, Sparkles } from "lucide-react";
+import { ShoppingCart, ChefHat, CalendarDays, Users, BellRing, Check, Clock, Sparkles, History } from "lucide-react";
 import { useDoneLast } from "../lib/doneLast";
 import { bgWrite } from "../lib/optimistic";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { AREAS, DAYS_HE, TASK_CATEGORIES, type AreaKey, type TaskCategory } from "../lib/constants";
-import { formatTime, toISODate, startOfWeek } from "../lib/dates";
+import { carriedLabel, formatTime, toISODate, startOfWeek } from "../lib/dates";
 import { periodKeyFor } from "./Cleaning";
 import { enablePush, pushEnabled, pushSupported } from "../lib/push";
 import { readCache, useOnResume, writeCache } from "../lib/cache";
@@ -179,6 +179,7 @@ export default function Dashboard() {
           <div className="nst-group" ref={listRef}>
             {doneLast.sort(todayTasks, (t) => t.id, (t) => t.is_done).map((t) => {
               const cat = TASK_CATEGORIES[t.category as TaskCategory] ?? TASK_CATEGORIES.general;
+              const carried = carriedLabel(t.carried_from, t.scheduled_date);
               return (
                 <div className="task-item" key={t.id} data-flip={t.id} style={{ opacity: t.is_done ? 0.55 : 1 }}>
                   <span style={{ width: 5, height: 34, borderRadius: 5, background: t.color ?? cat.color, flex: "none" }} />
@@ -188,6 +189,11 @@ export default function Dashboard() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ font: "400 17px var(--font-body)", color: "var(--text-bright)", textDecoration: t.is_done ? "line-through" : "none" }}>{t.title}</p>
                     <div className="nst-meta" style={{ marginTop: 2 }}>
+                      {carried && (
+                        <span className="nst-tag nst-tag-carried" title="לא סומנה כבוצעה, אז עברה להיום">
+                          <History /> {carried}
+                        </span>
+                      )}
                       {t.start_time && (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
                           <Clock size={12} />

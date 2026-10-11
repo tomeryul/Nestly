@@ -1,3 +1,5 @@
+import { DAYS_HE } from "./constants";
+
 // Local-date helpers. Weeks start on Sunday to match Israeli convention and
 // Postgres extract(dow) (0 = Sunday).
 
@@ -53,4 +55,17 @@ export function formatRelative(iso: string): string {
   if (hr < 24) return `לפני ${hr} שע׳`;
   const days = Math.floor(hr / 24);
   return `לפני ${days} ימים`;
+}
+
+/**
+ * Where a carried-over task came from, as a short tag: "מאתמול", "מיום שלישי",
+ * or a date once it is a week or more behind. Null when it was not carried.
+ */
+export function carriedLabel(carriedFrom: string | null, scheduled: string): string | null {
+  if (!carriedFrom || carriedFrom >= scheduled) return null;
+  const from = parseISODate(carriedFrom);
+  const days = Math.round((parseISODate(scheduled).getTime() - from.getTime()) / 86400000);
+  if (days === 1) return "מאתמול";
+  if (days < 7) return `מיום ${DAYS_HE[from.getDay()]}`;
+  return `מ־${formatDayMonth(from)}`;
 }

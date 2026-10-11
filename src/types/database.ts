@@ -531,6 +531,7 @@ export type Database = {
       schedule_tasks: {
         Row: {
           assigned_to: string | null
+          carried_from: string | null
           category: string
           color: string | null
           created_at: string
@@ -549,6 +550,7 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          carried_from?: string | null
           category?: string
           color?: string | null
           created_at?: string
@@ -567,6 +569,7 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          carried_from?: string | null
           category?: string
           color?: string | null
           created_at?: string
