@@ -375,6 +375,8 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .nst-sched-row { display: flex; align-items: center; gap: 8px; }
 .nst-sched-open { flex: 1; min-width: 0; padding: 0; border: none; background: transparent; text-align: right; cursor: pointer; color: inherit; }
 .nst-sched-open p { overflow-wrap: anywhere; }
+/* The "בלוז · מחר 09:00" line under a task that is also on the schedule — tap to change it. */
+.nst-on-schedule { margin-top: 4px; padding: 0; border: none; background: transparent; cursor: pointer; }
 
 /* Cleaning room header: content-sized, so a short name stays on one line with
    its controls and only a long one sends them to the next line. */

@@ -29,6 +29,10 @@ export function AppToaster() {
           "--normal-border": "var(--glass-edge)",
           "--normal-text": "var(--text-bright)",
           "--border-radius": "22px",
+          // Above the tab bar (80) and the menu (100), under a sheet (200): a
+          // sheet is modal, and a toast left over from the last action must not
+          // sit on the field you are filling in.
+          zIndex: 150,
         } as CSSProperties
       }
       toastOptions={{

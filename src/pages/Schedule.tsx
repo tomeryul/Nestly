@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { Plus, Trash2, ChevronRight, ChevronLeft, Check, Clock, Repeat, X, CalendarDays, ListChecks, Pencil, GripVertical, Library, History } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronLeft, Check, Clock, Repeat, X, CalendarDays, ListChecks, Pencil, GripVertical, Library, History, ListTodo } from "lucide-react";
 import { useDoneLast } from "../lib/doneLast";
 import { useLocation } from "react-router-dom";
 import { supabase } from "../lib/supabase";
@@ -223,6 +223,11 @@ export default function Schedule() {
                         <Clock size={12} />
                         {formatTime(t.start_time)}
                         {t.end_time && `–${formatTime(t.end_time)}`}
+                      </span>
+                    )}
+                    {t.personal_task_id && (
+                      <span className="nst-tag" title="גם ברשימת המשימות — סימון כאן מסמן גם שם">
+                        <ListTodo /> גם במשימות
                       </span>
                     )}
                     <span className="nst-tag" style={{ color: cat.color, background: cat.color + "1f" }}>{cat.label}</span>

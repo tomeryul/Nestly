@@ -27,9 +27,13 @@ export default function Personal() {
   const [tasks, setTasks] = useState<PTask[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  // Schedule tasks assigned to someone show in that person's section too: today's
-  // (ticked or not — a tick sinks it rather than making it vanish) and every
-  // unfinished one still ahead. One row, read from the schedule — no copy to sync.
+  // Two kinds of schedule rows matter here:
+  //  * ones assigned to someone, shown in that person's section under "בלוז" —
+  //    today's (ticked or not: a tick sinks it, it doesn't vanish) and every
+  //    unfinished one ahead; the same row as the schedule's, so a tick is shared;
+  //  * ones linked to a task on this page (personal_task_id): the task stays in
+  //    its list and the schedule holds a twin, kept in step by the database —
+  //    tick or rename either and the other follows.
   const [sched, setSched] = useState<STask[]>([]);
   const [schedFor, setSchedFor] = useState<PTask | null>(null);
 
@@ -56,7 +60,7 @@ export default function Personal() {
       .from("schedule_tasks")
       .select("*")
       .eq("home_id", homeId)
-      .not("assigned_to", "is", null)
+      .or("assigned_to.not.is.null,personal_task_id.not.is.null")
       .gte("scheduled_date", today)
       .order("scheduled_date")
       .limit(300);
@@ -75,48 +79,65 @@ export default function Personal() {
     bgWrite(supabase.from("schedule_tasks").update({ is_done: !s.is_done }).eq("id", s.id), loadSched);
   };
 
+  /** Schedule twins by the task they belong to. */
+  const linked = useMemo(() => new Map(sched.filter((s) => s.personal_task_id).map((s) => [s.personal_task_id!, s])), [sched]);
+
   /**
-   * A task given a day (and maybe a time) moves into the schedule as a real
-   * schedule task — reminders, carry-over and the home screen come with it —
-   * and, still assigned to its owner, keeps showing in their section here.
-   * Created first, then the original removed; if the removal is refused the new
-   * one is taken back out, so a task is never left in both places.
+   * Put a task on the schedule for a day (and maybe a time). The task stays in
+   * its list; the schedule gets a linked twin — assigned to the task's owner,
+   * with reminders and carry-over like any schedule task. Asked again for a
+   * task that is already on, it moves the twin to the new day/time instead.
    */
-  const moveToSchedule = async (t: PTask, date: string, time: string | null) => {
+  const putOnSchedule = async (t: PTask, date: string, time: string | null) => {
     if (!homeId) return;
     setSchedFor(null);
-    const today = toISODate(new Date());
+    const twin = linked.get(t.id);
+    const when = dayLabel(date, time);
+    const action = { label: "ללוז", onClick: () => navigate("/schedule", { state: { date } }) };
+    if (twin) {
+      const patch = { scheduled_date: date, start_time: time, carried_from: null, reminded: false };
+      setSched((prev) => prev.map((x) => (x.id === twin.id ? { ...x, ...patch } : x)).sort(bySchedule));
+      const { error } = await supabase.from("schedule_tasks").update(patch).eq("id", twin.id);
+      if (error) {
+        toast.error("לא הצלחנו לעדכן בלוז");
+        loadSched();
+      } else toast.success("עודכן בלוז", { description: `${t.title} · ${when}`, action });
+      return;
+    }
     const row: STask = {
       id: newId(), home_id: homeId, title: t.title, description: null, category: "general",
       scheduled_date: date, start_time: time, end_time: null,
       assigned_to: t.scope === "personal" ? t.owner_id : null, is_done: t.is_done, color: null,
-      recurring_id: null, reminded: false, position: 0, carried_from: null,
+      recurring_id: null, reminded: false, position: 0, carried_from: null, personal_task_id: t.id,
       created_by: user?.id ?? null, created_at: new Date().toISOString(),
     };
-    setTasks((prev) => prev.filter((x) => x.id !== t.id));
-    if (row.assigned_to && date >= today) setSched((prev) => [...prev, row].sort(bySchedule));
-    try {
-      // The schedule's own rule: an untouched day stays in time order (0); a day
-      // someone has reordered takes the new task at the end.
-      const { data: top } = await supabase.from("schedule_tasks").select("position").eq("home_id", homeId).eq("scheduled_date", date).order("position", { ascending: false }).limit(1);
-      const max = top?.[0]?.position ?? 0;
-      const ins = await supabase.from("schedule_tasks").insert({ ...row, position: max === 0 ? 0 : max + 1 });
-      if (ins.error) throw ins.error;
-      const del = await supabase.from("personal_tasks").delete().eq("id", t.id).select("id");
-      if (del.error || !del.data?.length) {
-        await supabase.from("schedule_tasks").delete().eq("id", row.id);
-        throw del.error ?? new Error("not allowed to remove the task from this list");
-      }
-      toast.success("עבר ללוז", {
-        description: `${t.title} · ${dayLabel(date, time)}`,
-        action: { label: "ללוז", onClick: () => navigate("/schedule", { state: { date } }) },
-      });
-    } catch (e) {
-      console.error("[nestly] move to schedule failed", e);
-      toast.error("לא הצלחנו להעביר ללוז", { description: "המשימה נשארה ברשימה." });
-      load();
+    setSched((prev) => [...prev, row].sort(bySchedule));
+    // The schedule's own rule: an untouched day stays in time order (0); a day
+    // someone has reordered takes the new task at the end.
+    const { data: top } = await supabase.from("schedule_tasks").select("position").eq("home_id", homeId).eq("scheduled_date", date).order("position", { ascending: false }).limit(1);
+    const max = top?.[0]?.position ?? 0;
+    const { error } = await supabase.from("schedule_tasks").insert({ ...row, position: max === 0 ? 0 : max + 1 });
+    if (error) {
+      console.error("[nestly] put on schedule failed", error);
+      toast.error("לא הצלחנו להוסיף ללוז");
       loadSched();
-    }
+    } else toast.success("נוסף ללוז", { description: `${t.title} · ${when}`, action });
+  };
+
+  /** Take a task's twin off the schedule; the task itself stays. Undoable. */
+  const takeOffSchedule = (t: PTask) => {
+    const twin = linked.get(t.id);
+    setSchedFor(null);
+    if (!twin) return;
+    setSched((prev) => prev.filter((x) => x.id !== twin.id));
+    removeWithUndo({
+      message: "הוסר מהלוז",
+      description: t.title,
+      remove: () => supabase.from("schedule_tasks").delete().eq("id", twin.id),
+      undoLocal: () => setSched((prev) => reinsert(prev, [twin]).sort(bySchedule)),
+      restore: () => supabase.from("schedule_tasks").insert(twin),
+      reload: loadSched,
+    });
   };
   const openDay = (date: string) => navigate("/schedule", { state: { date } });
 
@@ -133,19 +154,30 @@ export default function Personal() {
   };
   const toggle = (t: PTask) => {
     setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, is_done: !x.is_done } : x)));
+    setSched((prev) => prev.map((x) => (x.personal_task_id === t.id ? { ...x, is_done: !t.is_done } : x)));
     bgWrite(supabase.from("personal_tasks").update({ is_done: !t.is_done }).eq("id", t.id), load);
   };
   const remove = (id: string) => {
     const at = tasks.findIndex((x) => x.id === id);
     const row = tasks[at];
     if (!row) return;
+    // A twin on the schedule outlives the task (the database clears its link),
+    // so Undo has to link it back as well as restore the task.
+    const twin = linked.get(id);
     setTasks((prev) => prev.filter((x) => x.id !== id));
+    if (twin) setSched((prev) => prev.map((x) => (x.id === twin.id ? { ...x, personal_task_id: null } : x)));
     removeWithUndo({
       message: "המשימה נמחקה",
       description: row.title,
       remove: () => supabase.from("personal_tasks").delete().eq("id", id),
-      undoLocal: () => setTasks((prev) => reinsert(prev, [row], at)),
-      restore: () => supabase.from("personal_tasks").insert(row),
+      undoLocal: () => {
+        setTasks((prev) => reinsert(prev, [row], at));
+        if (twin) setSched((prev) => prev.map((x) => (x.id === twin.id ? { ...x, personal_task_id: id } : x)));
+      },
+      restore: async () => {
+        const r = await supabase.from("personal_tasks").insert(row);
+        return r.error || !twin ? r : supabase.from("schedule_tasks").update({ personal_task_id: id }).eq("id", twin.id);
+      },
       reload: load,
     });
   };
@@ -153,6 +185,7 @@ export default function Personal() {
     const n = title.trim();
     if (!n) return;
     setTasks((prev) => prev.map((x) => (x.id === id ? { ...x, title: n } : x)));
+    setSched((prev) => prev.map((x) => (x.personal_task_id === id ? { ...x, title: n } : x)));
     bgWrite(supabase.from("personal_tasks").update({ title: n }).eq("id", id), load);
   };
   const reorder = useCallback(
@@ -166,6 +199,7 @@ export default function Personal() {
   if (loading) return <FullPageSpinner />;
 
   const general = tasks.filter((t) => t.scope === "general");
+  const taskIds = new Set(tasks.map((t) => t.id));
   // Members sorted with me first.
   const ordered = [...members].sort((a, b) => (a.user_id === user?.id ? -1 : b.user_id === user?.id ? 1 : 0));
 
@@ -183,10 +217,11 @@ export default function Personal() {
             icon={<User />}
             hint={mine ? "כל בני הבית יכולים להוסיף לך משימות. רק אתה יכול למחוק." : "אפשר להוסיף כאן משימה — אך רק בעל הרשימה יכול למחוק."}
             tasks={tasks.filter((t) => t.scope === "personal" && t.owner_id === m.user_id)}
-            scheduled={sched.filter((s) => s.assigned_to === m.user_id)}
+            scheduled={sched.filter((s) => s.assigned_to === m.user_id && !(s.personal_task_id && taskIds.has(s.personal_task_id)))}
+            linked={linked}
             onToggleScheduled={toggleScheduled}
             onOpenDay={openDay}
-            onSchedule={mine ? setSchedFor : undefined}
+            onSchedule={setSchedFor}
             canDelete={mine}
             onAdd={(v) => add("personal", m.user_id, v)}
             onToggle={toggle}
@@ -203,6 +238,7 @@ export default function Personal() {
         hint="משותפות לכל הבית — לא בהכרח קשורות לבית."
         tasks={general}
         scheduled={[]}
+        linked={linked}
         onToggleScheduled={toggleScheduled}
         onOpenDay={openDay}
         onSchedule={setSchedFor}
@@ -217,37 +253,38 @@ export default function Personal() {
       {schedFor && (
         <ScheduleSheet
           task={schedFor}
-          ownerName={schedFor.scope === "personal" ? members.find((m) => m.user_id === schedFor.owner_id)?.profile?.display_name ?? null : null}
+          twin={linked.get(schedFor.id) ?? null}
           onClose={() => setSchedFor(null)}
-          onSave={(date, time) => moveToSchedule(schedFor, date, time)}
+          onSave={(date, time) => putOnSchedule(schedFor, date, time)}
+          onTakeOff={() => takeOffSchedule(schedFor)}
         />
       )}
     </section>
   );
 }
 
-/** Give a task a day (and optionally a time) — it moves into the schedule. */
+/** Put a task on the schedule for a day (and optionally a time) — or move or remove it there. */
 function ScheduleSheet({
   task,
-  ownerName,
+  twin,
   onClose,
   onSave,
+  onTakeOff,
 }: {
   task: PTask;
-  ownerName: string | null;
+  twin: STask | null;
   onClose: () => void;
   onSave: (date: string, time: string | null) => void;
+  onTakeOff: () => void;
 }) {
-  const [date, setDate] = useState(() => toISODate(new Date()));
-  const [time, setTime] = useState("");
+  const [date, setDate] = useState(() => twin?.scheduled_date ?? toISODate(new Date()));
+  const [time, setTime] = useState(() => twin?.start_time?.slice(0, 5) ?? "");
   return (
-    <Modal open onClose={onClose} title="העברה ללוז" done={{ label: "העברה", onClick: () => onSave(date, time || null), disabled: !date }}>
+    <Modal open onClose={onClose} title="בלוז" done={{ label: twin ? "עדכון" : "הוספה", onClick: () => onSave(date, time || null), disabled: !date }}>
       <div className="nst-fields">
         <p style={{ font: "600 var(--t-headline) var(--font-body)", color: "var(--text-bright)", overflowWrap: "anywhere" }}>{task.title}</p>
         <p className="section-sub" style={{ marginTop: -6 }}>
-          {ownerName
-            ? `המשימה תעבור ללוז של היום שתבחרו, ותמשיך להופיע כאן ברשימה של ${ownerName}.`
-            : "המשימה תעבור ללוז של היום שתבחרו."}
+          המשימה תופיע גם בלוז של היום שתבחרו, ותישאר גם כאן. סימון באחד המקומות מסמן גם בשני.
         </p>
         <div>
           <label>תאריך</label>
@@ -257,6 +294,11 @@ function ScheduleSheet({
           <label>שעה (לא חובה — עם שעה תגיע גם תזכורת)</label>
           <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
         </div>
+        {twin && (
+          <button className="btn btn-block" style={{ color: "var(--danger)" }} onClick={onTakeOff}>
+            הסרה מהלוז
+          </button>
+        )}
       </div>
     </Modal>
   );
@@ -268,6 +310,7 @@ function Section({
   hint,
   tasks,
   scheduled,
+  linked,
   onToggleScheduled,
   onOpenDay,
   onSchedule,
@@ -284,10 +327,12 @@ function Section({
   tasks: PTask[];
   /** Schedule tasks assigned to this section's person. */
   scheduled: STask[];
+  /** Schedule twins of tasks, by task id. */
+  linked: Map<string, STask>;
   onToggleScheduled: (s: STask) => void;
   onOpenDay: (date: string) => void;
-  /** Present when this list's tasks may be moved into the schedule from here. */
-  onSchedule?: (t: PTask) => void;
+  /** Put a task on the schedule (or change / remove its time there). */
+  onSchedule: (t: PTask) => void;
   canDelete: boolean;
   onAdd: (v: string) => void;
   onToggle: (t: PTask) => void;
@@ -371,14 +416,28 @@ function Section({
                     >
                       <Check size={14} />
                     </button>
-                    <span
-                      onClick={() => startEdit(t)}
-                      style={{ flex: 1, font: "400 17px var(--font-body)", color: "var(--text-bright)", textDecoration: t.is_done ? "line-through" : "none", cursor: "pointer" }}
-                    >
-                      {t.title}
-                    </span>
-                    {onSchedule && !t.is_done && (
-                      <button className="nst-del" onClick={() => onSchedule(t)} title="העברה ללוז" aria-label="העברה ללוז">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span
+                        onClick={() => startEdit(t)}
+                        style={{ display: "block", font: "400 17px var(--font-body)", color: "var(--text-bright)", textDecoration: t.is_done ? "line-through" : "none", cursor: "pointer", overflowWrap: "anywhere" }}
+                      >
+                        {t.title}
+                      </span>
+                      {linked.get(t.id) && (
+                        <button className="nst-meta nst-on-schedule" onClick={() => onSchedule(t)} title="שינוי המועד בלוז">
+                          <span className="nst-tag">
+                            <CalendarDays /> בלוז · {dayLabel(linked.get(t.id)!.scheduled_date, linked.get(t.id)!.start_time)}
+                          </span>
+                          {carriedLabel(linked.get(t.id)!.carried_from, linked.get(t.id)!.scheduled_date) && (
+                            <span className="nst-tag nst-tag-carried">
+                              <History /> {carriedLabel(linked.get(t.id)!.carried_from, linked.get(t.id)!.scheduled_date)}
+                            </span>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    {!t.is_done && !linked.get(t.id) && (
+                      <button className="nst-del" onClick={() => onSchedule(t)} title="הוספה ללוז" aria-label="הוספה ללוז">
                         <CalendarClock size={16} />
                       </button>
                     )}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type CSSProperties, useRef } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { ShoppingCart, ChefHat, CalendarDays, Users, BellRing, Check, Clock, Sparkles, History } from "lucide-react";
+import { ShoppingCart, ChefHat, CalendarDays, Users, BellRing, Check, Clock, Sparkles, History, ListTodo } from "lucide-react";
 import { useDoneLast } from "../lib/doneLast";
 import { bgWrite } from "../lib/optimistic";
 import { supabase } from "../lib/supabase";
@@ -198,6 +198,11 @@ export default function Dashboard() {
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
                           <Clock size={12} />
                           {formatTime(t.start_time)}
+                        </span>
+                      )}
+                      {t.personal_task_id && (
+                        <span className="nst-tag" title="גם ברשימת המשימות — סימון כאן מסמן גם שם">
+                          <ListTodo /> גם במשימות
                         </span>
                       )}
                       <span className="nst-tag" style={{ color: cat.color, background: cat.color + "1f" }}>{cat.label}</span>

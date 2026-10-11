@@ -541,6 +541,7 @@ export type Database = {
           home_id: string
           id: string
           is_done: boolean
+          personal_task_id: string | null
           position: number
           recurring_id: string | null
           reminded: boolean
@@ -560,6 +561,7 @@ export type Database = {
           home_id: string
           id?: string
           is_done?: boolean
+          personal_task_id?: string | null
           position?: number
           recurring_id?: string | null
           reminded?: boolean
@@ -579,6 +581,7 @@ export type Database = {
           home_id?: string
           id?: string
           is_done?: boolean
+          personal_task_id?: string | null
           position?: number
           recurring_id?: string | null
           reminded?: boolean
