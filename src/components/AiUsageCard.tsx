@@ -7,7 +7,9 @@ import { useHome } from "../context/HomeContext";
 import { Modal } from "./ui";
 
 type Totals = { requests: number; input: number; output: number; cost: number; byAction: Record<string, number> };
-type Usage = { month: Totals; all: Totals; sinceBalance: Totals | null; balance: number | null; balanceAt: string | null };
+// countingSince: the ledger's first row. Requests before it (before the ledger
+// existed) were never recorded, so "everything" only means everything since then.
+type Usage = { month: Totals; all: Totals; sinceBalance: Totals | null; balance: number | null; balanceAt: string | null; countingSince?: string | null };
 
 const FEATURES: Record<string, string> = {
   quick_add: "הוספה מהירה",
@@ -70,12 +72,20 @@ export default function AiUsageCard() {
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       const { data: home, error } = await supabase.from("homes").select("ai_balance_usd, ai_balance_at").eq("id", homeId).single();
       if (error) throw error;
-      const [month, all, sinceBalance] = await Promise.all([
+      const [month, all, sinceBalance, first] = await Promise.all([
         totalsSince(homeId, monthStart),
         totalsSince(homeId, "2000-01-01T00:00:00Z"),
         home.ai_balance_at ? totalsSince(homeId, home.ai_balance_at) : Promise.resolve(null),
+        supabase.from("ai_usage").select("created_at").eq("home_id", homeId).order("created_at").limit(1),
       ]);
-      const next: Usage = { month, all, sinceBalance, balance: home.ai_balance_usd == null ? null : Number(home.ai_balance_usd), balanceAt: home.ai_balance_at };
+      const next: Usage = {
+        month,
+        all,
+        sinceBalance,
+        balance: home.ai_balance_usd == null ? null : Number(home.ai_balance_usd),
+        balanceAt: home.ai_balance_at,
+        countingSince: first.data?.[0]?.created_at ?? null,
+      };
       setUsage(next);
       setFailed(false);
       writeCache(key, next);
@@ -147,7 +157,7 @@ export default function AiUsageCard() {
               </div>
             )}
             <div>
-              <dt>מאז ההתחלה</dt>
+              <dt>{usage.countingSince ? `מאז ${shortDate(usage.countingSince)} (תחילת הספירה)` : "מאז תחילת הספירה"}</dt>
               <dd>
                 {usd(usage.all.cost)} · {usage.all.requests} בקשות · {tokens(usage.all.input + usage.all.output)} טוקנים
               </dd>
@@ -172,7 +182,7 @@ export default function AiUsageCard() {
             </button>
           )}
           <p className="section-sub" style={{ marginTop: 10 }}>
-            הסכומים מחושבים מכמות הטוקנים שכל בקשה צרכה, לפי המחיר של המודל. ״נשאר״ היא הערכה: היתרה האחרונה שהוזנה פחות מה ש-Nestly ניצלה מאז — שימוש אחר באותו מפתח לא נכלל.
+            כל בקשת AI נרשמת כאן אוטומטית, עם הטוקנים שצרכה ומחירם. הספירה התחילה עם הגרסה הזו — שימוש מלפני כן, ושימוש אחר באותו מפתח, מופיעים רק בקונסולה של Anthropic. ״נשאר״ היא הערכה: היתרה האחרונה שהוזנה מהקונסולה, פחות מה ש-Nestly ניצלה מאז.
           </p>
         </>
       )}
