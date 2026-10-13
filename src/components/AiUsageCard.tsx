@@ -18,6 +18,8 @@ const FEATURES: Record<string, string> = {
   breakdown: "פירוק משימה",
   menu: "תפריט שבועי",
   summary: "היום בקצרה",
+  // Requests made before the ledger existed, filled in afterwards from the server logs and the Console totals.
+  before_ledger: "לפני תחילת הספירה",
 };
 const CONSOLE_BILLING = "https://console.anthropic.com/settings/billing";
 
@@ -157,7 +159,7 @@ export default function AiUsageCard() {
               </div>
             )}
             <div>
-              <dt>{usage.countingSince ? `מאז ${shortDate(usage.countingSince)} (תחילת הספירה)` : "מאז תחילת הספירה"}</dt>
+              <dt>{usage.countingSince ? `מאז ${shortDate(usage.countingSince)}` : "מאז ההתחלה"}</dt>
               <dd>
                 {usd(usage.all.cost)} · {usage.all.requests} בקשות · {tokens(usage.all.input + usage.all.output)} טוקנים
               </dd>
@@ -182,7 +184,7 @@ export default function AiUsageCard() {
             </button>
           )}
           <p className="section-sub" style={{ marginTop: 10 }}>
-            כל בקשת AI נרשמת כאן אוטומטית, עם הטוקנים שצרכה ומחירם. הספירה התחילה עם הגרסה הזו — שימוש מלפני כן, ושימוש אחר באותו מפתח, מופיעים רק בקונסולה של Anthropic. ״נשאר״ היא הערכה: היתרה האחרונה שהוזנה מהקונסולה, פחות מה ש-Nestly ניצלה מאז.
+            כל בקשת AI נרשמת כאן אוטומטית, עם הטוקנים שצרכה ומחירם. שימוש באותו מפתח מחוץ ל-Nestly מופיע רק בקונסולה של Anthropic. ״נשאר״ היא הערכה: היתרה האחרונה שהוזנה מהקונסולה, פחות מה ש-Nestly ניצלה מאז.
           </p>
         </>
       )}
