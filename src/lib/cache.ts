@@ -45,8 +45,10 @@ export function clearCache() {
  * Run `refresh` when the app comes back to the foreground after being away for
  * a while — quietly, with no spinner — so data changed on another phone shows
  * up without re-mounting (and re-loading) the whole screen. A quick hop to
- * another app and back doesn't trigger it.
+ * another app and back doesn't trigger it. It also runs at once when
+ * `announceDataChanged()` says something outside the screen just wrote data.
  */
+const CHANGED = "nestly:data-changed";
 export function useOnResume(refresh: () => void, minAwayMs = 15000) {
   const cb = useRef(refresh);
   cb.current = refresh;
@@ -56,10 +58,22 @@ export function useOnResume(refresh: () => void, minAwayMs = 15000) {
       if (document.visibilityState === "hidden") hiddenAt = Date.now();
       else if (hiddenAt && Date.now() - hiddenAt >= minAwayMs) cb.current();
     };
+    const onAnnounce = () => cb.current();
     document.addEventListener("visibilitychange", onChange);
-    return () => document.removeEventListener("visibilitychange", onChange);
+    window.addEventListener(CHANGED, onAnnounce);
+    return () => {
+      document.removeEventListener("visibilitychange", onChange);
+      window.removeEventListener(CHANGED, onAnnounce);
+    };
   }, [minAwayMs]);
 }
+
+/**
+ * Something outside the open screen just wrote data it shows (quick add, say):
+ * every screen listening through useOnResume refreshes now instead of on its
+ * next resume.
+ */
+export const announceDataChanged = () => window.dispatchEvent(new Event(CHANGED));
 
 /**
  * Seed a screen from its device copy before it first paints (and again whenever

@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Home, ChevronDown, Moon, Sun, Menu } from "lucide-react";
+import { Home, ChevronDown, Moon, Sun, Menu, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -7,6 +7,7 @@ import NotificationBell from "./NotificationBell";
 import { isNight, onThemeChange, toggleNight } from "../lib/theme";
 import { NAV, BOTTOM_MAX, getBottomNav, setBottomNav, navItem } from "../lib/nav";
 import NavDrawer from "./NavDrawer";
+import QuickAdd from "./QuickAdd";
 import { useTabLens } from "../lib/tabLens";
 
 
@@ -16,6 +17,7 @@ export default function Layout() {
   const [switcher, setSwitcher] = useState(false);
   const [night, setNight] = useState(() => isNight());
   const [drawer, setDrawer] = useState(false);
+  const [quickAdd, setQuickAdd] = useState(false);
   const [bottom, setBottom] = useState<string[]>(() => getBottomNav());
   const navigate = useNavigate();
   const location = useLocation();
@@ -169,6 +171,9 @@ export default function Layout() {
             </div>
             {/* Related bar items share one piece of glass, as native bar buttons do. */}
             <div className="nst-bar-group nst-glass">
+              <button className="nst-iconbtn plain nst-quickadd" onClick={() => setQuickAdd(true)} title="הוספה מהירה" aria-label="הוספה מהירה">
+                <Sparkles />
+              </button>
               <button
                 className="nst-iconbtn plain"
                 onClick={() => setNight(toggleNight() === "garden-night")}
@@ -207,6 +212,8 @@ export default function Layout() {
           })}
         </div>
       </nav>
+
+      {quickAdd && <QuickAdd onClose={() => setQuickAdd(false)} />}
 
       {drawer && (
         <NavDrawer
