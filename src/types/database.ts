@@ -12,6 +12,12 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_usage: {
+        Row: { action: string; cost_usd: number; created_at: string; home_id: string; id: number; input_tokens: number; model: string; output_tokens: number; user_id: string | null }
+        Insert: { action: string; cost_usd?: number; created_at?: string; home_id: string; id?: never; input_tokens?: number; model: string; output_tokens?: number; user_id?: string | null }
+        Update: { action?: string; cost_usd?: number; created_at?: string; home_id?: string; id?: never; input_tokens?: number; model?: string; output_tokens?: number; user_id?: string | null }
+        Relationships: []
+      }
       dish_ingredients: {
         Row: {
           category: string | null
@@ -343,9 +349,9 @@ export type Database = {
         Relationships: []
       }
       homes: {
-        Row: { created_at: string; created_by: string; id: string; name: string }
-        Insert: { created_at?: string; created_by: string; id?: string; name: string }
-        Update: { created_at?: string; created_by?: string; id?: string; name?: string }
+        Row: { ai_balance_at: string | null; ai_balance_usd: number | null; created_at: string; created_by: string; id: string; name: string }
+        Insert: { ai_balance_at?: string | null; ai_balance_usd?: number | null; created_at?: string; created_by: string; id?: string; name: string }
+        Update: { ai_balance_at?: string | null; ai_balance_usd?: number | null; created_at?: string; created_by?: string; id?: string; name?: string }
         Relationships: []
       }
       notifications: {
@@ -872,6 +878,10 @@ export type Database = {
     Functions: {
       accept_invite: { Args: { invite_code: string }; Returns: string }
       add_meal_to_list: { Args: { list_id: string; meal_id: string }; Returns: undefined }
+      ai_usage_totals: {
+        Args: { p_home: string; p_since: string }
+        Returns: { action: string; requests: number; input_tokens: number; output_tokens: number; cost_usd: number }[]
+      }
       create_home: { Args: { home_name: string }; Returns: string }
       invite_preview: {
         Args: { invite_code: string }

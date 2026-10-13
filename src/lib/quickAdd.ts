@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { newId } from "./optimistic";
 import { callAi } from "./ai";
+import type { AiImage } from "./images";
 import type { Tables } from "../types/database";
 
 /** What the quick-add function understood from one sentence — a proposal, nothing written yet. */
@@ -11,9 +12,9 @@ export type QuickPlan = {
   unclear: string;
 };
 
-/** Ask the server (and Claude Haiku behind it) what the sentence means. */
-export const understand = (text: string, homeId: string, categories: string[]) =>
-  callAi<QuickPlan>("quick_add", homeId, { text, categories });
+/** Ask the server (and Claude Haiku behind it) what the sentence — and any pictures — mean. */
+export const understand = (text: string, homeId: string, categories: string[], images: AiImage[] = []) =>
+  callAi<QuickPlan>("quick_add", homeId, { text, categories, images: images.map(({ media_type, data }) => ({ media_type, data })) });
 
 /**
  * Write the parts of a plan the person kept, the way each screen would: an item

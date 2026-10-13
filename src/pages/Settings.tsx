@@ -9,6 +9,7 @@ import { AREAS, type AreaKey } from "../lib/constants";
 import { enablePush, disablePush, pushEnabled, pushSupported } from "../lib/push";
 import { THEMES, getTheme, onThemeChange, setTheme, type ThemeKey } from "../lib/theme";
 import { Modal } from "../components/ui";
+import AiUsageCard from "../components/AiUsageCard";
 import type { Tables } from "../types/database";
 
 const AVATAR_BG = ["var(--accent)", "var(--cat-3-fg)", "var(--cat-5-fg)", "var(--cat-7-fg)", "var(--cat-4-fg)"];
@@ -236,6 +237,8 @@ export default function Settings() {
           </label>
         </div>
       </div>
+
+      <AiUsageCard />
 
       <button className="btn btn-block" style={{ color: "var(--danger)", padding: 13 }} onClick={signOut}>
         <LogOut size={16} /> התנתקות

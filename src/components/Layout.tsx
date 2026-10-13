@@ -7,7 +7,7 @@ import NotificationBell from "./NotificationBell";
 import { isNight, onThemeChange, toggleNight } from "../lib/theme";
 import { NAV, BOTTOM_MAX, getBottomNav, setBottomNav, navItem } from "../lib/nav";
 import NavDrawer from "./NavDrawer";
-import QuickAdd from "./QuickAdd";
+import QuickAdd, { ASSISTANT_EVENT, type AssistantTab } from "./QuickAdd";
 import { useTabLens } from "../lib/tabLens";
 
 
@@ -17,7 +17,8 @@ export default function Layout() {
   const [switcher, setSwitcher] = useState(false);
   const [night, setNight] = useState(() => isNight());
   const [drawer, setDrawer] = useState(false);
-  const [quickAdd, setQuickAdd] = useState(false);
+  // The ✨ sheet: closed, or open on one of its tabs (null = the last one used).
+  const [assistant, setAssistant] = useState<{ tab: AssistantTab | null } | null>(null);
   const [bottom, setBottom] = useState<string[]>(() => getBottomNav());
   const navigate = useNavigate();
   const location = useLocation();
@@ -35,6 +36,12 @@ export default function Layout() {
   const contentRef = useRef<HTMLElement | null>(null);
   // The theme can change from Settings or from the system appearance.
   useEffect(() => onThemeChange((t) => setNight(isNight(t))), []);
+  // Any screen can open the ✨ sheet on a given tab (openAssistant).
+  useEffect(() => {
+    const open = (e: Event) => setAssistant({ tab: (e as CustomEvent<AssistantTab>).detail ?? null });
+    window.addEventListener(ASSISTANT_EVENT, open);
+    return () => window.removeEventListener(ASSISTANT_EVENT, open);
+  }, []);
 
   // The top bar is a material the content passes under: it stays clear until
   // something is actually behind it, then frosts over and grows its hairline.
@@ -171,7 +178,7 @@ export default function Layout() {
             </div>
             {/* Related bar items share one piece of glass, as native bar buttons do. */}
             <div className="nst-bar-group nst-glass">
-              <button className="nst-iconbtn plain nst-quickadd" onClick={() => setQuickAdd(true)} title="הוספה מהירה" aria-label="הוספה מהירה">
+              <button className="nst-iconbtn plain nst-quickadd" onClick={() => setAssistant({ tab: null })} title="עוזר הבית: הוספה מהירה ושאלות" aria-label="עוזר הבית">
                 <Sparkles />
               </button>
               <button
@@ -213,7 +220,7 @@ export default function Layout() {
         </div>
       </nav>
 
-      {quickAdd && <QuickAdd onClose={() => setQuickAdd(false)} />}
+      {assistant && <QuickAdd onClose={() => setAssistant(null)} initialTab={assistant.tab ?? undefined} />}
 
       {drawer && (
         <NavDrawer

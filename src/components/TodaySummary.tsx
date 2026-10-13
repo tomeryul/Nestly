@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { RefreshCw, Sparkles } from "lucide-react";
+import { MessageCircleQuestion, RefreshCw, Sparkles } from "lucide-react";
 import { readCache, writeCache } from "../lib/cache";
 import { AiError, aiErrorText, callAi } from "../lib/ai";
 import { toISODate } from "../lib/dates";
+import { openAssistant } from "./QuickAdd";
 
 /**
  * "Today at home" in two or three sentences, on the home screen. Written by the
@@ -57,6 +58,9 @@ export default function TodaySummary({ homeId, ready, cleanLeft, mealCount }: { 
       ) : (
         <p className="section-sub">{error}</p>
       )}
+      <button className="btn btn-sm nst-ai-btn" style={{ alignSelf: "flex-start" }} onClick={() => openAssistant("ask")}>
+        <MessageCircleQuestion size={15} /> שאלה על הבית
+      </button>
     </div>
   );
 }
