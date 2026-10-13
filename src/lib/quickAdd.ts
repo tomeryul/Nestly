@@ -1,7 +1,6 @@
-import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import { newId } from "./optimistic";
-import { toISODate } from "./dates";
+import { callAi } from "./ai";
 import type { Tables } from "../types/database";
 
 /** What the quick-add function understood from one sentence — a proposal, nothing written yet. */
@@ -12,41 +11,9 @@ export type QuickPlan = {
   unclear: string;
 };
 
-const MESSAGES: Record<string, string> = {
-  no_key: "ה-AI עוד לא מחובר: צריך להגדיר מפתח Anthropic בהגדרות השרת.",
-  bad_key: "מפתח ה-AI בשרת לא תקין.",
-  credit: "נגמר הקרדיט של ה-AI.",
-  rate: "הרבה בקשות בשעה האחרונה — נסו שוב מאוחר יותר.",
-  busy: "ה-AI עמוס כרגע. נסו שוב בעוד רגע.",
-  refusal: "ה-AI לא עיבד את הבקשה הזו. נסו לנסח אחרת.",
-  too_long: "הבקשה ארוכה מדי — נסו לפצל אותה.",
-};
-
-export class QuickAddError extends Error {
-  constructor(public code: string) {
-    super(MESSAGES[code] ?? "לא הצלחנו להבין את הבקשה. נסו שוב.");
-  }
-}
-
 /** Ask the server (and Claude Haiku behind it) what the sentence means. */
-export async function understand(text: string, homeId: string, categories: string[]): Promise<QuickPlan> {
-  const now = new Date();
-  const { data, error } = await supabase.functions.invoke("quick-add", {
-    body: { text, home_id: homeId, today: toISODate(now), now: now.toTimeString().slice(0, 5), categories },
-  });
-  if (error) {
-    let code = "unknown";
-    if (error instanceof FunctionsHttpError) {
-      try {
-        code = (await error.context.json())?.error ?? code;
-      } catch {
-        /* not json */
-      }
-    }
-    throw new QuickAddError(code);
-  }
-  return data as QuickPlan;
-}
+export const understand = (text: string, homeId: string, categories: string[]) =>
+  callAi<QuickPlan>("quick_add", homeId, { text, categories });
 
 /**
  * Write the parts of a plan the person kept, the way each screen would: an item

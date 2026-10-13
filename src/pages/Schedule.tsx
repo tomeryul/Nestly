@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { Plus, Trash2, ChevronRight, ChevronLeft, Check, Clock, Repeat, X, CalendarDays, ListChecks, Pencil, GripVertical, Library, History, ListTodo } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronLeft, Check, Clock, Repeat, X, CalendarDays, ListChecks, Pencil, GripVertical, Library, History, ListTodo, TriangleAlert } from "lucide-react";
+import { toast } from "sonner";
+import { AiButton, PickRow, usePicks } from "../components/AiParts";
+import { aiErrorText, callAi } from "../lib/ai";
 import { useDoneLast } from "../lib/doneLast";
 import { useLocation } from "react-router-dom";
 import { supabase } from "../lib/supabase";
@@ -337,6 +340,44 @@ function TaskDetailModal({ task, onEdit, onClose }: { task: Task; onEdit: (t: Ta
     bgWrite(supabase.from("task_subtasks").delete().eq("id", id), load);
   };
 
+  // AI: break the task into steps. Proposed steps are picked, then added to the
+  // checklist after what's already there.
+  const [steps, setSteps] = useState<string[] | null>(null);
+  const [stepsBusy, setStepsBusy] = useState(false);
+  const [stepsError, setStepsError] = useState("");
+  const picks = usePicks();
+  const keptSteps = steps ? steps.filter((_, i) => picks.kept(`s:${i}`)) : [];
+  const suggestSteps = async () => {
+    setStepsBusy(true);
+    setStepsError("");
+    try {
+      const r = await callAi<{ steps: string[] }>("breakdown", task.home_id, { title: task.title, description: task.description ?? "", existing: subs.map((s) => s.title) });
+      if (!r.steps.length) setStepsError("לא מצאתי שלבים להוסיף למשימה הזו.");
+      else {
+        setSteps(r.steps);
+        picks.reset();
+      }
+    } catch (e) {
+      setStepsError(aiErrorText(e));
+    } finally {
+      setStepsBusy(false);
+    }
+  };
+  const addSteps = async () => {
+    if (!keptSteps.length) return;
+    setStepsBusy(true);
+    const rows = keptSteps.map((title, i) => ({ id: newId(), task_id: task.id, home_id: task.home_id, title, is_done: false, position: subs.length + i, created_at: new Date().toISOString() }));
+    setSubs((prev) => [...prev, ...rows]);
+    const { error } = await supabase.from("task_subtasks").insert(rows.map(({ created_at: _c, is_done: _d, ...r }) => r));
+    setStepsBusy(false);
+    if (error) {
+      toast.error("לא הצלחנו להוסיף את השלבים");
+      load();
+      return;
+    }
+    setSteps(null);
+  };
+
   const done = subs.filter((s) => s.is_done).length;
 
   return (
@@ -354,6 +395,36 @@ function TaskDetailModal({ task, onEdit, onClose }: { task: Task; onEdit: (t: Ta
           <Plus size={18} />
         </button>
       </div>
+
+      {steps ? (
+        <div className="nst-ai-panel" style={{ marginBottom: "1rem" }}>
+          <p className="section-sub">שלבים מוצעים — הורידו את מה שלא צריך:</p>
+          <div className="nst-group">
+            {steps.map((s, i) => (
+              <PickRow key={i} kept={picks.kept(`s:${i}`)} onToggle={() => picks.toggle(`s:${i}`)} title={s} />
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn btn-primary btn-sm" onClick={addSteps} disabled={stepsBusy || !keptSteps.length}>
+              {keptSteps.length === 1 ? "הוספת שלב אחד" : `הוספת ${keptSteps.length} שלבים`}
+            </button>
+            <button className="btn btn-sm" onClick={() => setSteps(null)} disabled={stepsBusy}>
+              ביטול
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ marginBottom: "1rem", display: "flex", flexDirection: "column", gap: 8 }}>
+          <AiButton block busy={stepsBusy} busyLabel="מפרק לשלבים…" onClick={suggestSteps}>
+            פירוק לשלבים עם AI
+          </AiButton>
+          {stepsError && (
+            <p className="alert qa-error" role="alert">
+              <TriangleAlert /> {stepsError}
+            </p>
+          )}
+        </div>
+      )}
 
       {subs.length === 0 ? (
         <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: "0.5rem 0" }}>אין תת‑משימות עדיין</p>

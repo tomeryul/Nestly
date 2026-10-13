@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2, ChevronRight, ChevronLeft, ShoppingCart, Check, X, CalendarPlus, ChefHat, UtensilsCrossed, Info, ArrowDownAZ, Clock, Repeat } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronLeft, ShoppingCart, Check, X, CalendarPlus, ChefHat, UtensilsCrossed, Info, ArrowDownAZ, Clock, Repeat, TriangleAlert } from "lucide-react";
+import { toast } from "sonner";
+import { AiButton, PickRow, usePicks } from "../components/AiParts";
+import { aiErrorText, callAi } from "../lib/ai";
 import { supabase } from "../lib/supabase";
 import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
@@ -168,6 +171,7 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
 
   return (
     <Modal open onClose={onClose} title={`מצרכים · ${dish.name}`}>
+      <RecipeAi dish={dish} existing={rows} onAdded={load} />
       <div style={{ background: "var(--surface-2)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 10, marginBottom: "1rem" }}>
         <div className="nst-seg">
           <SegLens />
@@ -223,6 +227,134 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
   );
 }
 
+type RecipeResult = {
+  ingredients: { name: string; quantity: number; unit: string; is_spice: boolean; category: string }[];
+  note: string;
+  suggested: boolean;
+};
+
+/**
+ * Fill a dish's ingredients with AI: from a pasted recipe, or — with nothing
+ * pasted — the ingredients the dish usually takes. Ingredients the dish already
+ * has come back unticked, so nothing is added twice unless asked.
+ */
+function RecipeAi({ dish, existing, onAdded }: { dish: Dish; existing: Ingredient[]; onAdded: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState<RecipeResult | null>(null);
+  const picks = usePicks();
+  const have = new Set(existing.map((i) => i.name.trim()));
+  const fmt = (n: number) => (Number.isInteger(n) ? `${n}` : n.toString());
+
+  const run = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const r = await callAi<RecipeResult>("recipe", dish.home_id, { dish: dish.name, text: text.trim(), categories: [...CATEGORIES] });
+      if (!r.ingredients.length) setError("לא מצאתי מצרכים בטקסט.");
+      else {
+        setResult(r);
+        picks.reset(r.ingredients.flatMap((x, i) => (have.has(x.name.trim()) ? [`i:${i}`] : [])));
+      }
+    } catch (e) {
+      setError(aiErrorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const chosen = result ? result.ingredients.filter((_, i) => picks.kept(`i:${i}`)) : [];
+  const save = async () => {
+    if (!chosen.length) return;
+    setBusy(true);
+    const { error: e } = await supabase.from("dish_ingredients").insert(
+      chosen.map((x) => ({ dish_id: dish.id, home_id: dish.home_id, name: x.name, quantity: x.quantity, unit: x.unit || null, category: x.category, is_spice: x.is_spice })),
+    );
+    setBusy(false);
+    if (e) {
+      toast.error("לא הצלחנו להוסיף את המצרכים");
+      return;
+    }
+    toast.success(chosen.length === 1 ? "נוסף מצרך אחד" : `נוספו ${chosen.length} מצרכים`, { description: dish.name });
+    setOpen(false);
+    setResult(null);
+    setText("");
+    onAdded();
+  };
+
+  if (!open)
+    return (
+      <div style={{ marginBottom: "1rem" }}>
+        <AiButton block onClick={() => setOpen(true)}>
+          מילוי מצרכים עם AI
+        </AiButton>
+      </div>
+    );
+  return (
+    <div className="nst-ai-panel" style={{ marginBottom: "1rem" }}>
+      {!result ? (
+        <>
+          <textarea
+            rows={4}
+            maxLength={4000}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            disabled={busy}
+            placeholder={`הדביקו כאן מתכון — או השאירו ריק, ונציע את המצרכים שבדרך כלל יש ב${dish.name}`}
+            style={{ resize: "vertical", font: "400 16px/1.45 var(--font-body)" }}
+          />
+          {error && (
+            <p className="alert qa-error" role="alert">
+              <TriangleAlert /> {error}
+            </p>
+          )}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <AiButton busy={busy} busyLabel="קורא…" onClick={run}>
+              {text.trim() ? "חילוץ המצרכים" : `הצעת מצרכים ל${dish.name}`}
+            </AiButton>
+            <button className="btn btn-sm" onClick={() => setOpen(false)} disabled={busy}>
+              סגירה
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="section-sub">
+            {result.suggested ? `הצעה לפי איך שמכינים ${dish.name} בדרך כלל — הורידו את מה שלא מתאים.` : "המצרכים מהמתכון — הורידו את מה שלא צריך."}
+          </p>
+          <div className="nst-group">
+            {result.ingredients.map((x, i) => (
+              <PickRow
+                key={i}
+                kept={picks.kept(`i:${i}`)}
+                onToggle={() => picks.toggle(`i:${i}`)}
+                title={`${x.name} · ${fmt(x.quantity)}${x.unit ? ` ${x.unit}` : ""}`}
+                tags={
+                  <>
+                    <span className="nst-tag">{x.is_spice ? "תבלין" : x.category}</span>
+                    {have.has(x.name.trim()) && <span className="nst-tag">כבר במאכל</span>}
+                  </>
+                }
+              />
+            ))}
+          </div>
+          {result.note && <p className="section-sub">{result.note}</p>}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn btn-primary btn-sm" onClick={save} disabled={busy || !chosen.length}>
+              {busy ? "מוסיף…" : chosen.length === 1 ? "הוספת מצרך אחד" : `הוספת ${chosen.length} מצרכים`}
+            </button>
+            <button className="btn btn-sm" onClick={() => setResult(null)} disabled={busy}>
+              חזרה
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function WeekTab() {
   const { homeId, members } = useHome();
   const { user } = useAuth();
@@ -235,6 +367,7 @@ function WeekTab() {
   const [adding, setAdding] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
   const [listPickerFor, setListPickerFor] = useState<Meal | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
   const weekIso = toISODate(weekStart);
 
   const load = useCallback(async () => {
@@ -298,6 +431,9 @@ function WeekTab() {
           <Repeat size={16} /> קבועות
         </button>
       </div>
+      <AiButton block onClick={() => setSuggesting(true)}>
+        הצעה לתפריט השבוע
+      </AiButton>
 
       {meals.length === 0 ? (
         <EmptyState icon={<ChefHat size={42} />} title="לא נבחרו מאכלים לשבוע זה" />
@@ -347,6 +483,18 @@ function WeekTab() {
           }}
         />
       )}
+      {suggesting && (
+        <MenuAiSheet
+          homeId={homeId!}
+          weekIso={weekIso}
+          userId={user?.id ?? null}
+          onClose={() => setSuggesting(false)}
+          onAdded={() => {
+            setSuggesting(false);
+            load();
+          }}
+        />
+      )}
       {listPickerFor && (
         <Modal open onClose={() => setListPickerFor(null)} title="לאיזו רשימה להוסיף?">
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -370,6 +518,107 @@ function WeekTab() {
         />
       )}
     </>
+  );
+}
+
+type MenuResult = { meals: { dish_id: string; dish_name: string; day_of_week: number; meal_type: string }[]; note: string };
+
+/**
+ * Plan the week with AI, from the household's own dishes only: it fills the
+ * meals still open (dinners by default), doesn't repeat a dish, prefers ones not
+ * eaten lately, and takes a request in plain words ("בלי בשר ביום שני").
+ */
+function MenuAiSheet({ homeId, weekIso, userId, onClose, onAdded }: { homeId: string; weekIso: string; userId: string | null; onClose: () => void; onAdded: () => void }) {
+  const [request, setRequest] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState<MenuResult | null>(null);
+  const picks = usePicks();
+  const chosen = result ? result.meals.filter((_, i) => picks.kept(`m:${i}`)) : [];
+
+  const run = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const r = await callAi<MenuResult>("menu", homeId, { week_start: weekIso, request: request.trim() });
+      if (!r.meals.length) setError(r.note || "לא נשארו ארוחות פנויות השבוע, או שלא מצאתי מאכל שמתאים.");
+      else {
+        setResult(r);
+        picks.reset();
+      }
+    } catch (e) {
+      setError(aiErrorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const save = async () => {
+    if (!chosen.length) return;
+    setBusy(true);
+    const { error: e } = await supabase.from("weekly_meals").insert(
+      chosen.map((m) => ({ home_id: homeId, week_start: weekIso, dish_id: m.dish_id, day_of_week: m.day_of_week, meal_type: m.meal_type, all_week: false, for_members: [], created_by: userId })),
+    );
+    setBusy(false);
+    if (e) {
+      toast.error("לא הצלחנו להוסיף לתפריט");
+      return;
+    }
+    toast.success(chosen.length === 1 ? "נוספה ארוחה אחת לשבוע" : `נוספו ${chosen.length} ארוחות לשבוע`);
+    onAdded();
+  };
+
+  const done = result
+    ? { label: busy ? "מוסיף…" : `הוספה (${chosen.length})`, onClick: save, disabled: busy || !chosen.length }
+    : { label: busy ? "מתכנן…" : "הצעה", onClick: run, disabled: busy };
+
+  return (
+    <Modal open onClose={onClose} title="הצעה לתפריט" done={done}>
+      {!result ? (
+        <div className="nst-fields">
+          <p className="section-sub">ה-AI בוחר מתוך המאכלים הקבועים שלכם, ממלא את הארוחות שעוד פנויות השבוע (ארוחות ערב, אם לא ביקשתם אחרת), ומעדיף מה שלא אכלתם לאחרונה.</p>
+          <div>
+            <label>בקשות (לא חובה)</label>
+            <textarea
+              rows={3}
+              maxLength={300}
+              value={request}
+              onChange={(e) => setRequest(e.target.value)}
+              disabled={busy}
+              placeholder="למשל: בלי בשר ביום שני, משהו מהיר ברביעי"
+              style={{ resize: "none", font: "400 16px/1.45 var(--font-body)" }}
+            />
+          </div>
+          {error && (
+            <p className="alert qa-error" role="alert">
+              <TriangleAlert /> {error}
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="qa-review">
+          {result.note && <p className="section-sub">{result.note}</p>}
+          <div className="nst-group">
+            {result.meals.map((m, i) => (
+              <PickRow
+                key={i}
+                kept={picks.kept(`m:${i}`)}
+                onToggle={() => picks.toggle(`m:${i}`)}
+                title={m.dish_name}
+                tags={
+                  <span className="nst-tag">
+                    יום {DAYS_HE[m.day_of_week]} · {MEAL_TYPES[m.meal_type as keyof typeof MEAL_TYPES] ?? ""}
+                  </span>
+                }
+              />
+            ))}
+          </div>
+          <button className="btn btn-sm" style={{ alignSelf: "flex-start" }} onClick={() => setResult(null)} disabled={busy}>
+            הצעה אחרת
+          </button>
+        </div>
+      )}
+    </Modal>
   );
 }
 

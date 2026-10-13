@@ -8,7 +8,9 @@ import { supabase } from "../lib/supabase";
 import { announceDataChanged, readCache } from "../lib/cache";
 import { CATEGORIES } from "../lib/constants";
 import { dayLabel } from "../lib/dates";
-import { applyPlan, understand, QuickAddError, type QuickPlan } from "../lib/quickAdd";
+import { applyPlan, understand, type QuickPlan } from "../lib/quickAdd";
+import { aiErrorText } from "../lib/ai";
+import { PickRow } from "./AiParts";
 
 type ListRow = { id: string; name: string; is_default: boolean };
 
@@ -59,7 +61,7 @@ export default function QuickAdd({ onClose }: { onClose: () => void }) {
       setSkipped(new Set());
       setStage("review");
     } catch (e) {
-      setError(e instanceof QuickAddError ? e.message : "לא הצלחנו להתחבר. בדקו את החיבור ונסו שוב.");
+      setError(aiErrorText(e));
       setStage("write");
     }
   };
@@ -120,15 +122,7 @@ export default function QuickAdd({ onClose }: { onClose: () => void }) {
     : { label: stage === "thinking" ? "מבין…" : "המשך", onClick: run, disabled: !text.trim() || stage === "thinking" };
 
   const row = (key: string, title: string, tags: React.ReactNode) => (
-    <button key={key} className="nst-row qa-row" aria-pressed={!skipped.has(key)} onClick={() => toggle(key)}>
-      <span className={`nst-check ${skipped.has(key) ? "" : "on"}`} aria-hidden>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-      </span>
-      <span className="qa-row-body">
-        <span className="qa-row-title">{title}</span>
-        <span className="nst-meta">{tags}</span>
-      </span>
-    </button>
+    <PickRow key={key} kept={!skipped.has(key)} onToggle={() => toggle(key)} title={title} tags={tags} />
   );
 
   return (

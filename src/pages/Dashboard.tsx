@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { ShoppingCart, ChefHat, CalendarDays, Users, BellRing, Check, Clock, Sparkles, History, ListTodo } from "lucide-react";
 import { useDoneLast } from "../lib/doneLast";
 import { bgWrite } from "../lib/optimistic";
+import TodaySummary from "../components/TodaySummary";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -29,6 +30,7 @@ export default function Dashboard() {
   const [mealCount, setMealCount] = useState(snap?.mealCount ?? 0);
   const [cleanLeft, setCleanLeft] = useState(snap?.cleanLeft ?? 0);
   const [pushOn, setPushOn] = useState<boolean | null>(null);
+  const [loaded, setLoaded] = useState(false); // fresh numbers have landed (not just the device copy)
   const [pushBusy, setPushBusy] = useState(false);
 
   const todayIso = toISODate(new Date());
@@ -64,6 +66,7 @@ export default function Dashboard() {
       left = all.filter((x) => (x.frequency === "weekly" ? !doneW.has(x.id) : !doneM.has(x.id))).length;
     }
     setCleanLeft(left);
+    setLoaded(true);
     writeCache(`dash.${homeId}.${todayIso}`, { todayTasks: t.data ?? [], shopCount: s.count ?? 0, mealCount: m.count ?? 0, cleanLeft: left });
   }, [homeId, todayIso, weekIso]);
 
@@ -118,6 +121,8 @@ export default function Dashboard() {
           שלום, {meFirst} 👋
         </h1>
       </div>
+
+      {homeId && <TodaySummary homeId={homeId} ready={loaded} cleanLeft={cleanLeft} mealCount={mealCount} />}
 
       {pushOn === false && pushSupported() && (
         <div className="next-action">

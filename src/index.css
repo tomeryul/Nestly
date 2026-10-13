@@ -388,6 +388,17 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .qa-row-title { font: 400 17px var(--font-body); color: var(--text-bright); overflow-wrap: anywhere; }
 .qa-list { margin-inline-start: auto; width: auto; min-height: 30px; padding: 2px 10px; font: 600 var(--t-footnote) var(--font-body); border-radius: var(--r-capsule); }
 .qa-error { background: var(--danger-soft); color: var(--text-bright); }
+/* The ✨ entry points: the accent's ink on its soft fill, so they read as "AI" without shouting. */
+.nst-ai-btn { background: var(--accent-soft); color: var(--accent-ink); }
+@media (hover: hover) and (pointer: fine) { .nst-ai-btn:hover:not(:disabled) { background: var(--accent-soft); filter: brightness(0.97); } }
+/* While the AI works, the sparkle breathes — a slow opacity pulse, nothing that moves. */
+.nst-ai-pulse { animation: nst-ai-pulse 1.2s var(--ease-in-out) infinite alternate; }
+@keyframes nst-ai-pulse { from { opacity: 1; } to { opacity: 0.35; } }
+/* An AI panel inside a sheet or card: the same surface every time. */
+.nst-ai-panel { display: flex; flex-direction: column; gap: 10px; background: var(--surface-2); border-radius: 16px; padding: 12px; }
+.nst-ai-panel .nst-group { background: var(--surface); }
+.nst-ai-summary { display: flex; flex-direction: column; gap: 6px; }
+.nst-ai-summary-text { font: 400 var(--t-body)/1.5 var(--font-body); color: var(--text-bright); transition: opacity 200ms var(--ease-out); }
 
 /* Cleaning room header: content-sized, so a short name stays on one line with
    its controls and only a long one sends them to the next line. */
