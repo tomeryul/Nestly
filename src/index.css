@@ -499,9 +499,15 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
   opacity: 1; transition: opacity 250ms var(--ease-out);
 }
 .nst-modal-bg[data-state="closed"] { opacity: 0; transition-duration: 200ms; }
+/* Keyboard avoidance (lib/keyboard): with the keyboard up, the sheet rides on top
+   of it and fits in what is left of the screen, as an iOS sheet does. The home
+   indicator is under the keyboard then, so its inset goes too. */
+.nst-modal-bg { padding-bottom: var(--kb, 0px); transition: opacity 250ms var(--ease-out), padding-bottom 300ms var(--ease-out); }
+.nst-modal-bg[data-kb] .nst-modal { max-height: calc(var(--vvh, 100dvh) - env(safe-area-inset-top, 0px) - 8px); --sheet-pad-b: 12px; }
 .nst-modal {
   background: var(--surface); border-radius: 16px 16px 0 0;
-  padding: 1.5rem 1.4rem calc(1.5rem + env(safe-area-inset-bottom));
+  --sheet-pad-b: calc(1.5rem + env(safe-area-inset-bottom));
+  padding: 1.5rem 1.4rem var(--sheet-pad-b);
   width: 100%; max-width: 520px; max-height: 92dvh;
   overflow-y: auto; -webkit-overflow-scrolling: touch;
   /* Keep the bounce inside the sheet — without this, scrolling past the end
@@ -845,9 +851,10 @@ input, textarea, p, li, h1, h2, h3, .nst-card-title, .page-title {
 .ask-action .btn { flex: none; }
 .ask-action[data-state="done"] .ask-action-ico, .ask-action[data-state="done"] .nst-meta { color: var(--ok, var(--accent)); }
 .ask-composer {
-  position: sticky; bottom: 0; z-index: 1;
+  /* Sticky stops at the sheet's padding; the negative offset takes it down to the edge. */
+  position: sticky; bottom: calc(-1 * var(--sheet-pad-b)); z-index: 1;
   display: flex; gap: 8px; align-items: center;
-  margin: 0 -1.4rem calc(-1.5rem - env(safe-area-inset-bottom)); padding: 10px 1.4rem calc(12px + env(safe-area-inset-bottom));
+  margin: 0 -1.4rem calc(-1 * var(--sheet-pad-b)); padding: 10px 1.4rem max(12px, calc(var(--sheet-pad-b) - 12px));
   background: var(--surface);
 }
 .ask-composer input { flex: 1; min-width: 0; border-radius: var(--r-capsule); padding-inline: 16px; }

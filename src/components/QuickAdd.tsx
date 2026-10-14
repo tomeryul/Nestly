@@ -13,6 +13,7 @@ import { aiErrorText } from "../lib/ai";
 import { PickRow } from "./AiParts";
 import AskHome from "./AskHome";
 import { imageFiles, shrinkImage, type AiImage } from "../lib/images";
+import { hasFinePointer } from "../lib/keyboard";
 
 type ListRow = { id: string; name: string; is_default: boolean };
 export type AssistantTab = "add" | "ask";
@@ -197,7 +198,7 @@ export default function QuickAdd({ onClose, initialTab }: { onClose: () => void;
             }}
           >
             <textarea
-              autoFocus={tab === "add"}
+              autoFocus={tab === "add" && hasFinePointer()}
               rows={images.length ? 2 : 4}
               maxLength={600}
               value={text}

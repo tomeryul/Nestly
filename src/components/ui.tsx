@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { useDragDismiss } from "../lib/dragDismiss";
 import { clamp, presentedOffset, useReducedMotion, useWideViewport } from "../lib/motion";
 import { useTabLens } from "../lib/tabLens";
+import { useKeyboardInset } from "../lib/keyboard";
 
 export function Spinner({ className = "" }: { className?: string }) {
   return (
@@ -197,6 +198,9 @@ export function Modal({
     [onClose, sheet.ref],
   );
   leaveRef.current = leave;
+
+  // With the keyboard up, the sheet rides on top of it (see lib/keyboard).
+  useKeyboardInset(backdropRef, present);
 
   useEffect(() => {
     if (open) {
