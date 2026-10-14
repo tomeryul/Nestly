@@ -12,6 +12,12 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_summaries: {
+        Row: { created_at: string; created_by: string | null; day: string; home_id: string; text: string }
+        Insert: { created_at?: string; created_by?: string | null; day: string; home_id: string; text: string }
+        Update: { created_at?: string; created_by?: string | null; day?: string; home_id?: string; text?: string }
+        Relationships: []
+      }
       ai_usage: {
         Row: { action: string; cost_usd: number; created_at: string; home_id: string; id: number; input_tokens: number; model: string; output_tokens: number; user_id: string | null }
         Insert: { action: string; cost_usd?: number; created_at?: string; home_id: string; id?: never; input_tokens?: number; model: string; output_tokens?: number; user_id?: string | null }
