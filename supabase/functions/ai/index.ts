@@ -13,6 +13,7 @@
 //   menu       { week_start, request? }      -> { meals, note }
 //   summary    { clean_left?, meals_this_week?, force? } -> { text, shared }
 //   ask        { question, history?, categories? } -> { answer, actions }
+//   categorize { names, categories }          -> { categories } (same order as names)
 //
 // Every model call is written to the ai_usage ledger (tokens and cost), which
 // the app's settings screen reads.
@@ -22,7 +23,10 @@ import Anthropic from "npm:@anthropic-ai/sdk@0.133.0";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 const MODEL = "claude-haiku-5-5";
-const PER_HOUR = 40; // per person, all actions together; protects the prepaid credit
+// Requests per person per hour; protects the prepaid credit. Sorting products into
+// categories is tiny and comes in bursts while a list is typed, so it has its own
+// allowance rather than eating into the others'.
+const PER_HOUR: Record<string, number> = { categorize: 120, other: 40 };
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -39,12 +43,14 @@ class Fail {
 
 // Best effort (per isolate), which is enough to stop a runaway loop.
 const recent = new Map<string, number[]>();
-function overLimit(userId: string) {
+function overLimit(userId: string, action: string) {
+  const bucket = action in PER_HOUR ? action : "other";
+  const key = `${userId}:${bucket}`;
   const now = Date.now();
-  const calls = (recent.get(userId) ?? []).filter((t) => now - t < 3_600_000);
-  if (calls.length >= PER_HOUR) return true;
+  const calls = (recent.get(key) ?? []).filter((t) => now - t < 3_600_000);
+  if (calls.length >= PER_HOUR[bucket]) return true;
   calls.push(now);
-  recent.set(userId, calls);
+  recent.set(key, calls);
   return false;
 }
 
@@ -632,7 +638,28 @@ async function askHome({ sb, homeId, body, people, today, now, ask }: Ctx) {
   return { answer: clip(out.answer, 1500).replace(/ {2,}/g, " "), actions };
 }
 
-const ACTIONS: Record<string, (ctx: Ctx) => Promise<unknown>> = { quick_add: quickAdd, recipe, breakdown, menu, summary, ask: askHome };
+// ---- categorize: new products -> their shelf on the shopping list ---------------
+// Only for names the app couldn't place itself (it knows the home's own history
+// and a built-in catalogue first). Short prompt, no thinking, one call for a burst.
+const CATEGORIZE = `You put products from an Israeli family's shopping list, written in Hebrew, into the list's categories. For each product, in the order given, choose the one category a shopper would look for it under; when none fits well, choose the most general one.
+
+${DATA_NOTE}`;
+
+async function categorize({ body, ask }: Ctx) {
+  const names = (Array.isArray(body.names) ? body.names : []).map((n) => clip(n, 60)).filter(Boolean).slice(0, 20);
+  const categories = cleanCategories(body.categories);
+  if (!names.length || !categories.length) throw new Fail(400, "empty");
+  const out = await ask(
+    CATEGORIZE,
+    `Categories: ${categories.join(" | ")}\n\nProducts:\n<message>\n${names.map((n, i) => `${i + 1}. ${n}`).join("\n")}\n</message>`,
+    obj({ categories: arr(oneOf(categories)) }),
+    { maxTokens: 400, think: false },
+  );
+  const picked: unknown[] = Array.isArray(out.categories) ? out.categories : [];
+  return { categories: names.map((_, i) => (categories.includes(picked[i] as string) ? picked[i] : null)) };
+}
+
+const ACTIONS: Record<string, (ctx: Ctx) => Promise<unknown>> = { quick_add: quickAdd, recipe, breakdown, menu, summary, ask: askHome, categorize };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -662,7 +689,7 @@ Deno.serve(async (req) => {
 
   const { data: rows } = await sb.from("home_members").select("user_id, profile:profiles(display_name)").eq("home_id", homeId);
   if (!rows?.some((m) => m.user_id === user.id)) return json(403, { error: "member" });
-  if (overLimit(user.id)) return json(429, { error: "rate" });
+  if (overLimit(user.id, String(body.action))) return json(429, { error: "rate" });
 
   // Short keys instead of ids: easier for the model, and an enum keeps it honest.
   const people: Person[] = rows.map((m, i) => {

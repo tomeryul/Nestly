@@ -18,6 +18,7 @@ const FEATURES: Record<string, string> = {
   breakdown: "פירוק משימה",
   menu: "תפריט שבועי",
   summary: "היום בקצרה",
+  categorize: "מיון קטגוריות",
   // Requests made before the ledger existed, filled in afterwards from the server logs and the Console totals.
   before_ledger: "לפני תחילת הספירה",
 };

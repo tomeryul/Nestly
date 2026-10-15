@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter, Tags, Tag, ShoppingCart } from "lucide-react";
+import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter, Tags, Tag, ShoppingCart, Sparkles } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -10,6 +10,7 @@ import { reinsert, removeWithUndo } from "../lib/undo";
 import { bgWrite, newId } from "../lib/optimistic";
 import { useDoneLast } from "../lib/doneLast";
 import { searchCatalog } from "../lib/products";
+import { aiCategory, knownCategory } from "../lib/categorize";
 import { fetchStores, getStoreId, getStoreName, priceMany, setStoreId, setStoreName, type PriceItem, type PriceStore } from "../lib/prices";
 import type { Tables } from "../types/database";
 
@@ -27,7 +28,10 @@ export default function Shopping() {
   const [loading, setLoading] = useState(() => !readCache<Item[]>(activeList && `items.${activeList}`));
   const [name, setName] = useState("");
   const [qty, setQty] = useState(1);
-  const [category, setCategory] = useState<string>(CATEGORIES[0]);
+  // "" = let the app decide (lib/categorize); a picked category is used as is.
+  const [category, setCategory] = useState<string>("");
+  // Items whose category the AI is still deciding.
+  const [sorting, setSorting] = useState<Set<string>>(() => new Set());
   const [showRecurring, setShowRecurring] = useState(false);
   const [showNewList, setShowNewList] = useState(false);
   const [grouped, setGrouped] = useState(() => localStorage.getItem("nestly.shopGrouped") === "1");
@@ -207,8 +211,11 @@ export default function Shopping() {
     }
 
     const id = newId();
+    // Picked by hand, or known from this home's history / the built-in catalogue —
+    // otherwise the item goes on now and the AI fills its category in a moment.
+    const known = category || knownCategory(name, catalog, allCategories);
     const row: Item = {
-      id, list_id: activeList, home_id: homeId, name: name.trim(), quantity: qty, category,
+      id, list_id: activeList, home_id: homeId, name: name.trim(), quantity: qty, category: known,
       source: "manual", is_checked: false, position: items.length, created_by: user?.id ?? null,
       created_at: new Date().toISOString(), dish_id: null, note: null, unit: null,
     };
@@ -216,11 +223,28 @@ export default function Shopping() {
     setItems((prev) => [...prev, row]);
     setName("");
     setQty(1);
+    setCategory("");
     setFocused(false);
-    bgWrite(
-      supabase.from("shopping_items").insert({ id, list_id: activeList, home_id: homeId, name: row.name, quantity: row.quantity, category, source: "manual", position: row.position, created_by: user?.id ?? null }),
-      loadItems
+    // One promise, shared: a query builder would send the insert again for every `then`.
+    const inserted = Promise.resolve(
+      supabase.from("shopping_items").insert({ id, list_id: activeList, home_id: homeId, name: row.name, quantity: row.quantity, category: known, source: "manual", position: row.position, created_by: user?.id ?? null }),
     );
+    bgWrite(inserted, loadItems);
+    if (!known) {
+      setSorting((s) => new Set(s).add(id));
+      Promise.all([aiCategory(homeId, row.name, allCategories), inserted]).then(([picked]) => {
+        const final = picked ?? "כללי";
+        setSorting((s) => {
+          const next = new Set(s);
+          next.delete(id);
+          return next;
+        });
+        // Unless someone chose a category for it in the meantime (here or on another phone).
+        setItems((prev) => prev.map((i) => (i.id === id && !i.category ? { ...i, category: final } : i)));
+        bgWrite(supabase.from("shopping_items").update({ category: final }).eq("id", id).is("category", null));
+        loadCatalog();
+      });
+    }
     loadCatalog();
   };
   const toggle = (item: Item) => {
@@ -329,7 +353,13 @@ export default function Shopping() {
             title="שינוי קטגוריה"
             style={{ border: "none", cursor: "pointer", font: "400 12px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.04em" }}
           >
-            {item.category || "ללא קטגוריה"}
+            {!item.category && sorting.has(item.id) ? (
+              <>
+                <Sparkles className="nst-ai-pulse" /> ממיין…
+              </>
+            ) : (
+              item.category || "ללא קטגוריה"
+            )}
           </button>
           {item.source === "recipe" && (
             <span className="nst-tag" style={{ background: "var(--cat-3-bg)", color: "var(--cat-3-fg)" }}>
@@ -465,7 +495,8 @@ export default function Shopping() {
               <Plus />
             </button>
           </div>
-          <select style={{ flex: 1 }} value={category} onChange={(e) => setCategory(e.target.value)}>
+          <select style={{ flex: 1 }} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="קטגוריה">
+            <option value="">קטגוריה אוטומטית</option>
             {allCategories.map((c) => (
               <option key={c} value={c}>
                 {c}
