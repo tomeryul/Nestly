@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter, Tags, Tag, ShoppingCart, Sparkles } from "lucide-react";
+import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter, Tag, ShoppingCart, Sparkles } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -28,15 +28,15 @@ export default function Shopping() {
   const [loading, setLoading] = useState(() => !readCache<Item[]>(activeList && `items.${activeList}`));
   const [name, setName] = useState("");
   const [qty, setQty] = useState(1);
-  // "" = let the app decide (lib/categorize); a picked category is used as is.
-  const [category, setCategory] = useState<string>("");
-  // Items whose category the AI is still deciding.
+  // Categories are the app's job, never the shopper's (lib/categorize). These are
+  // the items whose category the AI is still deciding, and those already sent to
+  // be sorted during this visit.
   const [sorting, setSorting] = useState<Set<string>>(() => new Set());
+  const sortTried = useRef(new Set<string>());
   const [showRecurring, setShowRecurring] = useState(false);
   const [showNewList, setShowNewList] = useState(false);
   const [grouped, setGrouped] = useState(() => localStorage.getItem("nestly.shopGrouped") === "1");
   const [customCats, setCustomCats] = useState<string[]>(() => readCache<string[]>(homeId && `cats.${homeId}`) ?? []);
-  const [showCats, setShowCats] = useState(false);
 
   // King Store prices (public price-transparency data, via the `prices` edge function)
   const [priceMap, setPriceMap] = useState<Record<string, PriceItem | null>>({});
@@ -45,7 +45,6 @@ export default function Shopping() {
   const [priceErr, setPriceErr] = useState("");
   const [priceOptions, setPriceOptions] = useState<Record<string, PriceItem[]>>({});
   const [pickFor, setPickFor] = useState<string | null>(null);
-  const [catFor, setCatFor] = useState<Item | null>(null);
   const [storeName, setStoreNameState] = useState(getStoreName());
   const listRef = useRef<HTMLDivElement>(null);
   // A ticked item keeps its place, showing its tick, until the shopper stops
@@ -196,6 +195,40 @@ export default function Shopping() {
     bgWrite(supabase.from("shopping_items").update({ is_checked: false }).eq("id", id), loadItems);
   };
 
+  // Write a category the app worked out, unless someone set one meanwhile (on any phone).
+  const setCategoryOf = useCallback((id: string, category: string) => {
+    setItems((prev) => prev.map((i) => (i.id === id && !i.category ? { ...i, category } : i)));
+    bgWrite(supabase.from("shopping_items").update({ category }).eq("id", id).is("category", null));
+  }, []);
+  /** Let the AI place an item the app couldn't, once the item is saved. */
+  const sortWithAi = useCallback(
+    (id: string, itemName: string, saved: Promise<unknown> = Promise.resolve()) => {
+      if (!homeId) return;
+      setSorting((s) => new Set(s).add(id));
+      Promise.all([aiCategory(homeId, itemName, allCategories), saved]).then(([picked]) => {
+        setSorting((s) => {
+          const next = new Set(s);
+          next.delete(id);
+          return next;
+        });
+        setCategoryOf(id, picked ?? "כללי");
+        loadCatalog();
+      });
+    },
+    [homeId, allCategories, setCategoryOf, loadCatalog],
+  );
+  // Anything on the list without a category — a weekly item, an older one — gets one too.
+  useEffect(() => {
+    if (loading) return;
+    for (const it of items) {
+      if (it.category || it.is_checked || it.list_id !== activeList || sortTried.current.has(it.id)) continue;
+      sortTried.current.add(it.id);
+      const known = knownCategory(it.name, catalog, allCategories);
+      if (known) setCategoryOf(it.id, known);
+      else sortWithAi(it.id, it.name);
+    }
+  }, [items, loading, activeList, catalog, allCategories, setCategoryOf, sortWithAi]);
+
   const addItem = () => {
     if (!name.trim() || !homeId || !activeList) return;
 
@@ -211,9 +244,10 @@ export default function Shopping() {
     }
 
     const id = newId();
-    // Picked by hand, or known from this home's history / the built-in catalogue —
-    // otherwise the item goes on now and the AI fills its category in a moment.
-    const known = category || knownCategory(name, catalog, allCategories);
+    // Known from this home's history or the built-in catalogue — otherwise the item
+    // goes on now and the AI fills its category in a moment.
+    const known = knownCategory(name, catalog, allCategories);
+    sortTried.current.add(id);
     const row: Item = {
       id, list_id: activeList, home_id: homeId, name: name.trim(), quantity: qty, category: known,
       source: "manual", is_checked: false, position: items.length, created_by: user?.id ?? null,
@@ -223,28 +257,13 @@ export default function Shopping() {
     setItems((prev) => [...prev, row]);
     setName("");
     setQty(1);
-    setCategory("");
     setFocused(false);
     // One promise, shared: a query builder would send the insert again for every `then`.
     const inserted = Promise.resolve(
       supabase.from("shopping_items").insert({ id, list_id: activeList, home_id: homeId, name: row.name, quantity: row.quantity, category: known, source: "manual", position: row.position, created_by: user?.id ?? null }),
     );
     bgWrite(inserted, loadItems);
-    if (!known) {
-      setSorting((s) => new Set(s).add(id));
-      Promise.all([aiCategory(homeId, row.name, allCategories), inserted]).then(([picked]) => {
-        const final = picked ?? "כללי";
-        setSorting((s) => {
-          const next = new Set(s);
-          next.delete(id);
-          return next;
-        });
-        // Unless someone chose a category for it in the meantime (here or on another phone).
-        setItems((prev) => prev.map((i) => (i.id === id && !i.category ? { ...i, category: final } : i)));
-        bgWrite(supabase.from("shopping_items").update({ category: final }).eq("id", id).is("category", null));
-        loadCatalog();
-      });
-    }
+    if (!known) sortWithAi(id, row.name, inserted);
     loadCatalog();
   };
   const toggle = (item: Item) => {
@@ -274,12 +293,6 @@ export default function Shopping() {
       restore: () => supabase.from("shopping_items").insert(row),
       reload: loadItems,
     });
-  };
-  const changeCategory = (item: Item, category: string) => {
-    flip();
-    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, category } : i)));
-    bgWrite(supabase.from("shopping_items").update({ category }).eq("id", item.id), loadItems);
-    setCatFor(null);
   };
   const clearChecked = () => {
     if (!activeList) return;
@@ -347,12 +360,7 @@ export default function Shopping() {
               </span>
             </button>
           )}
-          <button
-            className="nst-tag"
-            onClick={() => setCatFor(item)}
-            title="שינוי קטגוריה"
-            style={{ border: "none", cursor: "pointer", font: "400 12px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.04em" }}
-          >
+          <span className="nst-tag" style={{ font: "400 12px var(--font-body)", letterSpacing: "0.04em" }}>
             {!item.category && sorting.has(item.id) ? (
               <>
                 <Sparkles className="nst-ai-pulse" /> ממיין…
@@ -360,7 +368,7 @@ export default function Shopping() {
             ) : (
               item.category || "ללא קטגוריה"
             )}
-          </button>
+          </span>
           {item.source === "recipe" && (
             <span className="nst-tag" style={{ background: "var(--cat-3-bg)", color: "var(--cat-3-fg)" }}>
               <ChefHat /> ממתכון
@@ -411,9 +419,6 @@ export default function Shopping() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <button className={`btn btn-sm ${grouped ? "btn-primary" : ""}`} onClick={toggleGrouped} title="מיון לפי קטגוריה">
             <ListFilter size={15} /> קטגוריות
-          </button>
-          <button className="btn btn-sm" onClick={() => setShowCats(true)} title="ניהול קטגוריות">
-            <Tags size={15} />
           </button>
           <button className="btn btn-sm" onClick={() => loadPrices(items)} disabled={pricing || items.length === 0} title="מחירים מקינג סטור">
             <Tag size={15} /> {pricing ? "טוען…" : "מחירים"}
@@ -466,7 +471,6 @@ export default function Shopping() {
                     }
                     setName(s.name);
                     setQty(s.quantity);
-                    if (s.category) setCategory(s.category);
                     setFocused(false);
                   }}
                   style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--surface-2)", border: "none", borderRadius: 10, padding: "9px 12px", cursor: "pointer", textAlign: "right" }}
@@ -495,16 +499,8 @@ export default function Shopping() {
               <Plus />
             </button>
           </div>
-          <select style={{ flex: 1 }} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="קטגוריה">
-            <option value="">קטגוריה אוטומטית</option>
-            {allCategories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          <button className="btn btn-primary" style={{ padding: "0 16px" }} onClick={addItem}>
-            <Plus size={18} />
+          <button className="btn btn-primary" style={{ flex: 1 }} onClick={addItem} disabled={!name.trim()}>
+            <Plus size={18} /> הוספה
           </button>
         </div>
       </div>
@@ -575,7 +571,6 @@ export default function Shopping() {
         />
       )}
       {showRecurring && <RecurringModal homeId={homeId!} lists={lists} onClose={() => setShowRecurring(false)} />}
-      {showCats && <CategoriesModal homeId={homeId!} defaults={[...CATEGORIES]} onClose={() => { setShowCats(false); loadCats(); }} />}
       {pickFor && (
         <Modal open onClose={() => setPickFor(null)} title={`איזה מוצר? · ${pickFor}`}>
           {(priceOptions[pickFor] ?? []).length === 0 ? (
@@ -601,22 +596,6 @@ export default function Shopping() {
               })}
             </div>
           )}
-        </Modal>
-      )}
-      {catFor && (
-        <Modal open onClose={() => setCatFor(null)} title={`קטגוריה · ${catFor.name}`}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {allCategories.map((c) => (
-              <button
-                key={c}
-                className="btn btn-block"
-                style={{ justifyContent: "flex-start", ...(catFor.category === c ? { boxShadow: "inset 0 0 0 2px var(--accent)" } : {}) }}
-                onClick={() => changeCategory(catFor, c)}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
         </Modal>
       )}
       {showStores && (
@@ -665,63 +644,6 @@ function StorePickerModal({ onClose, onPicked }: { onClose: () => void; onPicked
           </div>
         </>
       )}
-    </Modal>
-  );
-}
-
-function CategoriesModal({ homeId, defaults, onClose }: { homeId: string; defaults: string[]; onClose: () => void }) {
-  const [rows, setRows] = useState<Tables<"shopping_categories">[]>([]);
-  const [name, setName] = useState("");
-  const load = useCallback(async () => {
-    const { data } = await supabase.from("shopping_categories").select("*").eq("home_id", homeId).order("position").order("created_at");
-    setRows(data ?? []);
-  }, [homeId]);
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const add = async () => {
-    const n = name.trim();
-    if (!n || defaults.includes(n) || rows.some((r) => r.name === n)) {
-      setName("");
-      return;
-    }
-    await supabase.from("shopping_categories").insert({ home_id: homeId, name: n, position: rows.length });
-    setName("");
-    load();
-  };
-  const remove = async (id: string) => {
-    await supabase.from("shopping_categories").delete().eq("id", id);
-    load();
-  };
-
-  return (
-    <Modal open onClose={onClose} title="קטגוריות מותאמות">
-      <p className="section-sub" style={{ marginBottom: "1rem" }}>הקטגוריות הקבועות תמיד זמינות. כאן אפשר להוסיף קטגוריות משלכם (למשל: "תינוק", "חיות מחמד").</p>
-      <div style={{ display: "flex", gap: 8, marginBottom: "1rem" }}>
-        <input style={{ flex: 1 }} placeholder="קטגוריה חדשה…" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
-        <button className="btn btn-primary" style={{ padding: "0 16px" }} onClick={add}>
-          <Plus size={18} />
-        </button>
-      </div>
-      <div style={{ marginBottom: 10, color: "var(--text-3)", font: "400 13px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>קבועות</div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: "1.2rem" }}>
-        {defaults.map((c) => (
-          <span key={c} className="nst-tag">{c}</span>
-        ))}
-      </div>
-      <div style={{ marginBottom: 10, color: "var(--text-3)", font: "400 13px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>שלכם</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {rows.length === 0 && <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: "0.5rem 0" }}>אין קטגוריות מותאמות עדיין</p>}
-        {rows.map((r) => (
-          <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface)", borderRadius: 12, padding: "9px 12px", boxShadow: "var(--shadow-sm)" }}>
-            <span style={{ flex: 1, fontSize: 15, color: "var(--text-2)", fontWeight: 500 }}>{r.name}</span>
-            <button className="nst-del" onClick={() => remove(r.id)}>
-              <X size={16} />
-            </button>
-          </div>
-        ))}
-      </div>
     </Modal>
   );
 }

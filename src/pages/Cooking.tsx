@@ -4,13 +4,14 @@ import { toast } from "sonner";
 import { AiButton, PickRow, usePicks } from "../components/AiParts";
 import { aiErrorText, callAi } from "../lib/ai";
 import { supabase } from "../lib/supabase";
-import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
+import { readCache, useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner, SegLens } from "../components/ui";
 import { CATEGORIES, DAYS_HE, MEAL_TYPES } from "../lib/constants";
 import { addDays, formatDayMonth, startOfWeek, toISODate } from "../lib/dates";
 import { bgWrite, newId } from "../lib/optimistic";
+import { aiCategory, knownCategory } from "../lib/categorize";
 import type { Tables } from "../types/database";
 
 type Dish = Tables<"dishes">;
@@ -123,7 +124,6 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
   const [name, setName] = useState("");
   const [qty, setQty] = useState(1);
   const [unit, setUnit] = useState("");
-  const [category, setCategory] = useState<string>(CATEGORIES[0]);
   const [isSpice, setIsSpice] = useState(false);
   const [sortMode, setSortMode] = useState<"added" | "alpha">("added");
 
@@ -135,13 +135,25 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
     load();
   }, [load]);
 
+  // The category is the app's to set, as on the shopping list: known products at
+  // once, a new one by the AI just after (spices never reach the list, so they skip it).
   const add = async () => {
     if (!name.trim()) return;
-    await supabase.from("dish_ingredients").insert({ dish_id: dish.id, home_id: dish.home_id, name: name.trim(), quantity: qty, unit: unit || null, category, is_spice: isSpice });
+    const homeId = dish.home_id;
+    const categories = [...new Set([...CATEGORIES, ...(readCache<string[]>(`cats.${homeId}`) ?? [])])];
+    const history = readCache<{ name: string; category: string | null }[]>(`catalog.${homeId}`) ?? [];
+    const known = knownCategory(name, history, categories);
+    const id = newId();
+    const ingredient = name.trim();
+    await supabase.from("dish_ingredients").insert({ id, dish_id: dish.id, home_id: homeId, name: ingredient, quantity: qty, unit: unit || null, category: known, is_spice: isSpice });
     setName("");
     setQty(1);
     setUnit("");
     load();
+    if (!known && !isSpice) {
+      const picked = await aiCategory(homeId, ingredient, categories);
+      await supabase.from("dish_ingredients").update({ category: picked ?? "כללי" }).eq("id", id).is("category", null);
+    }
   };
   const remove = async (id: string) => {
     await supabase.from("dish_ingredients").delete().eq("id", id);
@@ -184,15 +196,8 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
         </div>
         <input placeholder={isSpice ? "שם התבלין" : "שם המצרך"} value={name} onChange={(e) => setName(e.target.value)} />
         <div style={{ display: "flex", gap: 8 }}>
-          <input style={{ width: 84 }} type="number" min={0} step={0.25} value={qty} onChange={(e) => setQty(Number(e.target.value))} title="כמות (אפשר רבע/חצי)" />
-          <input style={{ width: 84 }} placeholder="יחידה" value={unit} onChange={(e) => setUnit(e.target.value)} />
-          <select style={{ flex: 1 }} value={category} onChange={(e) => setCategory(e.target.value)}>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+          <input style={{ flex: 1, minWidth: 0 }} type="number" min={0} step={0.25} value={qty} onChange={(e) => setQty(Number(e.target.value))} title="כמות (אפשר רבע/חצי)" />
+          <input style={{ flex: 1, minWidth: 0 }} placeholder="יחידה" value={unit} onChange={(e) => setUnit(e.target.value)} />
         </div>
         {isSpice && <p style={{ fontSize: 12, color: "var(--text-muted)" }}>תבלינים לא נכנסים לרשימת הקניות.</p>}
         <button className="btn btn-primary btn-block" style={{ padding: 11 }} onClick={add}>
