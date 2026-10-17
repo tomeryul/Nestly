@@ -676,6 +676,28 @@ const LIST_UPDATE = `You turn a request from an Israeli family into changes to t
 
 ${DATA_NOTE}`;
 
+// The request's words, without niqqud and punctuation, each also with Hebrew's
+// one-letter prefixes taken off ("ותוריד" → "תוריד", "ולחם" → "לחם"). The verbs and
+// numbers of the request itself are left out: they name no product.
+const NOT_PRODUCTS = new Set(
+  "תוסיף תוסיפי תוסיפו להוסיף תוריד תורידי תורידו להוריד תמחק תמחקי תמחוק מחק מחקי למחוק תעדכן תעדכני לעדכן תשנה תכניס תכניסי תחזיר תחזירי עוד יש אין את של עם גם כל זה זאת היא הוא מחסן רשימה רשימת קניות נגמר נגמרה נגמרו קנינו קניתי אחד אחת שני שניים שתיים שתי שלוש שלושה ארבע ארבעה חמש חמישה שש שישה שבע שבעה שמונה תשע עשר חצי".split(" "),
+);
+const words = (s: string) => s.replace(/[\u0591-\u05C7]/g, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim().split(" ").filter(Boolean);
+function requestStems(text: string) {
+  const out = new Set<string>();
+  for (const word of words(text)) {
+    const forms = [word];
+    for (let w = word; forms.length < 3 && /^[והבלמשכ]/.test(w) && w.length > 3; ) forms.push((w = w.slice(1)));
+    if (!forms.some((f) => NOT_PRODUCTS.has(f))) forms.forEach((f) => out.add(f));
+  }
+  return [...out].filter((f) => f.length >= 2);
+}
+// The same word give or take its ending: "עגבניות" / "עגבנייה", "ביצה" / "ביצים".
+const sameWord = (a: string, b: string) => {
+  const k = Math.min(4, Math.max(2, Math.min(a.length, b.length) - 1));
+  return a.length >= k && b.length >= k && a.slice(0, k) === b.slice(0, k);
+};
+
 async function listUpdate({ sb, homeId, body, ask }: Ctx) {
   const text = clip(body.text, 500);
   if (!text) throw new Fail(400, "empty");
@@ -687,13 +709,23 @@ async function listUpdate({ sb, homeId, body, ask }: Ctx) {
   const current = lists.find((l) => l.id === body.list_id) ?? lists[0];
   const listByKey = new Map(lists.map((l, i) => [`l${i + 1}`, l]));
   const keyOfList = new Map(lists.map((l, i) => [l.id, `l${i + 1}`]));
+  // Everything still on the lists goes in. What is ticked as bought (on a shopping
+  // list that is usually most of it: the record of past shops) only when the request
+  // names it, which is the one case it matters: adding it puts it back. One the model
+  // still names exactly is caught by the name match below.
+  const stems = requestStems(text);
+  const named = (name: string) => words(name).some((w) => stems.some((s) => sameWord(w, s)));
   const itemByKey = new Map<string, NonNullable<typeof items>[number]>();
   const sections = lists.map((l) => {
-    const rows = (items ?? []).filter((it) => it.list_id === l.id).map((it) => {
+    const onList = (items ?? []).filter((it) => it.list_id === l.id);
+    const shown = onList.filter((it) => !it.is_checked || named(it.name));
+    const rows = shown.map((it) => {
       const key = `i${itemByKey.size + 1}`;
       itemByKey.set(key, it);
       return `${key} ${it.name} ×${it.quantity}${it.is_checked ? " (ticked: bought)" : ""}`;
     });
+    const hidden = onList.length - shown.length;
+    if (hidden) rows.push(`(${hidden} more ticked as bought, not shown)`);
     return `${keyOfList.get(l.id)} "${l.name}"${l.id === current.id ? " — the current list" : ""}:\n${rows.join("\n") || "(empty)"}`;
   });
   const out = await ask(
