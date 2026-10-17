@@ -6,20 +6,22 @@ export type NavItem = {
   label: string;
   title: string;
   icon: ComponentType<{ size?: number | string }>;
+  /** The section's colour in the menu, one of the iOS system colours (--sys-*), as each app in Settings has its own. */
+  tint: string;
   end?: boolean;
 };
 
 /** Every section in the app. The hamburger menu shows all of these. */
 export const NAV: NavItem[] = [
-  { to: "/", label: "בית", title: "בית", icon: Home, end: true },
-  { to: "/shopping", label: "קניות", title: "קניות", icon: ShoppingCart },
-  { to: "/cooking", label: "בישולים", title: "בישולים", icon: ChefHat },
-  { to: "/cleaning", label: "ניקיון", title: "ניקיון", icon: Sparkles },
-  { to: "/laundry", label: "כביסות", title: "כביסות", icon: WashingMachine },
-  { to: "/schedule", label: "לוז", title: "לוז שבועי", icon: CalendarDays },
-  { to: "/personal", label: "משימות", title: "משימות אישיות", icon: ListTodo },
-  { to: "/deliveries", label: "משלוחים", title: "משלוחים", icon: Package },
-  { to: "/settings", label: "הגדרות", title: "הגדרות", icon: Settings },
+  { to: "/", label: "בית", title: "בית", icon: Home, tint: "blue", end: true },
+  { to: "/shopping", label: "קניות", title: "קניות", icon: ShoppingCart, tint: "green" },
+  { to: "/cooking", label: "בישולים", title: "בישולים", icon: ChefHat, tint: "orange" },
+  { to: "/cleaning", label: "ניקיון", title: "ניקיון", icon: Sparkles, tint: "teal" },
+  { to: "/laundry", label: "כביסות", title: "כביסות", icon: WashingMachine, tint: "indigo" },
+  { to: "/schedule", label: "לוז", title: "לוז שבועי", icon: CalendarDays, tint: "red" },
+  { to: "/personal", label: "משימות", title: "משימות אישיות", icon: ListTodo, tint: "purple" },
+  { to: "/deliveries", label: "משלוחים", title: "משלוחים", icon: Package, tint: "brown" },
+  { to: "/settings", label: "הגדרות", title: "הגדרות", icon: Settings, tint: "gray" },
 ];
 
 export const navItem = (to: string) => NAV.find((n) => n.to === to);
