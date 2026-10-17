@@ -14,6 +14,7 @@
 //   summary    { clean_left?, meals_this_week?, force? } -> { text, shared }
 //   ask        { question, history?, categories? } -> { answer, actions }
 //   categorize { names, categories }          -> { categories } (same order as names)
+//   list_update { text, list_id }             -> { changes, unclear }
 //
 // Every model call is written to the ai_usage ledger (tokens and cost), which
 // the app's settings screen reads.
@@ -659,7 +660,73 @@ async function categorize({ body, ask }: Ctx) {
   return { categories: names.map((_, i) => (categories.includes(picked[i] as string) ? picked[i] : null)) };
 }
 
-const ACTIONS: Record<string, (ctx: Ctx) => Promise<unknown>> = { quick_add: quickAdd, recipe, breakdown, menu, summary, ask: askHome, categorize };
+// ---- list_update: a sentence -> changes to the shopping lists ------------------
+// "תוסיף למחסן 4 רסק עגבניות ותוריד אורז אחד". The model only says what to change
+// and by how much; the app works out the new amounts from the rows as they are
+// when the person confirms. One of the lists may be a pantry: what's at home.
+const LIST_UPDATE = `You turn a request from an Israeli family into changes to the lists in their home app. They are shopping lists, and one may be a pantry (what is already at home, with how many of each).
+
+- Use the keys you are given. The list is the one the request names ("למחסן", "במחסן" → the pantry list); when none is named, the current list.
+- Each change is one of:
+  - "add": more of a product. "quantity" is how many to add (1 if no number was said). When the product is already on that list, give its item key — match by meaning, not spelling ("רסק" is "רסק עגבניות" if that's the one there). Otherwise "item" is "" and "name" is the product, short, in Hebrew as people write it on a list.
+  - "decrease": fewer of an item on that list. "quantity" is how many to take off (1 if no number was said).
+  - "set": how many there are now ("יש 5 ביצים"). "quantity" is that amount.
+  - "delete": off the list altogether ("נגמר", "אין יותר", "תמחק").
+- Numbers may be words (אחד, שניים, שלוש, חצי). Change only what was asked. Anything you couldn't match or understand goes, briefly and in Hebrew, in "unclear"; otherwise "unclear" is "".
+
+${DATA_NOTE}`;
+
+async function listUpdate({ sb, homeId, body, ask }: Ctx) {
+  const text = clip(body.text, 500);
+  if (!text) throw new Fail(400, "empty");
+  const [{ data: lists }, { data: items }] = await Promise.all([
+    sb.from("shopping_lists").select("id, name").eq("home_id", homeId).order("created_at"),
+    sb.from("shopping_items").select("id, name, quantity, is_checked, list_id").eq("home_id", homeId).order("name").limit(500),
+  ]);
+  if (!lists?.length) throw new Fail(422, "empty");
+  const current = lists.find((l) => l.id === body.list_id) ?? lists[0];
+  const listByKey = new Map(lists.map((l, i) => [`l${i + 1}`, l]));
+  const keyOfList = new Map(lists.map((l, i) => [l.id, `l${i + 1}`]));
+  const itemByKey = new Map<string, NonNullable<typeof items>[number]>();
+  const sections = lists.map((l) => {
+    const rows = (items ?? []).filter((it) => it.list_id === l.id).map((it) => {
+      const key = `i${itemByKey.size + 1}`;
+      itemByKey.set(key, it);
+      return `${key} ${it.name} ×${it.quantity}${it.is_checked ? " (ticked: bought)" : ""}`;
+    });
+    return `${keyOfList.get(l.id)} "${l.name}"${l.id === current.id ? " — the current list" : ""}:\n${rows.join("\n") || "(empty)"}`;
+  });
+  const out = await ask(
+    LIST_UPDATE,
+    `${sections.join("\n\n")}\n\nRequest:\n<message>\n${text}\n</message>`,
+    obj({
+      changes: arr(obj({ op: oneOf(["add", "decrease", "set", "delete"]), list: oneOf([...listByKey.keys()]), item: str, name: str, quantity: { type: "number" } })),
+      unclear: str,
+    }),
+    { maxTokens: 1500, think: false },
+  );
+  const norm = (n: string) => n.trim().replace(/\s+/g, " ");
+  const changes = [];
+  for (const c of (out.changes ?? []).slice(0, 30)) {
+    const op = String(c.op);
+    let item = c.item ? itemByKey.get(String(c.item)) : undefined;
+    const list = item ? lists.find((l) => l.id === item!.list_id)! : listByKey.get(String(c.list)) ?? current;
+    // A name the model gave for something that is in fact on that list already.
+    if (!item && c.name) item = (items ?? []).find((it) => it.list_id === list.id && norm(it.name) === norm(String(c.name)));
+    const q = Math.min(999, Math.max(0, Math.round((Number(c.quantity) || 0) * 100) / 100));
+    if (op === "add") {
+      if (item) changes.push({ op, list_id: list.id, list_name: list.name, item_id: item.id, name: item.name, quantity: q || 1, before: item.quantity, checked: item.is_checked });
+      else if (clip(c.name, 80)) changes.push({ op, list_id: list.id, list_name: list.name, item_id: null, name: clip(c.name, 80), quantity: q || 1, before: null, checked: false });
+    } else if (item && (op === "decrease" || op === "set" || op === "delete")) {
+      changes.push({ op, list_id: list.id, list_name: list.name, item_id: item.id, name: item.name, quantity: op === "decrease" ? q || 1 : q, before: item.quantity, checked: item.is_checked });
+    } else if (op === "set" && q > 0 && clip(c.name, 80)) {
+      changes.push({ op: "add", list_id: list.id, list_name: list.name, item_id: null, name: clip(c.name, 80), quantity: q, before: null, checked: false });
+    }
+  }
+  return { changes, unclear: clip(out.unclear, 200) };
+}
+
+const ACTIONS: Record<string, (ctx: Ctx) => Promise<unknown>> = { quick_add: quickAdd, recipe, breakdown, menu, summary, ask: askHome, categorize, list_update: listUpdate };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });

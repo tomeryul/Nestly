@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter, Tag, ShoppingCart, Sparkles } from "lucide-react";
+import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter, Tag, ShoppingCart, Sparkles, Search } from "lucide-react";
+import { AiButton } from "../components/AiParts";
+import ListUpdate from "../components/ListUpdate";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -26,13 +28,16 @@ export default function Shopping() {
   const [activeList, setActiveList] = useState<string | null>(() => readCache<string>(homeId && `activeList.${homeId}`) ?? null);
   const [items, setItems] = useState<Item[]>(() => readCache<Item[]>(activeList && `items.${activeList}`) ?? []);
   const [loading, setLoading] = useState(() => !readCache<Item[]>(activeList && `items.${activeList}`));
-  const [name, setName] = useState("");
+  const [typed, setName] = useState("");
   const [qty, setQty] = useState(1);
   // Categories are the app's job, never the shopper's (lib/categorize). These are
   // the items whose category the AI is still deciding, and those already sent to
   // be sorted during this visit.
   const [sorting, setSorting] = useState<Set<string>>(() => new Set());
   const sortTried = useRef(new Set<string>());
+  // Finding something on a long list (the pantry) to change it, and updating in a sentence.
+  const [query, setQuery] = useState("");
+  const [updating, setUpdating] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
   const [showNewList, setShowNewList] = useState(false);
   const [grouped, setGrouped] = useState(() => localStorage.getItem("nestly.shopGrouped") === "1");
@@ -120,7 +125,7 @@ export default function Shopping() {
   // Suggestions: products this home has bought before come first (they carry the
   // remembered quantity/category), then common Israeli products from the built-in list.
   const suggestions = useMemo(() => {
-    const q = name.trim();
+    const q = typed.trim();
     if (!q) return [];
     const lower = q.toLowerCase();
     const mine = catalog.filter((c) => c.name.toLowerCase().includes(lower)).slice(0, 6);
@@ -129,7 +134,7 @@ export default function Shopping() {
       .filter((p) => !seen.has(p.name.trim().toLowerCase()))
       .map((p) => ({ name: p.name, category: p.category, quantity: 1, builtin: true }));
     return [...mine.map((m) => ({ ...m, builtin: false })), ...builtin].slice(0, 8);
-  }, [name, catalog]);
+  }, [typed, catalog]);
 
   const loadLists = useCallback(async () => {
     if (!homeId) return;
@@ -229,8 +234,9 @@ export default function Shopping() {
     }
   }, [items, loading, activeList, catalog, allCategories, setCategoryOf, sortWithAi]);
 
-  const addItem = () => {
-    if (!name.trim() || !homeId || !activeList) return;
+  const addItem = (named?: string) => {
+    const name = (named ?? typed).trim();
+    if (!name || !homeId || !activeList) return;
 
     // Never create a second row for something already on the list. If it was
     // already bought, tick it back on instead; if it is still pending, leave it.
@@ -318,8 +324,15 @@ export default function Shopping() {
   const collator = new Intl.Collator("he");
   const byName = (a: Item, b: Item) => collator.compare(a.name, b.name);
   const shownTaken = (i: Item) => doneLast.shownDone(i.id, i.is_checked);
-  const active = items.filter((i) => !shownTaken(i)).sort(byName);
-  const taken = items.filter(shownTaken).sort(byName);
+  // Search ignores niqqud, quote marks and extra spaces, so "קוטג" finds "קוטג'".
+  const fold = (t: string) => t.normalize("NFD").replace(/[\u0591-\u05C7'"׳״`]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  const q = fold(query);
+  const shown = q ? items.filter((i) => fold(i.name).includes(q)) : items;
+  const active = shown.filter((i) => !shownTaken(i)).sort(byName);
+  const taken = shown.filter(shownTaken).sort(byName);
+  // The cost estimate is for the whole list, whatever the search shows.
+  const activeAll = items.filter((i) => !shownTaken(i));
+  const takenCount = items.length - activeAll.length;
 
   // when grouped, order categories by the CATEGORIES list (others last); items א־ב within each
   const groupedSections: [string, Item[]][] = (() => {
@@ -444,7 +457,7 @@ export default function Shopping() {
         <input
           placeholder="הוספת מצרך…"
           autoComplete="off"
-          value={name}
+          value={typed}
           onChange={(e) => setName(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setTimeout(() => setFocused(false), 150)}
@@ -499,10 +512,27 @@ export default function Shopping() {
               <Plus />
             </button>
           </div>
-          <button className="btn btn-primary" style={{ flex: 1 }} onClick={addItem} disabled={!name.trim()}>
+          <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => addItem()} disabled={!typed.trim()}>
             <Plus size={18} /> הוספה
           </button>
         </div>
+      </div>
+
+      <div className="shop-tools">
+        {items.length > 0 && (
+          <label className="shop-search">
+            <Search size={16} aria-hidden />
+            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="חיפוש ברשימה…" enterKeyHint="search" aria-label="חיפוש ברשימה" />
+            {query && (
+              <button type="button" onClick={() => setQuery("")} aria-label="ניקוי החיפוש">
+                <X size={15} />
+              </button>
+            )}
+          </label>
+        )}
+        <AiButton onClick={() => setUpdating(true)} block={items.length === 0}>
+          עדכון עם AI
+        </AiButton>
       </div>
 
       {priceErr && (
@@ -523,13 +553,13 @@ export default function Shopping() {
             <div className="next-action-kicker">קינג סטור{storeName ? ` · ${storeName}` : ""}</div>
             <div className="next-action-title">
               הערכת עלות: ₪
-              {active
+              {activeAll
                 .reduce((sum, i) => sum + (priceMap[i.name.trim()]?.price ?? 0) * i.quantity, 0)
                 .toFixed(2)}
             </div>
             <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
-              {active.filter((i) => priceMap[i.name.trim()]).length}/{active.length} מוצרים שנותרו לקנות
-              {taken.length > 0 ? ` · ${taken.length} שנקנו לא נספרים` : ""}
+              {activeAll.filter((i) => priceMap[i.name.trim()]).length}/{activeAll.length} מוצרים שנותרו לקנות
+              {takenCount > 0 ? ` · ${takenCount} שנקנו לא נספרים` : ""}
             </div>
           </div>
           <button className="btn btn-sm" onClick={() => setShowStores(true)}>
@@ -540,6 +570,19 @@ export default function Shopping() {
 
       {items.length === 0 ? (
         <EmptyState icon={<ShoppingBasket size={42} />} title="הרשימה ריקה" hint="הוסיפו מצרך ראשון למעלה" />
+      ) : q && !shown.length ? (
+        <div className="shop-nomatch">
+          <p>אין ״{query.trim()}״ ברשימה.</p>
+          <button
+            className="btn btn-sm"
+            onClick={() => {
+              addItem(query);
+              setQuery("");
+            }}
+          >
+            <Plus size={15} /> הוספה לרשימה
+          </button>
+        </div>
       ) : grouped ? (
         <div ref={listRef} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {groupedSections.map(([cat, catItems]) => (
@@ -559,6 +602,21 @@ export default function Shopping() {
         </div>
       )}
 
+      {updating && homeId && (
+        <ListUpdate
+          homeId={homeId}
+          userId={user?.id ?? null}
+          listId={activeList}
+          categories={allCategories}
+          history={catalog}
+          onClose={() => setUpdating(false)}
+          onDone={() => {
+            setUpdating(false);
+            loadItems();
+            loadCatalog();
+          }}
+        />
+      )}
       {showNewList && (
         <NewListModal
           homeId={homeId!}
