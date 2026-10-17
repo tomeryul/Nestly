@@ -31,9 +31,9 @@ export default function Shopping() {
   const [typed, setName] = useState("");
   const [qty, setQty] = useState(1);
   // Categories are the app's job, never the shopper's (lib/categorize). These are
-  // the items whose category the AI is still deciding, and those already sent to
-  // be sorted during this visit.
-  const [sorting, setSorting] = useState<Set<string>>(() => new Set());
+  // the items whose category the AI is still deciding (waiting for the next batch,
+  // or sent), and those already sent to be sorted during this visit.
+  const [sorting, setSorting] = useState<Map<string, "queued" | "sending">>(() => new Map());
   const sortTried = useRef(new Set<string>());
   // Finding something on a long list (the pantry) to change it, and updating in a sentence.
   const [query, setQuery] = useState("");
@@ -205,18 +205,21 @@ export default function Shopping() {
     setItems((prev) => prev.map((i) => (i.id === id && !i.category ? { ...i, category } : i)));
     bgWrite(supabase.from("shopping_items").update({ category }).eq("id", id).is("category", null));
   }, []);
-  /** Let the AI place an item the app couldn't, once the item is saved. */
+  /** Let the AI place an item the app couldn't, once the item is saved: it waits for the next batch. */
   const sortWithAi = useCallback(
     (id: string, itemName: string, saved: Promise<unknown> = Promise.resolve()) => {
       if (!homeId) return;
-      setSorting((s) => new Set(s).add(id));
-      Promise.all([aiCategory(homeId, itemName, allCategories), saved]).then(([picked]) => {
+      setSorting((s) => new Map(s).set(id, "queued"));
+      const sending = () => setSorting((s) => (s.has(id) ? new Map(s).set(id, "sending") : s));
+      Promise.all([aiCategory(homeId, itemName, allCategories, sending), saved]).then(([picked]) => {
         setSorting((s) => {
-          const next = new Set(s);
+          const next = new Map(s);
           next.delete(id);
           return next;
         });
-        setCategoryOf(id, picked ?? "כללי");
+        // No answer: it stays without a category and is asked about next time.
+        if (!picked) return;
+        setCategoryOf(id, picked);
         loadCatalog();
       });
     },
@@ -374,9 +377,13 @@ export default function Shopping() {
             </button>
           )}
           <span className="nst-tag" style={{ font: "400 12px var(--font-body)", letterSpacing: "0.04em" }}>
-            {!item.category && sorting.has(item.id) ? (
+            {!item.category && sorting.get(item.id) === "sending" ? (
               <>
                 <Sparkles className="nst-ai-pulse" /> ממיין…
+              </>
+            ) : !item.category && sorting.has(item.id) ? (
+              <>
+                <Sparkles /> ימוין בקרוב
               </>
             ) : (
               item.category || "ללא קטגוריה"

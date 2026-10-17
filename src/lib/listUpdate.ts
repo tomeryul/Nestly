@@ -71,10 +71,11 @@ export async function applyChanges(
           supabase.from("shopping_items").insert({ id, list_id: c.list_id, home_id: ctx.homeId, name: c.name, quantity: c.quantity, category, source: "manual", position: count ?? 0, created_by: ctx.userId }),
         );
         undos.push(() => supabase.from("shopping_items").delete().eq("id", id));
-        // Categories are the app's to set: a product it doesn't know goes to the AI.
+        // Categories are the app's to set: a product it doesn't know goes to the AI,
+        // with the next batch (no answer: the shopping list asks again when opened).
         if (!category)
           void aiCategory(ctx.homeId, c.name, ctx.categories).then((picked) =>
-            supabase.from("shopping_items").update({ category: picked ?? "כללי" }).eq("id", id).is("category", null),
+            picked ? supabase.from("shopping_items").update({ category: picked }).eq("id", id).is("category", null) : undefined,
           );
         continue;
       }

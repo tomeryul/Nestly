@@ -154,9 +154,12 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
     setQty(1);
     setUnit("");
     load();
+    // Sorted with the next batch of new products, so this can take a couple of minutes.
     if (!known && !isSpice) {
       const picked = await aiCategory(homeId, ingredient, categories);
-      await supabase.from("dish_ingredients").update({ category: picked ?? "כללי" }).eq("id", id).is("category", null);
+      if (!picked) return;
+      await supabase.from("dish_ingredients").update({ category: picked }).eq("id", id).is("category", null);
+      load();
     }
   };
   const remove = async (id: string) => {
