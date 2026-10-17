@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Check, ChevronLeft, Menu, MessageCircleQuestion, PanelBottom, Sparkles } from "lucide-react";
+import { Check, Menu, MessageCircleQuestion, SlidersHorizontal, Sparkles } from "lucide-react";
 import { NAV, navItem, type NavItem } from "../lib/nav";
 import { Modal } from "./ui";
 import type { AssistantTab } from "./QuickAdd";
@@ -8,11 +8,11 @@ import type { AssistantTab } from "./QuickAdd";
 /**
  * The menu, opened from the button in the middle of the tab bar. It rises from
  * the bottom like the app's other sheets (and drags down to close), so it opens
- * under the thumb that tapped it. Laid out the way iOS lays out a sheet like this:
- * grouped sections on the grouped background — the AI on top, then every section
- * as an icon in its own colour (as each app has one in Settings), then a row into
- * the tab bar's editor — and the version as a footnote. The editor is a page of
- * the same sheet: a preview of the bar, a list with a check per section, Done.
+ * under the thumb that tapped it. Built as an iOS menu in the app's own look:
+ * the AI on top as a row of icon-over-label buttons (the medium menu layout),
+ * then every section as a plain row — symbol and name, no separators — with the
+ * current one in the same lens the tab bar uses. Editing the tab bar is a page
+ * of the same sheet: a preview of the bar, a check per section, Done.
  */
 export default function MenuSheet({
   bottom,
@@ -40,88 +40,59 @@ export default function MenuSheet({
 
   return (
     <Modal open onClose={onClose} title={editing ? "הסרגל התחתון" : "תפריט"} done={editing ? { label: "סיום", onClick: () => setEditing(false) } : undefined}>
-      <div className="menu-sheet">
-        {editing ? (
-          <>
-            <h4 className="menu-section-head">כך ייראה הסרגל</h4>
-            <BarPreview bottom={bottom} />
-            <div className="menu-section" role="group" aria-label="סקשנים בסרגל התחתון">
-              {NAV.map(({ to, label, icon: Icon, tint }) => {
-                const picked = bottom.includes(to);
-                return (
-                  <button key={to} className="menu-row" aria-pressed={picked} disabled={picked ? last : full} onClick={() => toggle(to)}>
-                    <span className="menu-ico" data-tint={tint}>
-                      <Icon />
-                    </span>
-                    <span className="menu-row-text">
-                      <b>{label}</b>
-                    </span>
-                    <span className={`nst-check ${picked ? "on" : ""}`} aria-hidden>
-                      <Check size={12} />
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <p className="menu-section-foot">
-              עד {max} סקשנים בסרגל ({bottom.length}/{max}); התפריט תמיד באמצע.
-              {full && " כדי להוסיף אחר, הסירו קודם אחד."}
-              {last && " חייב להישאר לפחות סקשן אחד."}
-            </p>
-          </>
-        ) : (
-          <>
-            <div className="menu-section menu-ai">
-              <button className="menu-row" onClick={() => onAssistant("add")}>
-                <span className="menu-ico" data-tint="accent">
-                  <Sparkles />
-                </span>
-                <span className="menu-row-text">
-                  <b>הוספה מהירה</b>
-                  <small>קניות, לוז ומשימות במשפט או בצילום מסך</small>
-                </span>
-              </button>
-              <button className="menu-row" onClick={() => onAssistant("ask")}>
-                <span className="menu-ico" data-tint="accent">
-                  <MessageCircleQuestion />
-                </span>
-                <span className="menu-row-text">
-                  <b>שאל את הבית</b>
-                  <small>מה יש היום, מה חסר, מה מחכה לאיסוף</small>
-                </span>
-              </button>
-            </div>
-
-            <h4 className="menu-section-head">כל הסקשנים</h4>
-            <nav className="menu-section menu-grid" aria-label="כל הסקשנים">
-              {NAV.map(({ to, label, icon: Icon, tint, end }) => (
-                <NavLink key={to} to={to} end={end} onClick={onClose} className={({ isActive }) => `menu-app ${isActive ? "is-current" : ""}`}>
-                  <span className="menu-ico" data-tint={tint}>
-                    <Icon />
+      {editing ? (
+        <>
+          <BarPreview bottom={bottom} />
+          <div className="menu-list" role="group" aria-label="סקשנים בסרגל התחתון">
+            {NAV.map(({ to, label, icon: Icon }) => {
+              const picked = bottom.includes(to);
+              return (
+                <button key={to} className="menu-item" aria-pressed={picked} disabled={picked ? last : full} onClick={() => toggle(to)}>
+                  <span className={`nst-check ${picked ? "on" : ""}`} aria-hidden>
+                    <Check size={12} />
                   </span>
-                  <span className="menu-app-label">{label}</span>
-                </NavLink>
-              ))}
-            </nav>
+                  <Icon />
+                  <span className="menu-item-label">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="menu-foot">
+            עד {max} סקשנים ({bottom.length}/{max}); התפריט תמיד באמצע.
+            {full && " כדי להוסיף אחר, הסירו קודם אחד."}
+            {last && " חייב להישאר לפחות סקשן אחד."}
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="menu-ai">
+            <button className="menu-ai-btn" onClick={() => onAssistant("add")}>
+              <Sparkles />
+              הוספה מהירה
+            </button>
+            <button className="menu-ai-btn" onClick={() => onAssistant("ask")}>
+              <MessageCircleQuestion />
+              שאל את הבית
+            </button>
+          </div>
 
-            <div className="menu-section">
-              <button className="menu-row" onClick={() => setEditing(true)}>
-                <span className="menu-ico" data-tint="gray">
-                  <PanelBottom />
-                </span>
-                <span className="menu-row-text">
-                  <b>עריכת הסרגל התחתון</b>
-                </span>
-                <ChevronLeft className="menu-chevron" aria-hidden />
-              </button>
-            </div>
+          <nav className="menu-list" aria-label="כל הסקשנים">
+            {NAV.map(({ to, label, icon: Icon, end }) => (
+              <NavLink key={to} to={to} end={end} onClick={onClose} className={({ isActive }) => `menu-item ${isActive ? "is-current" : ""}`}>
+                <Icon />
+                <span className="menu-item-label">{label}</span>
+              </NavLink>
+            ))}
+          </nav>
 
-            <p className="menu-version">
-              Nestly · גרסה <bdi>{__APP_VERSION__}</bdi>
-            </p>
-          </>
-        )}
-      </div>
+          <button className="btn btn-block menu-edit" onClick={() => setEditing(true)}>
+            <SlidersHorizontal size={16} /> עריכת הסרגל התחתון
+          </button>
+          <p className="menu-foot menu-version">
+            גרסה <bdi>{__APP_VERSION__}</bdi>
+          </p>
+        </>
+      )}
     </Modal>
   );
 }

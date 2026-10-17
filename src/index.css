@@ -676,82 +676,50 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .nst-bn-menu:active .nst-bn-menu-disc { transform: scale(0.92); }
 .nst-bn-spacer { visibility: hidden; pointer-events: none; }
 
-/* The menu sheet, built as an iOS grouped sheet: white sections on the grouped
-   background, Settings-style rows, and each section's icon in its own system colour. */
-:root {
-  --sys-red: #FF3B30; --sys-orange: #FF9500; --sys-green: #34C759; --sys-teal: #30B0C7; --sys-blue: #007AFF;
-  --sys-indigo: #5856D6; --sys-purple: #AF52DE; --sys-brown: #A2845E; --sys-gray: #8E8E93;
+/* The menu sheet: an iOS menu in the app's own look. The AI on top as the medium
+   menu's row of icon-over-label buttons (tinted, as the app's AI buttons are);
+   below it every section as a plain row — symbol and name, no separators, as in a
+   menu or a sidebar — and the current one in the tab bar's lens, in the accent. */
+.menu-ai { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.menu-ai-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+  min-height: 78px; padding: 12px 8px; border: none; border-radius: 18px;
+  background: var(--accent-soft); color: var(--accent-ink);
+  font: 600 var(--t-subhead)/1.2 var(--font-body); text-align: center; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: transform var(--press) var(--ease-out), opacity var(--press) var(--ease-out);
 }
-[data-theme="garden-night"], [data-theme="warm-dark"], [data-theme="cool-dark"], [data-theme="midnight"] {
-  --sys-red: #FF453A; --sys-orange: #FF9F0A; --sys-green: #30D158; --sys-teal: #40C8E0; --sys-blue: #0A84FF;
-  --sys-indigo: #5E5CE6; --sys-purple: #BF5AF2; --sys-brown: #AC8E68; --sys-gray: #8E8E93;
-}
-.nst-modal:has(.menu-sheet) { background: var(--bg); }
-.menu-sheet { --ico: 30px; }
-.menu-section { background: var(--surface); border-radius: var(--radius); overflow: hidden; margin-bottom: 24px; }
-.menu-section-head { margin: 0 16px 7px; font: 400 var(--t-footnote)/1.3 var(--font-body); color: var(--text-3); }
-.menu-section-foot { margin: -16px 16px 24px; font: 400 var(--t-footnote)/1.4 var(--font-body); color: var(--text-3); }
+.menu-ai-btn svg { width: 24px; height: 24px; }
+.menu-ai-btn:active { transform: scale(0.97); opacity: .85; }
 
-/* The icon: a squircle in the section's colour with a white glyph, lit softly from above. */
-.menu-ico {
-  flex: none; width: var(--ico); height: var(--ico); border-radius: calc(var(--ico) * 0.235);
-  display: grid; place-items: center; color: #fff;
-  background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 65%) var(--tint, var(--sys-gray));
+.menu-list { display: flex; flex-direction: column; gap: 2px; margin: 0 -8px; }
+.menu-item {
+  display: flex; align-items: center; gap: 14px; width: 100%; min-height: 48px; padding: 0 12px;
+  border: none; border-radius: 14px; background: none; color: var(--text-bright); text-align: start; text-decoration: none;
+  font: 400 var(--t-body)/1.3 var(--font-body); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: background 120ms var(--ease-out);
 }
-.menu-ico svg { width: 62%; height: 62%; stroke-width: 2.1; }
-.menu-ico[data-tint="red"] { --tint: var(--sys-red); }
-.menu-ico[data-tint="orange"] { --tint: var(--sys-orange); }
-.menu-ico[data-tint="green"] { --tint: var(--sys-green); }
-.menu-ico[data-tint="teal"] { --tint: var(--sys-teal); }
-.menu-ico[data-tint="blue"] { --tint: var(--sys-blue); }
-.menu-ico[data-tint="indigo"] { --tint: var(--sys-indigo); }
-.menu-ico[data-tint="purple"] { --tint: var(--sys-purple); }
-.menu-ico[data-tint="brown"] { --tint: var(--sys-brown); }
-.menu-ico[data-tint="accent"] { --tint: var(--accent); color: var(--on-accent); }
+.menu-item > svg { flex: none; width: 22px; height: 22px; color: var(--text-3); }
+.menu-item-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-item:active:not(:disabled) { background: var(--lens); transition-duration: 0ms; }
+.menu-item.is-current { background: var(--lens); color: var(--accent-ink); font-weight: 600; }
+.menu-item.is-current > svg { color: var(--accent-ink); }
+.menu-item .nst-check { width: 24px; height: 24px; }
+.menu-item:disabled { cursor: default; }
+.menu-item:disabled > * { opacity: .4; }
+@media (hover: hover) and (pointer: fine) { .menu-item:hover:not(:disabled):not(.is-current) { background: var(--hover); } }
 
-/* Rows: 44pt and up, the hairline starting where the text starts, a grey wash while pressed. */
-.menu-row {
-  position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-height: var(--tap);
-  padding: 9px 16px; border: none; background: none; color: var(--text-bright); text-align: start; font: inherit;
-  cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background 120ms var(--ease-out);
-}
-.menu-row + .menu-row::before {
-  content: ''; position: absolute; top: 0; inset-inline: calc(16px + var(--ico) + 12px) 0;
-  height: 1px; transform: scaleY(0.5); transform-origin: top; background: var(--sep-strong);
-}
-.menu-row:active:not(:disabled) { background: var(--fill-2); transition-duration: 0ms; }
-.menu-row:disabled { cursor: default; }
-.menu-row:disabled > * { opacity: .4; }
-.menu-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.menu-row-text b { font: 400 var(--t-body)/1.3 var(--font-body); color: var(--text-bright); }
-.menu-row-text small { font: 400 var(--t-footnote)/1.35 var(--font-body); color: var(--text-3); }
-.menu-row .nst-check { width: 24px; height: 24px; }
-.menu-chevron { flex: none; width: 18px; height: 18px; color: var(--text-faint); stroke-width: 2.6; }
-.menu-ai { --ico: 38px; }
-.menu-ai .menu-row { padding-block: 11px; }
-
-/* All the sections, as a home screen: icon over a one-word name. */
-.menu-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 8px; padding: 20px 10px 18px; }
-.menu-app {
-  display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 0;
-  color: var(--text-bright); text-decoration: none; -webkit-tap-highlight-color: transparent;
-}
-.menu-app .menu-ico { --ico: 60px; transition: transform var(--press) var(--ease-out), filter var(--press) var(--ease-out); }
-.menu-app .menu-ico svg { width: 48%; height: 48%; stroke-width: 2; }
-.menu-app:active .menu-ico { transform: scale(0.92); filter: brightness(0.86); }
-.menu-app-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 var(--t-footnote)/1.25 var(--font-body); }
-.menu-app.is-current .menu-app-label { font-weight: 600; color: var(--accent-ink); }
-
-.menu-version { margin: -8px 0 0; text-align: center; font: 400 var(--t-footnote) var(--font-body); color: var(--text-3); }
+.menu-edit { margin-top: 16px; }
+.menu-foot { margin: 10px 4px 0; font: 400 var(--t-footnote)/1.4 var(--font-body); color: var(--text-3); }
+.menu-version { text-align: center; margin-top: 12px; }
 
 /* The editor's preview of the tab bar. */
 .menu-bar-preview {
-  display: flex; align-items: center; height: 60px; padding: 0 8px; margin-bottom: 24px;
-  border-radius: var(--r-capsule); background: var(--surface); box-shadow: inset 0 0 0 1px var(--sep);
+  display: flex; align-items: center; height: 60px; padding: 0 8px; margin-bottom: 14px;
+  border-radius: var(--r-capsule); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--sep);
 }
 .menu-bar-item { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--text-2); }
 .menu-bar-item svg { width: 21px; height: 21px; }
-.menu-bar-item small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 11px var(--font-body); }
+.menu-bar-item small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 11px var(--font-body); }
 .menu-bar-disc { flex: none; width: 42px; height: 42px; margin: 0 6px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--on-accent); }
 .menu-bar-disc svg { width: 21px; height: 21px; stroke-width: 2.3; }
 
@@ -837,7 +805,7 @@ input, textarea, p, li, h1, h2, h3, .nst-card-title, .page-title {
    scale are dropped. A blanket rule over * would take the loading indicator
    with it. */
 @media (prefers-reduced-motion: reduce) {
-  .menu-app:active .menu-ico { transform: none; }
+  .menu-ai-btn:active { transform: none; }
   html { scroll-behavior: auto; }
   .tab-content { animation-name: none; }
   .nst-modal, .nst-drawer {
