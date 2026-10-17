@@ -1,12 +1,13 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Home, ChevronDown, Moon, Sun, Menu, Sparkles } from "lucide-react";
+import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import NotificationBell from "./NotificationBell";
 import { isNight, onThemeChange, toggleNight } from "../lib/theme";
 import { NAV, BOTTOM_MAX, getBottomNav, setBottomNav, navItem } from "../lib/nav";
-import NavDrawer from "./NavDrawer";
+import MenuSheet from "./MenuSheet";
 import QuickAdd, { ASSISTANT_EVENT, type AssistantTab } from "./QuickAdd";
 import { useTabLens } from "../lib/tabLens";
 
@@ -190,9 +191,6 @@ export default function Layout() {
                 {night ? <Sun /> : <Moon />}
               </button>
               <NotificationBell />
-              <button className="nst-iconbtn plain nst-burger" onClick={() => setDrawer(true)} title="תפריט" aria-label="תפריט">
-                <Menu />
-              </button>
             </div>
           </header>
 
@@ -202,34 +200,57 @@ export default function Layout() {
         </div>
       </div>
 
-      {/* bottom nav (mobile) */}
+      {/* bottom nav (mobile): pinned sections either side of the menu button, which
+          stays in the exact middle — a spacer evens out an odd number of tabs. */}
       <nav className="nst-bottomnav nst-glass">
         <div className="nst-bn-grid" ref={tabsRef}>
           <span className="nst-bn-lens" ref={lensRef} aria-hidden="true" />
-          {bottom.map((path) => {
-            const item = navItem(path);
-            if (!item) return null;
-            const Icon = item.icon;
+          {(() => {
+            const tab = (path: string): ReactNode => {
+              const item = navItem(path);
+              if (!item) return null;
+              const Icon = item.icon;
+              return (
+                <NavLink key={path} to={path} end={item.end} className={({ isActive }) => `nst-bn ${isActive ? "active" : ""}`}>
+                  <Icon />
+                  <span>{item.label}</span>
+                </NavLink>
+              );
+            };
+            const half = Math.ceil(bottom.length / 2);
+            const before = bottom.slice(0, half);
+            const after = bottom.slice(half);
+            const spacer = <span className="nst-bn nst-bn-spacer" aria-hidden key="spacer" />;
             return (
-              <NavLink key={path} to={path} end={item.end} className={({ isActive }) => `nst-bn ${isActive ? "active" : ""}`}>
-                <Icon />
-                <span>{item.label}</span>
-              </NavLink>
+              <>
+                {before.map(tab)}
+                <button className="nst-bn-menu" onClick={() => setDrawer(true)} aria-label="תפריט" aria-haspopup="dialog" title="תפריט">
+                  <span className="nst-bn-menu-disc">
+                    <Menu />
+                  </span>
+                </button>
+                {after.map(tab)}
+                {after.length < before.length && spacer}
+              </>
             );
-          })}
+          })()}
         </div>
       </nav>
 
       {assistant && <QuickAdd onClose={() => setAssistant(null)} initialTab={assistant.tab ?? undefined} />}
 
       {drawer && (
-        <NavDrawer
+        <MenuSheet
           bottom={bottom}
           max={BOTTOM_MAX}
           onClose={() => setDrawer(false)}
           onBottomChange={(next) => {
             setBottom(next);
             setBottomNav(next);
+          }}
+          onAssistant={(tab) => {
+            setDrawer(false);
+            setAssistant({ tab });
           }}
         />
       )}

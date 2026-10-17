@@ -24,11 +24,11 @@ export const NAV: NavItem[] = [
 
 export const navItem = (to: string) => NAV.find((n) => n.to === to);
 
-/** How many sections fit across the bottom bar on a phone. */
-export const BOTTOM_MAX = 5;
+/** How many sections sit in the bottom bar on a phone: two each side of the menu button. */
+export const BOTTOM_MAX = 4;
 
 const KEY = "nestly.bottomNav";
-const DEFAULT_BOTTOM = ["/", "/shopping", "/schedule", "/cleaning", "/personal"];
+const DEFAULT_BOTTOM = ["/", "/shopping", "/schedule", "/personal"];
 
 /** The sections pinned to the bottom bar, newest-valid-first and capped at BOTTOM_MAX. */
 export function getBottomNav(): string[] {
