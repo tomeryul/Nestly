@@ -72,14 +72,15 @@ function roundedBox(ctx: CanvasRenderingContext2D, x: number, y: number, s: numb
   ctx.stroke();
 }
 
-export function newPage() {
+/** A blank page; portrait by default, or pass the landscape size (H × W). */
+export function newPage(w = W, h = H) {
   const canvas = document.createElement("canvas");
-  canvas.width = W * SCALE;
-  canvas.height = H * SCALE;
+  canvas.width = w * SCALE;
+  canvas.height = h * SCALE;
   const ctx = canvas.getContext("2d")!;
   ctx.scale(SCALE, SCALE);
   ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0, 0, w, h);
   // RTL paragraph direction, so "-" and "+" and numbers inside a Hebrew
   // title land where they do on screen.
   ctx.direction = "rtl";
@@ -157,9 +158,9 @@ export function drawChecklist(title: string, subtitle: string, sections: Checkli
 }
 
 /** Header shared by every printed sheet: title, subtitle, a rule. Returns where content starts. */
-export function drawHeader(ctx: CanvasRenderingContext2D, title: string, subtitle: string) {
-  const right = W - M;
-  let y = M;
+export function drawHeader(ctx: CanvasRenderingContext2D, title: string, subtitle: string, w = W, m = M) {
+  const right = w - m;
+  let y = m;
   ctx.fillStyle = "#111";
   ctx.font = font(700, 26);
   ctx.fillText(title, right, y + 26);
@@ -169,19 +170,19 @@ export function drawHeader(ctx: CanvasRenderingContext2D, title: string, subtitl
   ctx.fillText(subtitle, right, y + 16);
   y += 16 + 14;
   ctx.fillStyle = "#111";
-  ctx.fillRect(M, y, W - 2 * M, 3);
+  ctx.fillRect(m, y, w - 2 * m, 3);
   return y + 3 + 24;
 }
 
 /** Page numbers, once the total is known. */
-export function numberPages(pages: HTMLCanvasElement[]) {
+export function numberPages(pages: HTMLCanvasElement[], w = W, h = H) {
   if (pages.length < 2) return;
   pages.forEach((c, i) => {
     const p = c.getContext("2d")!;
     p.fillStyle = "#888";
     p.font = font(400, 11);
     p.textAlign = "center";
-    p.fillText(`עמוד ${i + 1} מתוך ${pages.length}`, W / 2, H - M + 6);
+    p.fillText(`עמוד ${i + 1} מתוך ${pages.length}`, w / 2, h - M + 6);
   });
 }
 
@@ -195,9 +196,9 @@ export async function exportChecklistPdf(opts: {
 }
 
 /** A4 pages drawn on canvases, saved as one PDF (on a phone it opens ready to print or share). */
-export async function savePdf(pages: HTMLCanvasElement[], filename: string) {
+export async function savePdf(pages: HTMLCanvasElement[], filename: string, orientation: "portrait" | "landscape" = "portrait") {
   const { jsPDF } = await import("jspdf");
-  const pdf = new jsPDF("p", "mm", "a4");
+  const pdf = new jsPDF(orientation === "landscape" ? "l" : "p", "mm", "a4");
   const pw = pdf.internal.pageSize.getWidth();
   const ph = pdf.internal.pageSize.getHeight();
   pages.forEach((c, i) => {

@@ -1,95 +1,104 @@
-import { M, W, H, baselineFor, drawHeader, font, newPage, numberPages, savePdf, wrap } from "./checklistPdf";
+import { W, H, baselineFor, drawHeader, font, newPage, savePdf, wrap } from "./checklistPdf";
 
 /**
- * The week's menu as a printable A4 sheet, for the fridge: a block per day,
- * Sunday to Saturday, the day and its date on the right and its meals beside
- * them, then whatever is planned for the whole week. Drawn on a canvas like the
- * cleaning sheet, so Hebrew and numbers sit where they do on screen and a day
- * is never split across a page break.
+ * The week's menu as a printable A4 sheet for the fridge, landscape: seven
+ * columns side by side, Sunday on the right, each with its day and date on top
+ * and that day's dishes under it, one per line. The grid runs to the foot of the
+ * page, so a day with nothing planned is room to write one in by hand. Drawn on
+ * a canvas like the cleaning sheet, so Hebrew and numbers sit where they do on
+ * screen; always one page (the text shrinks if a day is unusually full).
  */
-export type MenuLine = { label: string; dishes: string };
+export type MenuLine = { label: string; dishes: string[] };
 export type MenuDay = { day: string; date: string; meals: MenuLine[] };
 
-const DAY_COL = 150; // the day name + date column
-const NAME = 19; // dish text
-const LABEL = 14; // "ערב:" before it
-const LINE = 28;
-const PAD = 12; // above and below each day
-const FOOT = 32;
+// Landscape: the portrait page turned on its side.
+const PW = H;
+const PH = W;
+const PM = 40; // page margin
+const HEAD = 58; // the day + date band at the top of each column
+const PAD = 12; // inside a column
+const BULLET = 13; // room for the "•" that starts each dish, so a long name that wraps still reads as one
 
 export function drawMenu(title: string, subtitle: string, days: MenuDay[], extras: MenuLine[]) {
-  const pages: HTMLCanvasElement[] = [];
-  let { canvas, ctx } = newPage();
-  pages.push(canvas);
-  const right = W - M;
-  const mealRight = right - DAY_COL;
-  const bottom = H - M - FOOT;
-  let y = drawHeader(ctx, title, subtitle);
+  const { canvas, ctx } = newPage(PW, PH);
+  const right = PW - PM;
+  const top = drawHeader(ctx, title, subtitle, PW, PM) - 6;
+  const extrasH = extras.length ? 40 : 0;
+  const bottom = PH - PM - extrasH;
+  const colW = (PW - 2 * PM) / days.length;
+  const textW = colW - PAD * 2;
 
-  // One line per meal: the label, then its dishes, wrapped under themselves.
-  const layout = (meals: MenuLine[]) =>
-    meals.map((m) => {
-      ctx.font = font(700, LABEL);
-      const labelW = m.label ? ctx.measureText(m.label).width + 8 : 0;
-      ctx.font = font(500, NAME);
-      return { ...m, labelW, lines: wrap(ctx, m.dishes, mealRight - M - labelW) };
-    });
-
-  const drawBlock = (head: { day: string; date: string } | null, meals: MenuLine[], empty: string) => {
-    const rows = layout(meals);
-    const lineCount = Math.max(head ? 2 : 1, rows.reduce((n, r) => n + r.lines.length, 0) || 1);
-    const h = PAD * 2 + lineCount * LINE;
-    if (y + h > bottom && y > M + 1) {
-      ({ canvas, ctx } = newPage());
-      pages.push(canvas);
-      y = M;
-    }
-    const top = y + PAD;
-    if (head) {
-      ctx.fillStyle = "#111";
-      ctx.font = font(700, 20);
-      ctx.fillText(head.day, right, baselineFor(ctx, top + LINE / 2, 20));
-      ctx.fillStyle = "#666";
-      ctx.font = font(500, 15);
-      ctx.fillText(head.date, right, baselineFor(ctx, top + LINE * 1.5, 15));
-    }
-    let line = 0;
-    if (!rows.length) {
-      ctx.fillStyle = "#aaa";
-      ctx.font = font(400, NAME);
-      ctx.fillText(empty, mealRight, baselineFor(ctx, top + LINE / 2, NAME));
-    }
-    for (const r of rows) {
-      const mid = top + line * LINE + LINE / 2;
-      if (r.label) {
-        ctx.fillStyle = "#777";
-        ctx.font = font(700, LABEL);
-        ctx.fillText(r.label, mealRight, baselineFor(ctx, mid, LABEL));
-      }
-      ctx.fillStyle = "#111";
-      ctx.font = font(500, NAME);
-      r.lines.forEach((l, i) => ctx.fillText(l, mealRight - r.labelW, baselineFor(ctx, mid + i * LINE, NAME)));
-      line += r.lines.length;
-    }
-    y += h;
-    ctx.fillStyle = "#ddd";
-    ctx.fillRect(M, y, W - 2 * M, 1);
-    y += 1;
+  // The largest dish size at which every day fits its column.
+  const layoutAt = (size: number) => {
+    const line = Math.round(size * 1.35);
+    ctx.font = font(500, size);
+    const cols = days.map((d) => d.meals.map((m) => ({ label: m.label, dishes: m.dishes.map((dish) => wrap(ctx, dish, textW - BULLET)) })));
+    const need = cols.map((meals) => meals.reduce((h, m) => h + (m.label ? 20 : 0) + m.dishes.reduce((n, l) => n + l.length * line + 4, 0) + 6, 0));
+    return { size, line, cols, fits: need.every((h) => HEAD + PAD + h <= bottom - top) };
   };
+  let layout = layoutAt(17);
+  for (const size of [16, 15, 14, 13, 12]) if (!layout.fits) layout = layoutAt(size);
 
-  days.forEach((d) => drawBlock({ day: d.day, date: d.date }, d.meals, "—"));
-  if (extras.length) {
-    y += 18;
+  days.forEach((d, i) => {
+    const xr = right - i * colW; // RTL: Sunday's column is the rightmost
+    const xl = xr - colW;
+    // Day band
+    ctx.fillStyle = "#f1f1f1";
+    ctx.fillRect(xl, top, colW, HEAD);
     ctx.fillStyle = "#111";
-    ctx.font = font(700, 18);
-    ctx.fillText("עוד השבוע", right, y + 18);
-    y += 18 + 8;
-    drawBlock(null, extras, "");
+    ctx.font = font(700, 19);
+    ctx.fillText(d.day, xr - PAD, baselineFor(ctx, top + 21, 19));
+    ctx.fillStyle = "#666";
+    ctx.font = font(500, 14);
+    ctx.fillText(d.date, xr - PAD, baselineFor(ctx, top + 42, 14));
+    // Dishes, one per line, under their meal when the day has more than one
+    let y = top + HEAD + PAD;
+    for (const m of layout.cols[i]) {
+      if (m.label) {
+        ctx.fillStyle = "#888";
+        ctx.font = font(700, 12);
+        ctx.fillText(m.label, xr - PAD, baselineFor(ctx, y + 8, 12));
+        y += 20;
+      }
+      ctx.font = font(500, layout.size);
+      for (const lines of m.dishes) {
+        ctx.fillStyle = "#999";
+        ctx.fillText("•", xr - PAD, baselineFor(ctx, y + layout.line / 2, layout.size));
+        ctx.fillStyle = "#111";
+        for (const l of lines) {
+          ctx.fillText(l, xr - PAD - BULLET, baselineFor(ctx, y + layout.line / 2, layout.size));
+          y += layout.line;
+        }
+        y += 4;
+      }
+      y += 6;
+    }
+  });
+
+  // Grid: outline, column dividers, and the line under the day band.
+  ctx.strokeStyle = "#333";
+  ctx.lineWidth = 1.2;
+  ctx.strokeRect(PM, top, PW - 2 * PM, bottom - top);
+  ctx.beginPath();
+  for (let i = 1; i < days.length; i++) {
+    const x = right - i * colW;
+    ctx.moveTo(x, top);
+    ctx.lineTo(x, bottom);
   }
-  numberPages(pages);
-  return pages;
+  ctx.moveTo(PM, top + HEAD);
+  ctx.lineTo(right, top + HEAD);
+  ctx.stroke();
+
+  // Whatever is planned for the whole week (or no day), in one line under the grid.
+  if (extras.length) {
+    const text = extras.map((e) => `${e.label} ${e.dishes.join(", ")}`).join("   ·   ");
+    ctx.fillStyle = "#111";
+    ctx.font = font(500, 15);
+    ctx.fillText(wrap(ctx, text, PW - 2 * PM)[0], right, baselineFor(ctx, bottom + extrasH / 2 + 4, 15));
+  }
+  return [canvas];
 }
 
 export async function exportMenuPdf(opts: { title: string; subtitle: string; days: MenuDay[]; extras: MenuLine[]; filename: string }) {
-  await savePdf(drawMenu(opts.title, opts.subtitle, opts.days, opts.extras), opts.filename);
+  await savePdf(drawMenu(opts.title, opts.subtitle, opts.days, opts.extras), opts.filename, "landscape");
 }

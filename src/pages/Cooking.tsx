@@ -422,15 +422,20 @@ function WeekTab({ openWeek, openDay }: { openWeek?: string; openDay?: number })
   const others = meals.filter((m) => !isDinnerOf(m));
 
   const printMenu = async () => {
-    const line = (list: Meal[], label: string): MenuLine => ({ label, dishes: list.map((m) => m.dishes?.name ?? "מאכל").join(", ") });
+    const names = (list: Meal[]) => list.map((m) => m.dishes?.name ?? "מאכל");
     const days = DAYS_HE.map((d, i) => {
       const onDay = meals.filter((m) => !m.all_week && m.day_of_week === i);
       const byType = MEAL_ORDER.map((t) => [t, onDay.filter((m) => (m.meal_type ?? "other") === t)] as const).filter(([, l]) => l.length);
-      return { day: d, date: formatDayMonth(addDays(weekStart, i)), meals: byType.map(([t, l]) => line(l, `${MEAL_TYPES[t]}:`)) };
+      // A day of dinner only needs no label; one with more meals names each.
+      const labelled = byType.length > 1 || (byType.length === 1 && byType[0][0] !== "dinner");
+      return { day: d, date: formatDayMonth(addDays(weekStart, i)), meals: byType.map(([t, l]): MenuLine => ({ label: labelled ? MEAL_TYPES[t] : "", dishes: names(l) })) };
     });
     const allWeek = meals.filter((m) => m.all_week);
     const noDay = meals.filter((m) => !m.all_week && m.day_of_week == null);
-    const extras = [...(allWeek.length ? [line(allWeek, "כל השבוע:")] : []), ...(noDay.length ? [line(noDay, "ללא יום:")] : [])];
+    const extras: MenuLine[] = [
+      ...(allWeek.length ? [{ label: "כל השבוע:", dishes: names(allWeek) }] : []),
+      ...(noDay.length ? [{ label: "ללא יום:", dishes: names(noDay) }] : []),
+    ];
     setPrinting(true);
     try {
       const range = `${formatDayMonth(weekStart)} – ${formatDayMonth(addDays(weekStart, 6))}`;
