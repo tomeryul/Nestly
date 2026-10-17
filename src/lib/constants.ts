@@ -30,6 +30,11 @@ export const MEAL_TYPES = {
   other: "אחר",
 } as const;
 
+// Meals in the order of a day, and how a day's meal is named on its own
+// (the schedule shows "ארוחת ערב: שקשוקה").
+export const MEAL_ORDER = ["breakfast", "lunch", "dinner", "other"] as const;
+export const MEAL_LABEL: Record<string, string> = { breakfast: "ארוחת בוקר", lunch: "ארוחת צהריים", dinner: "ארוחת ערב", other: "ארוחה" };
+
 export const TASK_CATEGORIES = {
   general: { label: "כללי", color: "#64748b" },
   shopping: { label: "קניות", color: "#0d9488" },

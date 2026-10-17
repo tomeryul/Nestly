@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2, ChevronRight, ChevronLeft, ShoppingCart, Check, X, CalendarPlus, ChefHat, UtensilsCrossed, Info, ArrowDownAZ, Clock, Repeat, TriangleAlert } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronLeft, ShoppingCart, Check, X, CalendarPlus, ChefHat, UtensilsCrossed, Info, ArrowDownAZ, Clock, Repeat, TriangleAlert, Printer } from "lucide-react";
+import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { AiButton, PickRow, usePicks } from "../components/AiParts";
 import { aiErrorText, callAi } from "../lib/ai";
@@ -8,8 +9,9 @@ import { readCache, useOnResume, useSeedFromCache, writeCache } from "../lib/cac
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner, SegLens } from "../components/ui";
-import { CATEGORIES, DAYS_HE, MEAL_TYPES } from "../lib/constants";
-import { addDays, formatDayMonth, startOfWeek, toISODate } from "../lib/dates";
+import { CATEGORIES, DAYS_HE, MEAL_ORDER, MEAL_TYPES } from "../lib/constants";
+import { addDays, formatDayMonth, isToday, parseISODate, startOfWeek, toISODate } from "../lib/dates";
+import { exportMenuPdf, type MenuLine } from "../lib/menuPdf";
 import { bgWrite, newId } from "../lib/optimistic";
 import { aiCategory, knownCategory } from "../lib/categorize";
 import type { Tables } from "../types/database";
@@ -20,6 +22,8 @@ type Meal = Tables<"weekly_meals"> & { dishes?: { name: string } | null };
 type List = Tables<"shopping_lists">;
 
 export default function Cooking() {
+  // The schedule opens the menu on a given week and day (navigate state { week, day }).
+  const opened = useLocation().state as { week?: string; day?: number } | null;
   const [tab, setTab] = useState<"week" | "dishes">("week");
   return (
     <section className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -33,7 +37,7 @@ export default function Cooking() {
           מאכלים קבועים
         </button>
       </div>
-      {tab === "week" ? <WeekTab /> : <DishesTab />}
+      {tab === "week" ? <WeekTab openWeek={opened?.week} openDay={opened?.day} /> : <DishesTab />}
     </section>
   );
 }
@@ -360,11 +364,16 @@ function RecipeAi({ dish, existing, onAdded }: { dish: Dish; existing: Ingredien
   );
 }
 
-function WeekTab() {
+const isDinnerOf = (m: Meal) => m.meal_type === "dinner" && m.day_of_week != null && !m.all_week;
+
+function WeekTab({ openWeek, openDay }: { openWeek?: string; openDay?: number }) {
   const { homeId, members } = useHome();
   const { user } = useAuth();
   const nameFor = (uid: string) => members.find((m) => m.user_id === uid)?.profile?.display_name ?? "";
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(openWeek ? parseISODate(openWeek) : new Date()));
+  // The day whose dinner is being chosen.
+  const [dinnerDay, setDinnerDay] = useState<number | null>(openDay ?? null);
+  const [printing, setPrinting] = useState(false);
   const [meals, setMeals] = useState<Meal[]>([]);
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [lists, setLists] = useState<List[]>([]);
@@ -409,6 +418,31 @@ function WeekTab() {
     load();
   };
 
+  const dinnersOn = (day: number) => meals.filter((m) => isDinnerOf(m) && m.day_of_week === day);
+  const others = meals.filter((m) => !isDinnerOf(m));
+
+  const printMenu = async () => {
+    const line = (list: Meal[], label: string): MenuLine => ({ label, dishes: list.map((m) => m.dishes?.name ?? "מאכל").join(", ") });
+    const days = DAYS_HE.map((d, i) => {
+      const onDay = meals.filter((m) => !m.all_week && m.day_of_week === i);
+      const byType = MEAL_ORDER.map((t) => [t, onDay.filter((m) => (m.meal_type ?? "other") === t)] as const).filter(([, l]) => l.length);
+      return { day: d, date: formatDayMonth(addDays(weekStart, i)), meals: byType.map(([t, l]) => line(l, `${MEAL_TYPES[t]}:`)) };
+    });
+    const allWeek = meals.filter((m) => m.all_week);
+    const noDay = meals.filter((m) => !m.all_week && m.day_of_week == null);
+    const extras = [...(allWeek.length ? [line(allWeek, "כל השבוע:")] : []), ...(noDay.length ? [line(noDay, "ללא יום:")] : [])];
+    setPrinting(true);
+    try {
+      const range = `${formatDayMonth(weekStart)} – ${formatDayMonth(addDays(weekStart, 6))}`;
+      await exportMenuPdf({ title: "תפריט השבוע", subtitle: range, days, extras, filename: `תפריט-השבוע-${formatDayMonth(weekStart).replace(/\//g, ".")}.pdf` });
+    } catch (e) {
+      console.error(e);
+      toast.error("לא הצלחנו להכין את התפריט להדפסה", { description: "נסו שוב בעוד רגע." });
+    } finally {
+      setPrinting(false);
+    }
+  };
+
   if (loading) return <FullPageSpinner />;
 
   return (
@@ -428,9 +462,34 @@ function WeekTab() {
         </button>
       </div>
 
+      <div className="nst-subhead" style={{ paddingTop: 0 }}>
+        <UtensilsCrossed size={13} /> ארוחות ערב
+        <button className="btn btn-sm" style={{ marginInlineStart: "auto" }} onClick={printMenu} disabled={printing} title="הדפסת תפריט השבוע (PDF)">
+          <Printer size={15} /> {printing ? "מכין…" : "הדפסה"}
+        </button>
+      </div>
+      <div className="nst-group dinner-week">
+        {DAYS_HE.map((d, i) => {
+          const date = addDays(weekStart, i);
+          const chosen = dinnersOn(i);
+          return (
+            <button key={i} className="nst-row dinner-row" data-today={isToday(date) || undefined} onClick={() => setDinnerDay(i)}>
+              <span className="dinner-day">
+                <b>{d}</b>
+                <span>{formatDayMonth(date)}</span>
+              </span>
+              <span className={`dinner-dish ${chosen.length ? "" : "is-empty"}`}>
+                {chosen.length ? chosen.map((m) => m.dishes?.name ?? "מאכל").join(" · ") : "בחירת ארוחת ערב"}
+              </span>
+              <ChevronLeft size={16} className="dinner-chev" aria-hidden />
+            </button>
+          );
+        })}
+      </div>
+
       <div style={{ display: "flex", gap: 8 }}>
-        <button className="btn btn-primary" style={{ flex: 1, justifyContent: "center", padding: 13 }} onClick={() => setAdding(true)}>
-          <CalendarPlus size={18} /> הוספת מאכל לשבוע
+        <button className="btn" style={{ flex: 1, justifyContent: "center" }} onClick={() => setAdding(true)}>
+          <CalendarPlus size={17} /> ארוחה אחרת
         </button>
         <button className="btn" style={{ padding: "0 14px" }} onClick={() => setShowRecurring(true)} title="ארוחות קבועות">
           <Repeat size={16} /> קבועות
@@ -440,39 +499,57 @@ function WeekTab() {
         הצעה לתפריט השבוע
       </AiButton>
 
-      {meals.length === 0 ? (
-        <EmptyState icon={<ChefHat size={42} />} title="לא נבחרו מאכלים לשבוע זה" />
-      ) : (
-        <div className="nst-group">
-          {meals.map((meal) => (
-            <div className="nst-row" key={meal.id}>
-              <span className="nst-tile" style={{ background: "var(--cat-3-bg)", color: "var(--cat-3-fg)" }}>
-                <UtensilsCrossed size={20} />
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ font: "400 17px var(--font-body)", color: "var(--text-bright)" }}>{meal.dishes?.name ?? "מאכל"}</p>
-                <p style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
-                  {meal.all_week ? "כל השבוע" : meal.day_of_week != null ? `יום ${DAYS_HE[meal.day_of_week]}` : "ללא יום"}
-                  {meal.meal_type ? ` · ${MEAL_TYPES[meal.meal_type as keyof typeof MEAL_TYPES]}` : ""}
-                  {" · "}
-                  {meal.for_members && meal.for_members.length > 0 ? meal.for_members.map((id) => nameFor(id)).filter(Boolean).join(", ") : "כל הבית"}
-                </p>
-              </div>
-              {meal.added_to_list ? (
-                <span className="badge b-active" style={{ borderRadius: 30 }}>
-                  <Check size={12} style={{ verticalAlign: -2 }} /> נוסף
+      {others.length > 0 && (
+        <>
+          <div className="nst-subhead">
+            <ChefHat size={13} /> עוד בשבוע
+          </div>
+          <div className="nst-group">
+            {others.map((meal) => (
+              <div className="nst-row" key={meal.id}>
+                <span className="nst-tile" style={{ background: "var(--cat-3-bg)", color: "var(--cat-3-fg)" }}>
+                  <UtensilsCrossed size={20} />
                 </span>
-              ) : (
-                <button className="nst-chip" style={{ color: "var(--accent)", boxShadow: "inset 0 0 0 1px var(--accent-soft)" }} onClick={() => setListPickerFor(meal)}>
-                  <ShoppingCart /> לרשימה
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ font: "400 17px var(--font-body)", color: "var(--text-bright)" }}>{meal.dishes?.name ?? "מאכל"}</p>
+                  <p style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
+                    {meal.all_week ? "כל השבוע" : meal.day_of_week != null ? `יום ${DAYS_HE[meal.day_of_week]}` : "ללא יום"}
+                    {meal.meal_type ? ` · ${MEAL_TYPES[meal.meal_type as keyof typeof MEAL_TYPES]}` : ""}
+                    {" · "}
+                    {meal.for_members && meal.for_members.length > 0 ? meal.for_members.map((id) => nameFor(id)).filter(Boolean).join(", ") : "כל הבית"}
+                  </p>
+                </div>
+                {meal.added_to_list ? (
+                  <span className="badge b-active" style={{ borderRadius: 30 }}>
+                    <Check size={12} style={{ verticalAlign: -2 }} /> נוסף
+                  </span>
+                ) : (
+                  <button className="nst-chip" style={{ color: "var(--accent)", boxShadow: "inset 0 0 0 1px var(--accent-soft)" }} onClick={() => setListPickerFor(meal)}>
+                    <ShoppingCart /> לרשימה
+                  </button>
+                )}
+                <button className="nst-del" onClick={() => removeMeal(meal.id)}>
+                  <Trash2 />
                 </button>
-              )}
-              <button className="nst-del" onClick={() => removeMeal(meal.id)}>
-                <Trash2 />
-              </button>
-            </div>
-          ))}
-        </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {dinnerDay != null && homeId && (
+        <DinnerSheet
+          homeId={homeId}
+          weekIso={weekIso}
+          day={dinnerDay}
+          date={addDays(weekStart, dinnerDay)}
+          chosen={dinnersOn(dinnerDay)}
+          dishes={dishes}
+          lists={lists}
+          userId={user?.id ?? null}
+          onClose={() => setDinnerDay(null)}
+          onChanged={load}
+        />
       )}
 
       {adding && (
@@ -523,6 +600,149 @@ function WeekTab() {
         />
       )}
     </>
+  );
+}
+
+/**
+ * A day's dinner: the dishes chosen for it (each can go to the shopping list or
+ * be taken off), and the household's dishes to pick from — searchable, and a
+ * name that isn't a dish yet becomes one. Several dishes make one dinner.
+ */
+function DinnerSheet({
+  homeId,
+  weekIso,
+  day,
+  date,
+  chosen,
+  dishes,
+  lists,
+  userId,
+  onClose,
+  onChanged,
+}: {
+  homeId: string;
+  weekIso: string;
+  day: number;
+  date: Date;
+  chosen: Meal[];
+  dishes: Dish[];
+  lists: List[];
+  userId: string | null;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [listId, setListId] = useState<string>(() => (lists.find((l) => l.is_default) ?? lists[0])?.id ?? "");
+  const q = query.trim();
+  const chosenIds = new Set(chosen.map((m) => m.dish_id));
+  const matches = dishes.filter((d) => !chosenIds.has(d.id) && (!q || d.name.includes(q)));
+  const exact = dishes.some((d) => d.name.trim() === q);
+
+  const run = async (key: string, work: () => Promise<unknown>) => {
+    setBusy(key);
+    try {
+      await work();
+      onChanged();
+    } catch (e) {
+      console.error("[nestly] dinner change failed", e);
+      toast.error("השינוי לא נשמר", { description: "בדקו את החיבור ונסו שוב." });
+    } finally {
+      setBusy(null);
+    }
+  };
+  const pick = (dishId: string) =>
+    run(dishId, async () => {
+      const { error } = await supabase.from("weekly_meals").insert({ home_id: homeId, dish_id: dishId, week_start: weekIso, day_of_week: day, meal_type: "dinner", all_week: false, for_members: [], created_by: userId });
+      if (error) throw error;
+      setQuery("");
+    });
+  const createAndPick = () =>
+    run("new", async () => {
+      const id = newId();
+      const { error } = await supabase.from("dishes").insert({ id, home_id: homeId, name: q, created_by: userId });
+      if (error) throw error;
+      const { error: e } = await supabase.from("weekly_meals").insert({ home_id: homeId, dish_id: id, week_start: weekIso, day_of_week: day, meal_type: "dinner", all_week: false, for_members: [], created_by: userId });
+      if (e) throw e;
+      setQuery("");
+    });
+  const unpick = (meal: Meal) =>
+    run(meal.id, async () => {
+      const { error } = await supabase.from("weekly_meals").delete().eq("id", meal.id);
+      if (error) throw error;
+    });
+  const toList = (meal: Meal) =>
+    run(`list:${meal.id}`, async () => {
+      const { error } = await supabase.rpc("add_meal_to_list", { meal_id: meal.id, list_id: listId });
+      if (error) throw error;
+      toast.success("המצרכים נוספו לרשימה", { description: meal.dishes?.name ?? undefined });
+    });
+
+  return (
+    <Modal open onClose={onClose} title={`ארוחת ערב · ${DAYS_HE[day]} ${formatDayMonth(date)}`} done={{ label: "סיום", onClick: onClose }}>
+      <div className="nst-fields">
+        {chosen.length > 0 && (
+          <section className="dinner-chosen">
+            <div className="nst-subhead" style={{ paddingTop: 0 }}>
+              נבחר
+              {lists.length > 1 && (
+                <select className="qa-list" value={listId} onChange={(e) => setListId(e.target.value)} aria-label="לאיזו רשימת קניות">
+                  {lists.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <div className="nst-group">
+              {chosen.map((m) => (
+                <div className="nst-row" key={m.id}>
+                  <span style={{ flex: 1, minWidth: 0, font: "400 17px var(--font-body)", color: "var(--text-bright)" }}>{m.dishes?.name ?? "מאכל"}</span>
+                  {m.added_to_list ? (
+                    <span className="badge b-active" style={{ borderRadius: 30 }}>
+                      <Check size={12} style={{ verticalAlign: -2 }} /> ברשימה
+                    </span>
+                  ) : (
+                    listId && (
+                      <button className="nst-chip" style={{ color: "var(--accent)", boxShadow: "inset 0 0 0 1px var(--accent-soft)" }} onClick={() => toList(m)} disabled={busy !== null}>
+                        <ShoppingCart /> {busy === `list:${m.id}` ? "…" : "לרשימה"}
+                      </button>
+                    )
+                  )}
+                  <button className="nst-del" onClick={() => unpick(m)} disabled={busy !== null} aria-label={`הסרת ${m.dishes?.name ?? "המאכל"}`}>
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && q && (matches[0] && !exact ? pick(matches[0].id) : !exact && createAndPick())}
+          placeholder={dishes.length ? "חיפוש מאכל או מאכל חדש…" : "שם המאכל…"}
+          enterKeyHint="done"
+          aria-label="חיפוש מאכל"
+        />
+        <div className="nst-group">
+          {q && !exact && (
+            <button className="nst-row dinner-pick dinner-new" onClick={createAndPick} disabled={busy !== null}>
+              <Plus size={18} /> <span>{busy === "new" ? "מוסיף…" : `״${q}״ — מאכל חדש`}</span>
+            </button>
+          )}
+          {matches.map((d) => (
+            <button key={d.id} className="nst-row dinner-pick" onClick={() => pick(d.id)} disabled={busy !== null}>
+              <span>{d.name}</span>
+              {busy === d.id ? <span className="nst-meta">מוסיף…</span> : <Plus size={18} className="dinner-plus" aria-hidden />}
+            </button>
+          ))}
+          {!q && !matches.length && <p className="section-sub" style={{ padding: "10px 14px" }}>{dishes.length ? "כל המאכלים כבר נבחרו." : "עוד אין מאכלים. כתבו שם של מאכל כדי להוסיף אותו."}</p>}
+        </div>
+      </div>
+    </Modal>
   );
 }
 

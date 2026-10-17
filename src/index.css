@@ -882,3 +882,27 @@ input, textarea, p, li, h1, h2, h3, .nst-card-title, .page-title {
 .ai-balance-field { display: flex; align-items: center; gap: 8px; }
 .ai-balance-field span { font: 600 20px var(--font-display); color: var(--text-muted); }
 .ai-balance-field input { flex: 1; min-width: 0; font-size: 20px; }
+
+/* Weekly menu: a dinner per day */
+.dinner-row { width: 100%; border: none; font: inherit; color: inherit; text-align: right; cursor: pointer; gap: 12px; }
+.dinner-day { flex: none; width: 64px; display: flex; flex-direction: column; gap: 1px; }
+.dinner-day b { font: 600 15px var(--font-body); color: var(--text-bright); }
+.dinner-day span { font: 600 12px var(--font-body); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.dinner-row[data-today] .dinner-day b { color: var(--accent-ink); }
+.dinner-row[data-today] .dinner-day span { color: var(--accent-ink); opacity: .8; }
+.dinner-dish { flex: 1; min-width: 0; font: 400 17px var(--font-body); color: var(--text-bright); overflow-wrap: anywhere; }
+.dinner-dish.is-empty { color: var(--accent-ink); font-size: 15px; font-weight: 600; opacity: .85; }
+.dinner-chev { flex: none; color: var(--text-faint); }
+.dinner-pick { width: 100%; border: none; font: 400 17px var(--font-body); color: var(--text-bright); text-align: right; cursor: pointer; justify-content: space-between; }
+.dinner-pick > span { min-width: 0; overflow-wrap: anywhere; }
+.dinner-plus { flex: none; color: var(--accent); }
+.dinner-new { justify-content: flex-start; color: var(--accent-ink); font-weight: 600; }
+@media (hover: hover) and (pointer: fine) { .dinner-row:hover, .dinner-pick:hover:not(:disabled) { background: var(--surface-2); } }
+.dinner-row:active, .dinner-pick:active:not(:disabled) { background: var(--surface-2); }
+
+/* Schedule: the day's meals, above its tasks (like an all-day event) */
+.sched-meal { width: 100%; border: none; font: inherit; color: inherit; text-align: right; cursor: pointer; gap: 12px; }
+.sched-meal-lines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sched-meal-lines p { font: 400 16px var(--font-body); color: var(--text-bright); overflow-wrap: anywhere; }
+.sched-meal-type { font: 600 13px var(--font-body); color: var(--text-muted); margin-inline-end: 6px; }
+.sched-meal:active { background: var(--surface-2); }

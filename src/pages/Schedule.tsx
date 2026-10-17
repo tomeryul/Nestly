@@ -1,21 +1,25 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { Plus, Trash2, ChevronRight, ChevronLeft, Check, Clock, Repeat, X, CalendarDays, ListChecks, Pencil, GripVertical, Library, History, ListTodo, TriangleAlert } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronLeft, Check, Clock, Repeat, X, CalendarDays, ListChecks, Pencil, GripVertical, Library, History, ListTodo, TriangleAlert, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 import { AiButton, PickRow, usePicks } from "../components/AiParts";
 import { aiErrorText, callAi } from "../lib/ai";
 import { useDoneLast } from "../lib/doneLast";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useOnResume, useSeedFromCache, writeCache } from "../lib/cache";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner } from "../components/ui";
-import { DAYS_HE, DAYS_HE_SHORT, TASK_CATEGORIES, type TaskCategory } from "../lib/constants";
+import { DAYS_HE, DAYS_HE_SHORT, MEAL_LABEL, MEAL_ORDER, TASK_CATEGORIES, type TaskCategory } from "../lib/constants";
 import { addDays, carriedLabel, formatTime, isToday, parseISODate, startOfWeek, toISODate, weekDates } from "../lib/dates";
 import { reinsert, removeWithUndo } from "../lib/undo";
 import { bgWrite, newId } from "../lib/optimistic";
 import { useDragReorder } from "../lib/dragReorder";
 import type { Tables } from "../types/database";
+
+// The week's meals, shown on their day (display only: a dinner isn't a task to
+// tick off, carry over or be reminded about).
+type DayMeal = { id: string; day_of_week: number | null; meal_type: string | null; all_week: boolean; dishes: { name: string } | null };
 
 type Task = Tables<"schedule_tasks">;
 type RecurringTask = Tables<"recurring_tasks">;
@@ -28,6 +32,8 @@ export default function Schedule() {
   const [selected, setSelected] = useState(() => (opened ? parseISODate(opened) : new Date()));
   const [tasks, setTasks] = useState<Task[]>([]);
   const [subCounts, setSubCounts] = useState<Record<string, { done: number; total: number }>>({});
+  const [meals, setMeals] = useState<DayMeal[]>([]);
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
@@ -43,9 +49,15 @@ export default function Schedule() {
 
   const load = useCallback(async () => {
     if (!homeId) return;
-    const { data } = await supabase.from("schedule_tasks").select("*").eq("home_id", homeId).gte("scheduled_date", weekFrom).lte("scheduled_date", weekTo).order("position").order("start_time", { nullsFirst: true });
+    const [{ data }, { data: mealRows }] = await Promise.all([
+      supabase.from("schedule_tasks").select("*").eq("home_id", homeId).gte("scheduled_date", weekFrom).lte("scheduled_date", weekTo).order("position").order("start_time", { nullsFirst: true }),
+      // The schedule's week starts on Sunday, as the menu's does.
+      supabase.from("weekly_meals").select("id, day_of_week, meal_type, all_week, dishes(name)").eq("home_id", homeId).eq("week_start", weekFrom),
+    ]);
     const list = data ?? [];
+    const weekMeals = (mealRows as unknown as DayMeal[]) ?? [];
     setTasks(list);
+    setMeals(weekMeals);
     const ids = list.map((t) => t.id);
     let counts: Record<string, { done: number; total: number }> = {};
     if (ids.length) {
@@ -60,11 +72,12 @@ export default function Schedule() {
     }
     setSubCounts(counts);
     setLoading(false);
-    writeCache(`sched.${homeId}.${weekFrom}`, { tasks: list, subCounts: counts });
+    writeCache(`sched.${homeId}.${weekFrom}`, { tasks: list, subCounts: counts, meals: weekMeals });
   }, [homeId, weekFrom, weekTo]);
-  useSeedFromCache<{ tasks: Task[]; subCounts: Record<string, { done: number; total: number }> }>(homeId && `sched.${homeId}.${weekFrom}`, (c) => {
+  useSeedFromCache<{ tasks: Task[]; subCounts: Record<string, { done: number; total: number }>; meals?: DayMeal[] }>(homeId && `sched.${homeId}.${weekFrom}`, (c) => {
     setTasks(c.tasks);
     setSubCounts(c.subCounts);
+    setMeals(c.meals ?? []);
     setLoading(false);
   });
   useEffect(() => {
@@ -96,6 +109,11 @@ export default function Schedule() {
     [tasks, selectedIso]
   );
   const countFor = (iso: string) => tasks.filter((t) => t.scheduled_date === iso).length;
+  // The selected day's meals, grouped by meal in the order of the day.
+  const dayMeals = useMemo(() => {
+    const onDay = meals.filter((m) => !m.all_week && m.day_of_week === selected.getDay());
+    return MEAL_ORDER.map((t) => [t, onDay.filter((m) => (m.meal_type ?? "other") === t).map((m) => m.dishes?.name ?? "מאכל")] as const).filter(([, names]) => names.length);
+  }, [meals, selected]);
 
   const toggle = (t: Task) => {
     doneLast.ticked(t.id, t.is_done);
@@ -188,6 +206,25 @@ export default function Schedule() {
           <Library size={16} /> מהמאגר
         </button>
       </div>
+
+      {dayMeals.length > 0 && (
+        <div className="nst-group">
+          <button className="nst-row sched-meal" onClick={() => navigate("/cooking", { state: { week: weekFrom, day: selected.getDay() } })} title="לתפריט השבועי">
+            <span className="nst-tile" style={{ background: "var(--cat-3-bg)", color: "var(--cat-3-fg)" }}>
+              <UtensilsCrossed size={18} />
+            </span>
+            <span className="sched-meal-lines">
+              {dayMeals.map(([type, names]) => (
+                <p key={type}>
+                  <span className="sched-meal-type">{MEAL_LABEL[type]}</span>
+                  {names.join(" · ")}
+                </p>
+              ))}
+            </span>
+            <ChevronLeft size={16} style={{ flex: "none", color: "var(--text-faint)" }} aria-hidden />
+          </button>
+        </div>
+      )}
 
       {dayTasks.length === 0 ? (
         <EmptyState icon={<CalendarDays size={42} />} title="אין משימות ליום זה" />

@@ -14,11 +14,12 @@
 
 export type ChecklistSection = { title: string; items: string[] };
 
-// A4 at 96dpi, rendered at 2x for print sharpness.
-const W = 794;
-const H = 1123;
+// A4 at 96dpi, rendered at 2x for print sharpness. Shared with the other printable
+// sheets (menuPdf), so every page the app prints looks like one family.
+export const W = 794;
+export const H = 1123;
 const SCALE = 2;
-const M = 48; // page margin
+export const M = 48; // page margin
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
 
 const BOX = 18; // checkbox side
@@ -29,7 +30,7 @@ const ROW_PAD = 8; // above and below each task
 const HEAD = 18; // room heading font size
 const FOOT = 32; // space reserved for the page number
 
-const font = (weight: number, size: number) => `${weight} ${size}px ${FONT}`;
+export const font = (weight: number, size: number) => `${weight} ${size}px ${FONT}`;
 
 /**
  * Where to put the baseline so the *body* of Hebrew letters is centred on `y`.
@@ -37,13 +38,13 @@ const font = (weight: number, size: number) => `${weight} ${size}px ${FONT}`;
  * a ל above or a ק below; a reference word with neither keeps every row the
  * same, the way the eye expects.
  */
-function baselineFor(ctx: CanvasRenderingContext2D, y: number, size: number) {
+export function baselineFor(ctx: CanvasRenderingContext2D, y: number, size: number) {
   const m = ctx.measureText("שמסב");
   const body = m.actualBoundingBoxAscent || size * 0.7;
   return y + body / 2;
 }
 
-function wrap(ctx: CanvasRenderingContext2D, text: string, max: number) {
+export function wrap(ctx: CanvasRenderingContext2D, text: string, max: number) {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let line = "";
@@ -71,7 +72,7 @@ function roundedBox(ctx: CanvasRenderingContext2D, x: number, y: number, s: numb
   ctx.stroke();
 }
 
-function newPage() {
+export function newPage() {
   const canvas = document.createElement("canvas");
   canvas.width = W * SCALE;
   canvas.height = H * SCALE;
@@ -95,20 +96,7 @@ export function drawChecklist(title: string, subtitle: string, sections: Checkli
   const textRight = right - BOX - GAP;
   const textMax = textRight - M;
   const bottom = H - M - FOOT;
-  let y = M;
-
-  // ---- page header ----
-  ctx.fillStyle = "#111";
-  ctx.font = font(700, 26);
-  ctx.fillText(title, right, y + 26);
-  y += 26 + 10;
-  ctx.fillStyle = "#444";
-  ctx.font = font(600, 16);
-  ctx.fillText(subtitle, right, y + 16);
-  y += 16 + 14;
-  ctx.fillStyle = "#111";
-  ctx.fillRect(M, y, W - 2 * M, 3);
-  y += 3 + 24;
+  let y = drawHeader(ctx, title, subtitle);
 
   const heading = (text: string, cont: boolean) => {
     ctx.fillStyle = cont ? "#777" : "#111";
@@ -164,17 +152,37 @@ export function drawChecklist(title: string, subtitle: string, sections: Checkli
     y += 18; // breathing room between rooms
   }
 
-  // Page numbers last, once the total is known.
-  if (pages.length > 1) {
-    pages.forEach((c, i) => {
-      const p = c.getContext("2d")!;
-      p.fillStyle = "#888";
-      p.font = font(400, 11);
-      p.textAlign = "center";
-      p.fillText(`עמוד ${i + 1} מתוך ${pages.length}`, W / 2, H - M + 6);
-    });
-  }
+  numberPages(pages);
   return pages;
+}
+
+/** Header shared by every printed sheet: title, subtitle, a rule. Returns where content starts. */
+export function drawHeader(ctx: CanvasRenderingContext2D, title: string, subtitle: string) {
+  const right = W - M;
+  let y = M;
+  ctx.fillStyle = "#111";
+  ctx.font = font(700, 26);
+  ctx.fillText(title, right, y + 26);
+  y += 26 + 10;
+  ctx.fillStyle = "#444";
+  ctx.font = font(600, 16);
+  ctx.fillText(subtitle, right, y + 16);
+  y += 16 + 14;
+  ctx.fillStyle = "#111";
+  ctx.fillRect(M, y, W - 2 * M, 3);
+  return y + 3 + 24;
+}
+
+/** Page numbers, once the total is known. */
+export function numberPages(pages: HTMLCanvasElement[]) {
+  if (pages.length < 2) return;
+  pages.forEach((c, i) => {
+    const p = c.getContext("2d")!;
+    p.fillStyle = "#888";
+    p.font = font(400, 11);
+    p.textAlign = "center";
+    p.fillText(`עמוד ${i + 1} מתוך ${pages.length}`, W / 2, H - M + 6);
+  });
 }
 
 export async function exportChecklistPdf(opts: {
@@ -183,17 +191,22 @@ export async function exportChecklistPdf(opts: {
   sections: ChecklistSection[];
   filename: string;
 }) {
+  await savePdf(drawChecklist(opts.title, opts.subtitle, opts.sections), opts.filename);
+}
+
+/** A4 pages drawn on canvases, saved as one PDF (on a phone it opens ready to print or share). */
+export async function savePdf(pages: HTMLCanvasElement[], filename: string) {
   const { jsPDF } = await import("jspdf");
-  const pages = drawChecklist(opts.title, opts.subtitle, opts.sections);
   const pdf = new jsPDF("p", "mm", "a4");
   const pw = pdf.internal.pageSize.getWidth();
   const ph = pdf.internal.pageSize.getHeight();
   pages.forEach((c, i) => {
     if (i) pdf.addPage();
-    pdf.addImage(c.toDataURL("image/png"), "PNG", 0, 0, pw, ph);
+    // Compressed: a page is mostly white, and stored raw it was ~10MB.
+    pdf.addImage(c.toDataURL("image/png"), "PNG", 0, 0, pw, ph, undefined, "FAST");
     // iOS Safari holds canvas memory until GC and caps the total; a long list
     // of A4 pages at 2x can hit that cap, so let each one go once it's used.
     c.width = c.height = 0;
   });
-  pdf.save(opts.filename);
+  pdf.save(filename);
 }
