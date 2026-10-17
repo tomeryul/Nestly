@@ -154,7 +154,7 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
     setQty(1);
     setUnit("");
     load();
-    // Sorted with the next batch of new products, so this can take a couple of minutes.
+    // Sorted with the next batch of new products, so this can take a few minutes.
     if (!known && !isSpice) {
       const picked = await aiCategory(homeId, ingredient, categories);
       if (!picked) return;

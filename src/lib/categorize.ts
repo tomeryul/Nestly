@@ -38,7 +38,7 @@ type Waiting = { name: string; resolve: (category: string | null) => void; onSen
 const queue: Waiting[] = [];
 let target: { homeId: string; categories: string[] } | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
-const QUIET = 120_000;
+const QUIET = 300_000; // five minutes after the last new product
 const BATCH_MAX = 20; // names per request, as the server takes them
 
 /**
