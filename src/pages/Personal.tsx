@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { Plus, Check, X, User, Globe, GripVertical, Pencil, CalendarClock, CalendarDays, Clock, History } from "lucide-react";
+import { Plus, Check, X, User, Globe, GripVertical, Pencil, CalendarClock, CalendarDays, Clock, History, ListTodo } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useDoneLast } from "../lib/doneLast";
@@ -16,6 +16,8 @@ import type { Tables } from "../types/database";
 
 type PTask = Tables<"personal_tasks">;
 type STask = Tables<"schedule_tasks">;
+/** A task list of its own, with the people in it (the only ones who see it). */
+type TList = Tables<"task_lists"> & { members: string[] };
 
 /** Schedule order: by day, then by time (untimed last on their day), then manual position. */
 const bySchedule = (a: STask, b: STask) =>
@@ -52,6 +54,22 @@ export default function Personal() {
     load();
   }, [load]);
   useOnResume(load);
+
+  // Lists of their own: row-level security returns only the ones I'm in.
+  const [lists, setLists] = useState<TList[]>([]);
+  const [listSheet, setListSheet] = useState<TList | "new" | null>(null);
+  const loadLists = useCallback(async () => {
+    if (!homeId) return;
+    const { data } = await supabase.from("task_lists").select("*, task_list_members(user_id)").eq("home_id", homeId).order("position").order("created_at");
+    const next = (data ?? []).map(({ task_list_members, ...l }) => ({ ...l, members: (task_list_members ?? []).map((m) => m.user_id) }));
+    setLists(next);
+    writeCache(`personal.lists.${homeId}`, next);
+  }, [homeId]);
+  useSeedFromCache<TList[]>(homeId && `personal.lists.${homeId}`, setLists);
+  useEffect(() => {
+    loadLists();
+  }, [loadLists]);
+  useOnResume(loadLists);
 
   const loadSched = useCallback(async () => {
     if (!homeId) return;
@@ -141,16 +159,17 @@ export default function Personal() {
   };
   const openDay = (date: string) => navigate("/schedule", { state: { date } });
 
-  const add = (scope: "personal" | "general", ownerId: string | null, title: string) => {
+  /** A task on someone's list, the general list, or (listId) a list of its own — whose tasks are shared ones. */
+  const add = (scope: "personal" | "general", ownerId: string | null, title: string, listId: string | null = null) => {
     if (!title.trim() || !homeId) return;
-    const siblings = tasks.filter((t) => t.scope === scope && (scope === "general" || t.owner_id === ownerId));
+    const siblings = tasks.filter((t) => t.scope === scope && t.list_id === listId && (scope === "general" || t.owner_id === ownerId));
     const id = newId();
     const row: PTask = {
-      id, home_id: homeId, scope, owner_id: scope === "personal" ? ownerId : null, title: title.trim(),
+      id, home_id: homeId, scope, owner_id: scope === "personal" ? ownerId : null, title: title.trim(), list_id: listId,
       is_done: false, position: siblings.length, due_date: null, created_by: user?.id ?? null, created_at: new Date().toISOString(),
     };
     setTasks((prev) => [...prev, row]);
-    bgWrite(supabase.from("personal_tasks").insert({ id, home_id: homeId, scope, owner_id: row.owner_id, title: row.title, position: row.position, created_by: user?.id ?? null }), load);
+    bgWrite(supabase.from("personal_tasks").insert({ id, home_id: homeId, scope, owner_id: row.owner_id, list_id: listId, title: row.title, position: row.position, created_by: user?.id ?? null }), load);
   };
   const toggle = (t: PTask) => {
     setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, is_done: !x.is_done } : x)));
@@ -196,9 +215,85 @@ export default function Personal() {
     [load]
   );
 
+  /** A new list: the list, then everyone in it (me always), in that order — the second needs the first. */
+  const createList = async (name: string, people: string[]) => {
+    if (!homeId || !user) return;
+    setListSheet(null);
+    const id = newId();
+    const everyone = [user.id, ...people.filter((p) => p !== user.id)];
+    const row: TList = { id, home_id: homeId, name, position: lists.length, created_by: user.id, created_at: new Date().toISOString(), members: everyone };
+    setLists((prev) => [...prev, row]);
+    let { error } = await supabase.from("task_lists").insert({ id, home_id: homeId, name, position: row.position, created_by: user.id });
+    if (!error) ({ error } = await supabase.from("task_list_members").insert(everyone.map((user_id) => ({ list_id: id, user_id }))));
+    if (error) {
+      console.error("[nestly] create list failed", error);
+      toast.error("לא הצלחנו ליצור את הרשימה");
+      loadLists();
+      return;
+    }
+    requestAnimationFrame(() => document.getElementById(`list-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  };
+
+  /** Rename a list and change who is in it. I stay in: it's my edit. */
+  const saveList = async (list: TList, name: string, people: string[]) => {
+    if (!user) return;
+    setListSheet(null);
+    const everyone = [user.id, ...people.filter((p) => p !== user.id)];
+    const added = everyone.filter((p) => !list.members.includes(p));
+    const removed = list.members.filter((p) => !everyone.includes(p));
+    setLists((prev) => prev.map((l) => (l.id === list.id ? { ...l, name, members: everyone } : l)));
+    const results = await Promise.all([
+      name !== list.name ? supabase.from("task_lists").update({ name }).eq("id", list.id) : null,
+      added.length ? supabase.from("task_list_members").insert(added.map((user_id) => ({ list_id: list.id, user_id }))) : null,
+      removed.length ? supabase.from("task_list_members").delete().eq("list_id", list.id).in("user_id", removed) : null,
+    ]);
+    if (results.some((r) => r?.error)) {
+      console.error("[nestly] save list failed", results);
+      toast.error("לא הצלחנו לשמור את הרשימה");
+      loadLists();
+    }
+  };
+
+  /** Delete a list with its tasks, undoable: Undo writes back the list, its people, its tasks and their links to the schedule. */
+  const deleteList = (list: TList) => {
+    if (!user) return;
+    setListSheet(null);
+    const at = lists.findIndex((l) => l.id === list.id);
+    const listTasks = tasks.filter((t) => t.list_id === list.id);
+    const twins = listTasks.flatMap((t) => (linked.get(t.id) ? [linked.get(t.id)!] : []));
+    setLists((prev) => prev.filter((l) => l.id !== list.id));
+    setTasks((prev) => prev.filter((t) => t.list_id !== list.id));
+    if (twins.length) setSched((prev) => prev.map((x) => (twins.some((w) => w.id === x.id) ? { ...x, personal_task_id: null } : x)));
+    const { members, ...listRow } = list;
+    removeWithUndo({
+      message: "הרשימה נמחקה",
+      description: list.name,
+      remove: () => supabase.from("task_lists").delete().eq("id", list.id),
+      undoLocal: () => {
+        setLists((prev) => reinsert(prev, [list], at));
+        setTasks((prev) => [...prev, ...listTasks]);
+        if (twins.length) setSched((prev) => prev.map((x) => twins.find((w) => w.id === x.id) ?? x));
+      },
+      restore: async () => {
+        // Written back as mine: only a list's creator may seat its first people.
+        let r = await supabase.from("task_lists").insert({ ...listRow, created_by: user.id });
+        if (!r.error) r = await supabase.from("task_list_members").insert(members.map((user_id) => ({ list_id: list.id, user_id })));
+        if (!r.error && listTasks.length) r = await supabase.from("personal_tasks").insert(listTasks);
+        for (const w of twins) if (!r.error) r = await supabase.from("schedule_tasks").update({ personal_task_id: w.personal_task_id }).eq("id", w.id);
+        return r;
+      },
+      reload: () => {
+        load();
+        loadLists();
+        loadSched();
+      },
+    });
+  };
+
   if (loading) return <FullPageSpinner />;
 
-  const general = tasks.filter((t) => t.scope === "general");
+  const general = tasks.filter((t) => t.scope === "general" && !t.list_id);
+  const nameOf = (id: string) => (id === user?.id ? "אני" : members.find((m) => m.user_id === id)?.profile?.display_name ?? "בן הבית");
   const taskIds = new Set(tasks.map((t) => t.id));
   // Members sorted with me first.
   const ordered = [...members].sort((a, b) => (a.user_id === user?.id ? -1 : b.user_id === user?.id ? 1 : 0));
@@ -232,6 +327,29 @@ export default function Personal() {
         );
       })}
 
+      {lists.map((l) => (
+        <Section
+          key={l.id}
+          id={`list-${l.id}`}
+          title={l.name}
+          icon={<ListTodo />}
+          hint={sharedWith(l.members.filter((p) => p !== user?.id).map(nameOf))}
+          onEdit={() => setListSheet(l)}
+          tasks={tasks.filter((t) => t.list_id === l.id)}
+          scheduled={[]}
+          linked={linked}
+          onToggleScheduled={toggleScheduled}
+          onOpenDay={openDay}
+          onSchedule={setSchedFor}
+          canDelete
+          onAdd={(v) => add("general", null, v, l.id)}
+          onToggle={toggle}
+          onRemove={remove}
+          onRename={rename}
+          onReorder={reorder}
+        />
+      ))}
+
       <Section
         title="משימות כלליות"
         icon={<Globe />}
@@ -250,6 +368,21 @@ export default function Personal() {
         onReorder={reorder}
       />
 
+      <button className="btn btn-block" onClick={() => setListSheet("new")}>
+        <Plus size={17} /> רשימה חדשה
+      </button>
+
+      {listSheet && (
+        <ListSheet
+          list={listSheet === "new" ? null : listSheet}
+          me={user?.id ?? ""}
+          people={ordered.map((m) => ({ id: m.user_id, name: m.profile?.display_name ?? "בן הבית" }))}
+          onClose={() => setListSheet(null)}
+          onSave={(name, people) => (listSheet === "new" ? createList(name, people) : saveList(listSheet, name, people))}
+          onDelete={listSheet === "new" ? undefined : () => deleteList(listSheet)}
+        />
+      )}
+
       {schedFor && (
         <ScheduleSheet
           task={schedFor}
@@ -260,6 +393,78 @@ export default function Personal() {
         />
       )}
     </section>
+  );
+}
+
+/** "משותפת לך, לנועה ולדני." — or, with nobody else in it, that it's only mine. */
+function sharedWith(others: string[]) {
+  if (!others.length) return "רק שלך: אף אחד אחר לא רואה אותה.";
+  const to = ["לך", ...others.map((n) => `ל${n}`)];
+  return `משותפת ${to.slice(0, -1).join(", ")} ו${to[to.length - 1]}. רק מי שברשימה רואה אותה.`;
+}
+
+/** Create a list, or rename it and change who is in it. I'm always in — it's my list too. */
+function ListSheet({
+  list,
+  me,
+  people,
+  onClose,
+  onSave,
+  onDelete,
+}: {
+  list: TList | null;
+  me: string;
+  people: { id: string; name: string }[];
+  onClose: () => void;
+  onSave: (name: string, people: string[]) => void;
+  onDelete?: () => void;
+}) {
+  const [name, setName] = useState(list?.name ?? "");
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(list?.members ?? [me]));
+  const valid = name.trim().length > 0;
+  const toggle = (id: string) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const save = () => valid && onSave(name.trim().slice(0, 60), [...picked]);
+  return (
+    <Modal open onClose={onClose} title={list ? "עריכת רשימה" : "רשימה חדשה"} done={{ label: list ? "שמירה" : "יצירה", onClick: save, disabled: !valid }}>
+      <div className="nst-fields">
+        <div>
+          <label htmlFor="list-name">שם הרשימה</label>
+          <input id="list-name" value={name} maxLength={60} placeholder="למשל: שיפוץ המטבח" onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} />
+        </div>
+        <div>
+          <label>משתתפים</label>
+          <div className="nst-group list-people" role="group" aria-label="משתתפים">
+            {people.map((p) => {
+              const mine = p.id === me;
+              const on = mine || picked.has(p.id);
+              return (
+                <button key={p.id} type="button" className="nst-row list-person" aria-pressed={on} disabled={mine} onClick={() => toggle(p.id)}>
+                  <span className={`nst-check ${on ? "on" : ""}`} aria-hidden>
+                    <Check size={14} />
+                  </span>
+                  <span className="list-person-name">{p.name}</span>
+                  {mine && <span className="list-person-me">אני</span>}
+                </button>
+              );
+            })}
+          </div>
+          <p className="section-sub" style={{ marginTop: 8 }}>
+            רק מי שמסומן יראה את הרשימה ואת המשימות שבה, ויוכל להוסיף, לסמן ולערוך.
+          </p>
+        </div>
+        {onDelete && (
+          <button className="btn btn-block" style={{ color: "var(--danger)" }} onClick={onDelete}>
+            מחיקת הרשימה
+          </button>
+        )}
+      </div>
+    </Modal>
   );
 }
 
@@ -305,9 +510,11 @@ function ScheduleSheet({
 }
 
 function Section({
+  id,
   title,
   icon,
   hint,
+  onEdit,
   tasks,
   scheduled,
   linked,
@@ -321,9 +528,12 @@ function Section({
   onRename,
   onReorder,
 }: {
+  id?: string;
   title: string;
   icon: React.ReactNode;
   hint: string;
+  /** A list of its own: rename it, change who is in it, delete it. */
+  onEdit?: () => void;
   tasks: PTask[];
   /** Schedule tasks assigned to this section's person. */
   scheduled: STask[];
@@ -364,10 +574,17 @@ function Section({
     setEditingId(null);
   };
   return (
-    <div className="nst-card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <h2 className="nst-card-title">
-        {icon} {title}
-      </h2>
+    <div id={id} className="nst-card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <h2 className="nst-card-title">
+          {icon} {title}
+        </h2>
+        {onEdit && (
+          <button className="nst-chip" style={{ boxShadow: "none", background: "transparent", color: "var(--accent)", padding: "4px 6px", flex: "none" }} onClick={onEdit}>
+            עריכה
+          </button>
+        )}
+      </div>
       <p className="section-sub" style={{ marginTop: "-0.3rem" }}>{hint}</p>
       <div style={{ display: "flex", gap: 8 }}>
         <input style={{ flex: 1 }} placeholder="הוספת משימה…" value={v} onChange={(e) => setV(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />

@@ -155,6 +155,7 @@ export type Database = {
           home_id: string
           id: string
           is_done: boolean
+          list_id: string | null
           owner_id: string | null
           position: number
           scope: string
@@ -167,6 +168,7 @@ export type Database = {
           home_id: string
           id?: string
           is_done?: boolean
+          list_id?: string | null
           owner_id?: string | null
           position?: number
           scope?: string
@@ -179,6 +181,7 @@ export type Database = {
           home_id?: string
           id?: string
           is_done?: boolean
+          list_id?: string | null
           owner_id?: string | null
           position?: number
           scope?: string
@@ -804,6 +807,20 @@ export type Database = {
         }
         Relationships: []
       }
+      task_lists: {
+        Row: { created_at: string; created_by: string | null; home_id: string; id: string; name: string; position: number }
+        Insert: { created_at?: string; created_by?: string | null; home_id: string; id?: string; name: string; position?: number }
+        Update: { created_at?: string; created_by?: string | null; home_id?: string; id?: string; name?: string; position?: number }
+        Relationships: []
+      }
+      task_list_members: {
+        Row: { created_at: string; list_id: string; user_id: string }
+        Insert: { created_at?: string; list_id: string; user_id: string }
+        Update: { created_at?: string; list_id?: string; user_id?: string }
+        Relationships: [
+          { foreignKeyName: "task_list_members_list_id_fkey"; columns: ["list_id"]; isOneToOne: false; referencedRelation: "task_lists"; referencedColumns: ["id"] },
+        ]
+      }
       task_subtasks: {
         Row: {
           created_at: string
@@ -893,6 +910,7 @@ export type Database = {
         Args: { invite_code: string }
         Returns: { home_id: string; home_name: string; valid: boolean }[]
       }
+      is_task_list_member: { Args: { p_list: string }; Returns: boolean }
     }
     Enums: { [_ in never]: never }
     CompositeTypes: { [_ in never]: never }

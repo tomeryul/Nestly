@@ -450,10 +450,10 @@ async function homeSnapshot(sb: SupabaseClient, homeId: string, today: string, n
   const nameOf = new Map(people.map((p) => [p.id, p.name.split(" ")[0]]));
   const weekStart = addDays(today, -dowOf(today));
   const monthKey = today.slice(0, 7);
-  const [sched, recurring, tasks, lists, items, bought, meals, dishes, rooms, ctasks, laundry, deliveries, points] = await Promise.all([
+  const [sched, recurring, tasks, lists, items, bought, meals, dishes, rooms, ctasks, laundry, deliveries, points, taskLists] = await Promise.all([
     sb.from("schedule_tasks").select("id, title, scheduled_date, start_time, assigned_to, is_done, carried_from, personal_task_id").eq("home_id", homeId).gte("scheduled_date", addDays(today, -7)).lte("scheduled_date", addDays(today, 30)).order("scheduled_date").order("start_time", { nullsFirst: false }).limit(150),
     sb.from("recurring_tasks").select("title, day_of_week, start_time, assigned_to, interval_weeks, active").eq("home_id", homeId).limit(60),
-    sb.from("personal_tasks").select("id, title, owner_id, scope, is_done").eq("home_id", homeId).order("position").limit(150),
+    sb.from("personal_tasks").select("id, title, owner_id, scope, is_done, list_id").eq("home_id", homeId).order("position").limit(150),
     sb.from("shopping_lists").select("id, name").eq("home_id", homeId),
     sb.from("shopping_items").select("id, name, quantity, category, list_id").eq("home_id", homeId).eq("is_checked", false).order("category").limit(150),
     sb.from("shopping_items").select("id", { count: "exact", head: true }).eq("home_id", homeId).eq("is_checked", true),
@@ -464,6 +464,8 @@ async function homeSnapshot(sb: SupabaseClient, homeId: string, today: string, n
     sb.from("laundry_tasks").select("name, stage, assigned_to").eq("home_id", homeId).eq("week_start", weekStart),
     sb.from("deliveries").select("name, stage, return_by, arrived_on, pickup_point_id").eq("home_id", homeId).lt("stage", 2).limit(30),
     sb.from("pickup_points").select("id, name, location, closing_time").eq("home_id", homeId),
+    // Lists of their own: only the ones the caller is in come back.
+    sb.from("task_lists").select("id, name").eq("home_id", homeId),
   ]);
   const ctIds = (ctasks.data ?? []).map((c) => c.id);
   const doneRows = ctIds.length
@@ -498,11 +500,12 @@ async function homeSnapshot(sb: SupabaseClient, homeId: string, today: string, n
   const openTasks = (tasks.data ?? []).filter((t) => !t.is_done);
   const doneTasks = (tasks.data ?? []).length - openTasks.length;
   if (topics.has("tasks")) {
+    const listName = new Map((taskLists.data ?? []).map((l) => [l.id, l.name]));
     const byList = new Map<string, string[]>();
     openTasks.forEach((t, i) => {
       const key = `t${i + 1}`;
       refs.set(key, { table: "personal_tasks", id: t.id, title: t.title });
-      const list = t.scope === "general" ? "general list" : `${who(t.owner_id)}'s list`;
+      const list = t.list_id ? `list "${listName.get(t.list_id) ?? "?"}"` : t.scope === "general" ? "general list" : `${who(t.owner_id)}'s list`;
       byList.set(list, [...(byList.get(list) ?? []), `${key} ${t.title}`]);
     });
     detailed.push(`Open tasks (${doneTasks} done, not listed):\n${[...byList].map(([l, ts]) => `${l}: ${ts.join("; ")}`).join("\n") || "(none)"}`);
