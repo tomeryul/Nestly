@@ -227,7 +227,12 @@ export default function Schedule() {
       )}
 
       {dayTasks.length === 0 ? (
-        <EmptyState icon={<CalendarDays size={42} />} title="אין משימות ליום זה" />
+        <EmptyState
+          icon={<CalendarDays size={42} />}
+          title="אין משימות ליום זה"
+          // The nightly cleanup (supabase 0041) deletes a day's tasks 30 days after it.
+          hint={selectedIso < toISODate(addDays(new Date(), -30)) ? "משימות בלוז נמחקות אוטומטית 30 יום אחרי היום שלהן." : undefined}
+        />
       ) : (
         <div className="nst-group" ref={listRef}>
           {dr.order.map((id) => {
