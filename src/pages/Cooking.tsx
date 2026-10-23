@@ -325,74 +325,75 @@ function RecipeAi({ dish, existing, onAdded }: { dish: Dish; existing: Ingredien
     onAdded();
   };
 
-  if (!open)
-    return (
+  // Its own short sheet rather than a panel inside the ingredients sheet: there, on
+  // iPhone, the tall sheet resizing for the keyboard took the focus back and the
+  // keyboard closed the moment the field was tapped.
+  const close = () => {
+    if (busy) return;
+    setOpen(false);
+    setResult(null);
+    setError("");
+  };
+  const done = result
+    ? { label: busy ? "מוסיף…" : chosen.length === 1 ? "הוספת מצרך אחד" : `הוספת ${chosen.length} מצרכים`, onClick: save, disabled: busy || !chosen.length }
+    : { label: busy ? "קורא…" : text.trim() ? "חילוץ המצרכים" : "הצעת מצרכים", onClick: run, disabled: busy };
+
+  return (
+    <>
       <div style={{ marginBottom: "1rem" }}>
         <AiButton block onClick={() => setOpen(true)}>
           מילוי מצרכים עם AI
         </AiButton>
       </div>
-    );
-  return (
-    <div className="nst-ai-panel" style={{ marginBottom: "1rem" }}>
-      {!result ? (
-        <>
-          <textarea
-            rows={4}
-            maxLength={4000}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            disabled={busy}
-            placeholder={`הדביקו כאן מתכון — או השאירו ריק, ונציע את המצרכים שבדרך כלל יש ב${dish.name}`}
-            style={{ resize: "vertical", font: "400 16px/1.45 var(--font-body)" }}
-          />
-          {error && (
-            <p className="alert qa-error" role="alert">
-              <TriangleAlert /> {error}
-            </p>
-          )}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <AiButton busy={busy} busyLabel="קורא…" onClick={run}>
-              {text.trim() ? "חילוץ המצרכים" : `הצעת מצרכים ל${dish.name}`}
-            </AiButton>
-            <button className="btn btn-sm" onClick={() => setOpen(false)} disabled={busy}>
-              סגירה
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="section-sub">
-            {result.suggested ? `הצעה לפי איך שמכינים ${dish.name} בדרך כלל — הורידו את מה שלא מתאים.` : "המצרכים מהמתכון — הורידו את מה שלא צריך."}
-          </p>
-          <div className="nst-group">
-            {result.ingredients.map((x, i) => (
-              <PickRow
-                key={i}
-                kept={picks.kept(`i:${i}`)}
-                onToggle={() => picks.toggle(`i:${i}`)}
-                title={`${x.name} · ${fmt(x.quantity)}${x.unit ? ` ${x.unit}` : ""}`}
-                tags={
-                  <>
-                    <span className="nst-tag">{x.is_spice ? "תבלין" : x.category}</span>
-                    {have.has(x.name.trim()) && <span className="nst-tag">כבר במאכל</span>}
-                  </>
-                }
+      {open && (
+        <Modal open onClose={close} title={`מצרכים עם AI · ${dish.name}`} done={done}>
+          {!result ? (
+            <div className="nst-fields">
+              <textarea
+                rows={4}
+                maxLength={4000}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                disabled={busy}
+                placeholder={`הדביקו כאן מתכון — או השאירו ריק, ונציע את המצרכים שבדרך כלל יש ב${dish.name}`}
+                style={{ resize: "none", font: "400 17px/1.45 var(--font-body)" }}
               />
-            ))}
-          </div>
-          {result.note && <p className="section-sub">{result.note}</p>}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button className="btn btn-primary btn-sm" onClick={save} disabled={busy || !chosen.length}>
-              {busy ? "מוסיף…" : chosen.length === 1 ? "הוספת מצרך אחד" : `הוספת ${chosen.length} מצרכים`}
-            </button>
-            <button className="btn btn-sm" onClick={() => setResult(null)} disabled={busy}>
-              חזרה
-            </button>
-          </div>
-        </>
+              {error && (
+                <p className="alert qa-error" role="alert">
+                  <TriangleAlert /> {error}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="qa-review">
+              <p className="section-sub">
+                {result.suggested ? `הצעה לפי איך שמכינים ${dish.name} בדרך כלל — הורידו את מה שלא מתאים.` : "המצרכים מהמתכון — הורידו את מה שלא צריך."}
+              </p>
+              <div className="nst-group">
+                {result.ingredients.map((x, i) => (
+                  <PickRow
+                    key={i}
+                    kept={picks.kept(`i:${i}`)}
+                    onToggle={() => picks.toggle(`i:${i}`)}
+                    title={`${x.name} · ${fmt(x.quantity)}${x.unit ? ` ${x.unit}` : ""}`}
+                    tags={
+                      <>
+                        <span className="nst-tag">{x.is_spice ? "תבלין" : x.category}</span>
+                        {have.has(x.name.trim()) && <span className="nst-tag">כבר במאכל</span>}
+                      </>
+                    }
+                  />
+                ))}
+              </div>
+              {result.note && <p className="section-sub">{result.note}</p>}
+              <button className="btn btn-sm" style={{ alignSelf: "flex-start" }} onClick={() => setResult(null)} disabled={busy}>
+                עריכת הטקסט
+              </button>
+            </div>
+          )}
+        </Modal>
       )}
-    </div>
+    </>
   );
 }
 
