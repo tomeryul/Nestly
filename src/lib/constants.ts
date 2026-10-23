@@ -39,6 +39,13 @@ export type DishMeal = keyof typeof DISH_MEALS;
 /** Whether a dish belongs at a meal. Only lunch and dinner are told apart; any dish fits any other meal. */
 export const dishFits = (dish: { meal_type?: string | null }, meal: string | null | undefined) =>
   !dish.meal_type || !(meal === "lunch" || meal === "dinner") || dish.meal_type === meal;
+/**
+ * Whether the dishes table has its meal_type column yet (migration 0042): rows
+ * read with select("*") carry the key once it does. Until then the app neither
+ * shows the setting nor writes it, so nothing fails in the meantime. Ask it of
+ * rows read from the database, not of rows made on the phone.
+ */
+export const hasDishMeal = (dishes: object[]) => dishes.some((d) => "meal_type" in d);
 export const MEAL_LABEL: Record<string, string> = { breakfast: "ארוחת בוקר", lunch: "ארוחת צהריים", dinner: "ארוחת ערב", other: "ארוחה" };
 
 export const TASK_CATEGORIES = {

@@ -9,7 +9,7 @@ import { readCache, useOnResume, useSeedFromCache, writeCache } from "../lib/cac
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner, SegLens } from "../components/ui";
-import { CATEGORIES, DAYS_HE, DISH_MEALS, MEAL_ORDER, MEAL_TYPES, dishFits, type DishMeal } from "../lib/constants";
+import { CATEGORIES, DAYS_HE, DISH_MEALS, MEAL_ORDER, MEAL_TYPES, dishFits, hasDishMeal, type DishMeal } from "../lib/constants";
 import { addDays, formatDayMonth, isToday, parseISODate, startOfWeek, toISODate } from "../lib/dates";
 import { exportMenuPdf, type MenuLine } from "../lib/menuPdf";
 import { bgWrite, newId } from "../lib/optimistic";
@@ -50,11 +50,13 @@ function DishesTab() {
   const [name, setName] = useState("");
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [editing, setEditing] = useState<Dish | null>(null);
+  const [mealReady, setMealReady] = useState(false);
 
   const load = useCallback(async () => {
     if (!homeId) return;
     const { data } = await supabase.from("dishes").select("*").eq("home_id", homeId).order("name");
     setDishes(data ?? []);
+    setMealReady(hasDishMeal(data ?? []));
     const { data: ings } = await supabase.from("dish_ingredients").select("dish_id").eq("home_id", homeId);
     const c: Record<string, number> = {};
     (ings ?? []).forEach((i) => (c[i.dish_id] = (c[i.dish_id] ?? 0) + 1));
@@ -118,12 +120,12 @@ function DishesTab() {
           ))}
         </div>
       )}
-      {editing && <IngredientsModal dish={editing} onClose={() => { setEditing(null); load(); }} />}
+      {editing && <IngredientsModal dish={editing} mealReady={mealReady} onClose={() => { setEditing(null); load(); }} />}
     </>
   );
 }
 
-function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }) {
+function IngredientsModal({ dish, mealReady, onClose }: { dish: Dish; mealReady: boolean; onClose: () => void }) {
   const [rows, setRows] = useState<Ingredient[]>([]);
   const [name, setName] = useState("");
   const [qty, setQty] = useState(1);
@@ -204,17 +206,19 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
 
   return (
     <Modal open onClose={onClose} title={`מצרכים · ${dish.name}`}>
-      <div className="dish-meal">
-        <span className="dish-meal-label" id="dish-meal-label">ארוחה</span>
-        <div className="nst-seg" role="radiogroup" aria-labelledby="dish-meal-label">
-          <SegLens />
-          {([["lunch", DISH_MEALS.lunch], ["dinner", DISH_MEALS.dinner], [null, "שניהם"]] as const).map(([value, label]) => (
-            <button key={label} role="radio" aria-checked={meal === value} className={meal === value ? "active" : ""} onClick={() => setDishMeal(value)}>
-              {label}
-            </button>
-          ))}
+      {mealReady && (
+        <div className="dish-meal">
+          <span className="dish-meal-label" id="dish-meal-label">ארוחה</span>
+          <div className="nst-seg" role="radiogroup" aria-labelledby="dish-meal-label">
+            <SegLens />
+            {([["lunch", DISH_MEALS.lunch], ["dinner", DISH_MEALS.dinner], [null, "שניהם"]] as const).map(([value, label]) => (
+              <button key={label} role="radio" aria-checked={meal === value} className={meal === value ? "active" : ""} onClick={() => setDishMeal(value)}>
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
       <RecipeAi dish={dish} existing={rows} onAdded={load} />
       <div style={{ background: "var(--surface-2)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 10, marginBottom: "1rem" }}>
         <div className="nst-seg">
@@ -696,7 +700,7 @@ function DinnerSheet({
     run("new", async () => {
       const id = newId();
       // Made from the dinner planner, so it's a dinner dish (changeable in the dish's sheet).
-      const { error } = await supabase.from("dishes").insert({ id, home_id: homeId, name: q, meal_type: "dinner", created_by: userId });
+      const { error } = await supabase.from("dishes").insert({ id, home_id: homeId, name: q, ...(hasDishMeal(dishes) ? { meal_type: "dinner" } : {}), created_by: userId });
       if (error) throw error;
       const { error: e } = await supabase.from("weekly_meals").insert({ home_id: homeId, dish_id: id, week_start: weekIso, day_of_week: day, meal_type: "dinner", all_week: false, for_members: [], created_by: userId });
       if (e) throw e;
