@@ -9,7 +9,7 @@ import { readCache, useOnResume, useSeedFromCache, writeCache } from "../lib/cac
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
 import { Modal, EmptyState, FullPageSpinner, SegLens } from "../components/ui";
-import { CATEGORIES, DAYS_HE, MEAL_ORDER, MEAL_TYPES } from "../lib/constants";
+import { CATEGORIES, DAYS_HE, DISH_MEALS, MEAL_ORDER, MEAL_TYPES, dishFits, type DishMeal } from "../lib/constants";
 import { addDays, formatDayMonth, isToday, parseISODate, startOfWeek, toISODate } from "../lib/dates";
 import { exportMenuPdf, type MenuLine } from "../lib/menuPdf";
 import { bgWrite, newId } from "../lib/optimistic";
@@ -75,7 +75,7 @@ function DishesTab() {
   const add = () => {
     if (!name.trim() || !homeId) return;
     const id = newId();
-    const row: Dish = { id, home_id: homeId, name: name.trim(), description: null, created_by: user?.id ?? null, created_at: new Date().toISOString() };
+    const row: Dish = { id, home_id: homeId, name: name.trim(), description: null, meal_type: null, created_by: user?.id ?? null, created_at: new Date().toISOString() };
     setDishes((prev) => [...prev, row].sort((a, b) => a.name.localeCompare(b.name, "he")));
     setName("");
     bgWrite(supabase.from("dishes").insert({ id, home_id: homeId, name: row.name, created_by: user?.id ?? null }), load);
@@ -107,7 +107,7 @@ function DishesTab() {
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: "block", font: "400 17px var(--font-body)", color: "var(--text-bright)" }}>{d.name}</span>
-                  <span style={{ display: "block", fontSize: 13, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>{counts[d.id] ?? 0} מצרכים · הקשה לעריכה</span>
+                  <span style={{ display: "block", fontSize: 13, color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>{counts[d.id] ?? 0} מצרכים{d.meal_type ? ` · ${DISH_MEALS[d.meal_type as DishMeal]}` : ""} · הקשה לעריכה</span>
                 </span>
                 <ChevronLeft size={18} style={{ color: "var(--text-faint)" }} />
               </button>
@@ -130,6 +130,20 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
   const [unit, setUnit] = useState("");
   const [isSpice, setIsSpice] = useState(false);
   const [sortMode, setSortMode] = useState<"added" | "alpha">("added");
+  const [meal, setMeal] = useState<string | null>(dish.meal_type ?? null);
+
+  /** Lunch, dinner or either: which meals the planners offer this dish for. */
+  const setDishMeal = async (next: string | null) => {
+    if (next === meal) return;
+    const was = meal;
+    setMeal(next);
+    const { error } = await supabase.from("dishes").update({ meal_type: next }).eq("id", dish.id);
+    if (error) {
+      console.error("[nestly] dish meal failed", error);
+      setMeal(was);
+      toast.error("לא הצלחנו לשמור את סוג הארוחה");
+    }
+  };
 
   const load = useCallback(async () => {
     const { data } = await supabase.from("dish_ingredients").select("*").eq("dish_id", dish.id).order("name");
@@ -190,6 +204,17 @@ function IngredientsModal({ dish, onClose }: { dish: Dish; onClose: () => void }
 
   return (
     <Modal open onClose={onClose} title={`מצרכים · ${dish.name}`}>
+      <div className="dish-meal">
+        <span className="dish-meal-label" id="dish-meal-label">ארוחה</span>
+        <div className="nst-seg" role="radiogroup" aria-labelledby="dish-meal-label">
+          <SegLens />
+          {([["lunch", DISH_MEALS.lunch], ["dinner", DISH_MEALS.dinner], [null, "שניהם"]] as const).map(([value, label]) => (
+            <button key={label} role="radio" aria-checked={meal === value} className={meal === value ? "active" : ""} onClick={() => setDishMeal(value)}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
       <RecipeAi dish={dish} existing={rows} onAdded={load} />
       <div style={{ background: "var(--surface-2)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 10, marginBottom: "1rem" }}>
         <div className="nst-seg">
@@ -644,7 +669,9 @@ function DinnerSheet({
   const [listId, setListId] = useState<string>(() => (lists.find((l) => l.is_default) ?? lists[0])?.id ?? "");
   const q = query.trim();
   const chosenIds = new Set(chosen.map((m) => m.dish_id));
-  const matches = dishes.filter((d) => !chosenIds.has(d.id) && (!q || d.name.includes(q)));
+  // Without a search, dinner dishes (and those set to either); a search finds any dish.
+  const matches = dishes.filter((d) => !chosenIds.has(d.id) && (q ? d.name.includes(q) : dishFits(d, "dinner")));
+  const lunchOnly = q ? 0 : dishes.filter((d) => !chosenIds.has(d.id) && !dishFits(d, "dinner")).length;
   const exact = dishes.some((d) => d.name.trim() === q);
 
   const run = async (key: string, work: () => Promise<unknown>) => {
@@ -668,7 +695,8 @@ function DinnerSheet({
   const createAndPick = () =>
     run("new", async () => {
       const id = newId();
-      const { error } = await supabase.from("dishes").insert({ id, home_id: homeId, name: q, created_by: userId });
+      // Made from the dinner planner, so it's a dinner dish (changeable in the dish's sheet).
+      const { error } = await supabase.from("dishes").insert({ id, home_id: homeId, name: q, meal_type: "dinner", created_by: userId });
       if (error) throw error;
       const { error: e } = await supabase.from("weekly_meals").insert({ home_id: homeId, dish_id: id, week_start: weekIso, day_of_week: day, meal_type: "dinner", all_week: false, for_members: [], created_by: userId });
       if (e) throw e;
@@ -749,6 +777,7 @@ function DinnerSheet({
           ))}
           {!q && !matches.length && <p className="section-sub" style={{ padding: "10px 14px" }}>{dishes.length ? "כל המאכלים כבר נבחרו." : "עוד אין מאכלים. כתבו שם של מאכל כדי להוסיף אותו."}</p>}
         </div>
+        {lunchOnly > 0 && <p className="section-sub">{lunchOnly === 1 ? "מאכל צהריים אחד לא מוצג כאן — אפשר למצוא אותו בחיפוש." : `${lunchOnly} מאכלי צהריים לא מוצגים כאן — אפשר למצוא אותם בחיפוש.`}</p>}
       </div>
     </Modal>
   );
@@ -864,6 +893,9 @@ function RecurringMealsModal({ homeId, dishes, userId, onClose }: { homeId: stri
   const [dishId, setDishId] = useState<string>(dishes[0]?.id ?? "");
   const [day, setDay] = useState<string>("");
   const [mealType, setMealType] = useState<string>("");
+  // A lunch-only dish isn't offered for dinner, nor the other way round.
+  const fitting = dishes.filter((d) => dishFits(d, mealType));
+  const picked = fitting.some((d) => d.id === dishId) ? dishId : fitting[0]?.id ?? "";
   const [interval, setInterval] = useState(1);
   const [forMembers, setForMembers] = useState<string[]>([]);
 
@@ -878,11 +910,11 @@ function RecurringMealsModal({ homeId, dishes, userId, onClose }: { homeId: stri
   const toggleMember = (uid: string) => setForMembers((r) => (r.includes(uid) ? r.filter((x) => x !== uid) : [...r, uid]));
 
   const add = async () => {
-    if (!dishId) return;
+    if (!picked) return;
     const allWeek = day === "all";
     await supabase.from("recurring_meals").insert({
       home_id: homeId,
-      dish_id: dishId,
+      dish_id: picked,
       all_week: allWeek,
       day_of_week: day === "" || allWeek ? null : Number(day),
       meal_type: mealType || null,
@@ -910,8 +942,8 @@ function RecurringMealsModal({ homeId, dishes, userId, onClose }: { homeId: stri
     <Modal open onClose={onClose} title="ארוחות קבועות">
       <p className="section-sub" style={{ marginTop: "-0.3rem", marginBottom: "1rem" }}>מאכלים שייכנסו אוטומטית לתפריט השבועי — כל שבוע, שבועיים או 4 שבועות.</p>
       <div style={{ background: "var(--surface-2)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 10, marginBottom: "1rem" }}>
-        <select value={dishId} onChange={(e) => setDishId(e.target.value)}>
-          {dishes.map((d) => (
+        <select value={picked} onChange={(e) => setDishId(e.target.value)}>
+          {fitting.map((d) => (
             <option key={d.id} value={d.id}>
               {d.name}
             </option>
@@ -997,16 +1029,19 @@ function AddMealModal({
   const [dishId, setDishId] = useState<string>(dishes[0]?.id ?? "");
   const [day, setDay] = useState<string>("");
   const [mealType, setMealType] = useState<string>("");
+  // A lunch-only dish isn't offered for dinner, nor the other way round.
+  const fitting = dishes.filter((d) => dishFits(d, mealType));
+  const picked = fitting.some((d) => d.id === dishId) ? dishId : fitting[0]?.id ?? "";
   const [forMembers, setForMembers] = useState<string[]>([]);
 
   const toggleMember = (uid: string) => setForMembers((r) => (r.includes(uid) ? r.filter((x) => x !== uid) : [...r, uid]));
 
   const save = async () => {
-    if (!dishId) return;
+    if (!picked) return;
     const allWeek = day === "all";
     await supabase.from("weekly_meals").insert({
       home_id: homeId,
-      dish_id: dishId,
+      dish_id: picked,
       week_start: weekIso,
       all_week: allWeek,
       day_of_week: day === "" || allWeek ? null : Number(day),
@@ -1030,8 +1065,8 @@ function AddMealModal({
       <div className="nst-fields">
         <div>
           <label>מאכל</label>
-          <select value={dishId} onChange={(e) => setDishId(e.target.value)}>
-            {dishes.map((d) => (
+          <select value={picked} onChange={(e) => setDishId(e.target.value)}>
+            {fitting.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
               </option>

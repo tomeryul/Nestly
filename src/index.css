@@ -676,6 +676,11 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .nst-bn-menu:active .nst-bn-menu-disc { transform: scale(0.92); }
 .nst-bn-spacer { visibility: hidden; pointer-events: none; }
 
+/* A dish's meal (lunch / dinner / either): a segmented control under the sheet's title. */
+.dish-meal { display: flex; align-items: center; gap: 12px; margin-bottom: 1rem; }
+.dish-meal-label { flex: none; font: 600 var(--t-subhead) var(--font-body); color: var(--text-2); }
+.dish-meal .nst-seg { flex: 1; }
+
 /* Who is in a task list: the home's people as rows, a circle-check each (iOS
    multi-select); "me" is always in, so its check is shown but can't be changed. */
 .list-person { width: 100%; border: none; text-align: start; font: 400 var(--t-body)/1.3 var(--font-body); color: var(--text-bright); cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background 120ms var(--ease-out); }

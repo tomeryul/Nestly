@@ -33,6 +33,12 @@ export const MEAL_TYPES = {
 // Meals in the order of a day, and how a day's meal is named on its own
 // (the schedule shows "ארוחת ערב: שקשוקה").
 export const MEAL_ORDER = ["breakfast", "lunch", "dinner", "other"] as const;
+/** What a dish is eaten as. A dish set to neither (null) is eaten as either. */
+export const DISH_MEALS = { lunch: "צהריים", dinner: "ערב" } as const;
+export type DishMeal = keyof typeof DISH_MEALS;
+/** Whether a dish belongs at a meal. Only lunch and dinner are told apart; any dish fits any other meal. */
+export const dishFits = (dish: { meal_type?: string | null }, meal: string | null | undefined) =>
+  !dish.meal_type || !(meal === "lunch" || meal === "dinner") || dish.meal_type === meal;
 export const MEAL_LABEL: Record<string, string> = { breakfast: "ארוחת בוקר", lunch: "ארוחת צהריים", dinner: "ארוחת ערב", other: "ארוחה" };
 
 export const TASK_CATEGORIES = {

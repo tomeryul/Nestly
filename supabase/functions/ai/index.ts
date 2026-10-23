@@ -304,6 +304,7 @@ async function breakdown({ body, ask }: Ctx) {
 const MENU = `You plan a week of family meals for an Israeli household, using only the household's own dishes (by key).
 
 - Fill only the meals that are still open. By default that means dinner (ערב) on each day of the week that has no dinner yet, unless the request asks for other meals or days.
+- A dish marked (lunch only) or (dinner only) goes only into that meal; the others fit any meal.
 - Vary the week: don't use a dish twice, and prefer dishes the household hasn't eaten in recent weeks.
 - Follow the request when there is one (e.g. "בלי בשר ביום שני", "משהו מהיר ברביעי"). If no dish fits a slot, leave the slot out rather than forcing one.
 - "note": one short, friendly Hebrew line about the choices.
@@ -316,7 +317,7 @@ async function menu({ sb, homeId, body, ask }: Ctx) {
   const request = String(body.request ?? "").trim().slice(0, 300);
   // Read as the caller: row-level security decides what is visible.
   const [{ data: dishes }, { data: planned }, { data: before }] = await Promise.all([
-    sb.from("dishes").select("id, name").eq("home_id", homeId).order("name").limit(150),
+    sb.from("dishes").select("id, name, meal_type").eq("home_id", homeId).order("name").limit(150),
     sb.from("weekly_meals").select("dish_id, day_of_week, meal_type, all_week").eq("home_id", homeId).eq("week_start", weekStart),
     sb.from("weekly_meals").select("dish_id").eq("home_id", homeId).gte("week_start", addDays(weekStart, -21)).lt("week_start", weekStart),
   ]);
@@ -333,7 +334,7 @@ async function menu({ sb, homeId, body, ask }: Ctx) {
     MENU,
     [
       `Week starting יום ראשון ${weekStart}. Days are numbered 0 (ראשון) to 6 (שבת).`,
-      `Dishes:\n${dishes.map((d) => `${keyOf.get(d.id)}: ${d.name}${recentCount.get(d.id) ? ` (eaten ${recentCount.get(d.id)}× in the last 3 weeks)` : ""}`).join("\n")}`,
+      `Dishes:\n${dishes.map((d) => `${keyOf.get(d.id)}: ${d.name}${d.meal_type ? ` (${d.meal_type} only)` : ""}${recentCount.get(d.id) ? ` (eaten ${recentCount.get(d.id)}× in the last 3 weeks)` : ""}`).join("\n")}`,
       `Already planned this week:\n${plannedText || "(nothing yet)"}`,
       `Request:\n<message>\n${request || "(none)"}\n</message>`,
     ].join("\n\n"),
@@ -349,6 +350,8 @@ async function menu({ sb, homeId, body, ask }: Ctx) {
     const dish = byKey.get(m.dish);
     const slot = `${m.day}:${m.meal_type}`;
     if (!dish || !(m.day >= 0 && m.day <= 6) || !MEALS[m.meal_type] || taken.has(slot) || used.has(slot)) continue;
+    // A lunch-only dish never lands on dinner, nor the other way round (lunch/dinner only; breakfast and "other" take anything).
+    if (dish.meal_type && (m.meal_type === "lunch" || m.meal_type === "dinner") && dish.meal_type !== m.meal_type) continue;
     used.add(slot);
     meals.push({ dish_id: dish.id, dish_name: dish.name, day_of_week: m.day, meal_type: m.meal_type });
   }
