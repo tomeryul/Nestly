@@ -133,6 +133,9 @@ function IngredientsModal({ dish, mealReady, onClose }: { dish: Dish; mealReady:
   const [isSpice, setIsSpice] = useState(false);
   const [sortMode, setSortMode] = useState<"added" | "alpha">("added");
   const [meal, setMeal] = useState<string | null>(dish.meal_type ?? null);
+  // While the AI box is open the sheet shows only it: a short sheet keeps the
+  // iPhone keyboard up, where the full, scrolling one closed it on the first tap.
+  const [aiOpen, setAiOpen] = useState(false);
 
   /** Lunch, dinner or either: which meals the planners offer this dish for. */
   const setDishMeal = async (next: string | null) => {
@@ -206,7 +209,7 @@ function IngredientsModal({ dish, mealReady, onClose }: { dish: Dish; mealReady:
 
   return (
     <Modal open onClose={onClose} title={`מצרכים · ${dish.name}`}>
-      {mealReady && (
+      {mealReady && !aiOpen && (
         <div className="dish-meal">
           <span className="dish-meal-label" id="dish-meal-label">ארוחה</span>
           <div className="nst-seg" role="radiogroup" aria-labelledby="dish-meal-label">
@@ -219,49 +222,53 @@ function IngredientsModal({ dish, mealReady, onClose }: { dish: Dish; mealReady:
           </div>
         </div>
       )}
-      <RecipeAi dish={dish} existing={rows} onAdded={load} />
-      <div style={{ background: "var(--surface-2)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 10, marginBottom: "1rem" }}>
-        <div className="nst-seg">
-          <SegLens />
-          <button className={!isSpice ? "active" : ""} onClick={() => setIsSpice(false)}>
-            מצרך
-          </button>
-          <button className={isSpice ? "active" : ""} onClick={() => setIsSpice(true)}>
-            תבלין
-          </button>
-        </div>
-        <input placeholder={isSpice ? "שם התבלין" : "שם המצרך"} value={name} onChange={(e) => setName(e.target.value)} />
-        <div style={{ display: "flex", gap: 8 }}>
-          <input style={{ flex: 1, minWidth: 0 }} type="number" min={0} step={0.25} value={qty} onChange={(e) => setQty(Number(e.target.value))} title="כמות (אפשר רבע/חצי)" />
-          <input style={{ flex: 1, minWidth: 0 }} placeholder="יחידה" value={unit} onChange={(e) => setUnit(e.target.value)} />
-        </div>
-        {isSpice && <p style={{ fontSize: 12, color: "var(--text-muted)" }}>תבלינים לא נכנסים לרשימת הקניות.</p>}
-        <button className="btn btn-primary btn-block" style={{ padding: 11 }} onClick={add}>
-          <Plus size={16} /> {isSpice ? "הוספת תבלין" : "הוספת מצרך"}
-        </button>
-      </div>
-
-      {rows.length === 0 && <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: "0.5rem 0" }}>אין מצרכים עדיין</p>}
-      {rows.length > 1 && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-          <button className="btn btn-sm" onClick={() => setSortMode((m) => (m === "added" ? "alpha" : "added"))} title="שינוי סדר תצוגה">
-            {sortMode === "added" ? (
-              <>
-                <Clock size={14} /> לפי סדר הוספה
-              </>
-            ) : (
-              <>
-                <ArrowDownAZ size={14} /> לפי א־ב
-              </>
-            )}
-          </button>
-        </div>
-      )}
-      {ingredients.length > 0 && <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: spices.length ? 14 : 0 }}>{ingredients.map(rowView)}</div>}
-      {spices.length > 0 && (
+      <RecipeAi dish={dish} existing={rows} onAdded={load} open={aiOpen} setOpen={setAiOpen} />
+      {!aiOpen && (
         <>
-          <div style={{ margin: "0 4px 8px", color: "var(--text-3)", font: "400 13px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>תבלינים</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{spices.map(rowView)}</div>
+          <div style={{ background: "var(--surface-2)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 10, marginBottom: "1rem" }}>
+            <div className="nst-seg">
+              <SegLens />
+              <button className={!isSpice ? "active" : ""} onClick={() => setIsSpice(false)}>
+                מצרך
+              </button>
+              <button className={isSpice ? "active" : ""} onClick={() => setIsSpice(true)}>
+                תבלין
+              </button>
+            </div>
+            <input placeholder={isSpice ? "שם התבלין" : "שם המצרך"} value={name} onChange={(e) => setName(e.target.value)} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <input style={{ flex: 1, minWidth: 0 }} type="number" min={0} step={0.25} value={qty} onChange={(e) => setQty(Number(e.target.value))} title="כמות (אפשר רבע/חצי)" />
+              <input style={{ flex: 1, minWidth: 0 }} placeholder="יחידה" value={unit} onChange={(e) => setUnit(e.target.value)} />
+            </div>
+            {isSpice && <p style={{ fontSize: 12, color: "var(--text-muted)" }}>תבלינים לא נכנסים לרשימת הקניות.</p>}
+            <button className="btn btn-primary btn-block" style={{ padding: 11 }} onClick={add}>
+              <Plus size={16} /> {isSpice ? "הוספת תבלין" : "הוספת מצרך"}
+            </button>
+          </div>
+
+          {rows.length === 0 && <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: "0.5rem 0" }}>אין מצרכים עדיין</p>}
+          {rows.length > 1 && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+              <button className="btn btn-sm" onClick={() => setSortMode((m) => (m === "added" ? "alpha" : "added"))} title="שינוי סדר תצוגה">
+                {sortMode === "added" ? (
+                  <>
+                    <Clock size={14} /> לפי סדר הוספה
+                  </>
+                ) : (
+                  <>
+                    <ArrowDownAZ size={14} /> לפי א־ב
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+          {ingredients.length > 0 && <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: spices.length ? 14 : 0 }}>{ingredients.map(rowView)}</div>}
+          {spices.length > 0 && (
+            <>
+              <div style={{ margin: "0 4px 8px", color: "var(--text-3)", font: "400 13px var(--font-body)", textTransform: "uppercase", letterSpacing: "0.06em" }}>תבלינים</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{spices.map(rowView)}</div>
+            </>
+          )}
         </>
       )}
     </Modal>
@@ -279,8 +286,7 @@ type RecipeResult = {
  * pasted — the ingredients the dish usually takes. Ingredients the dish already
  * has come back unticked, so nothing is added twice unless asked.
  */
-function RecipeAi({ dish, existing, onAdded }: { dish: Dish; existing: Ingredient[]; onAdded: () => void }) {
-  const [open, setOpen] = useState(false);
+function RecipeAi({ dish, existing, onAdded, open, setOpen }: { dish: Dish; existing: Ingredient[]; onAdded: () => void; open: boolean; setOpen: (open: boolean) => void }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -325,75 +331,74 @@ function RecipeAi({ dish, existing, onAdded }: { dish: Dish; existing: Ingredien
     onAdded();
   };
 
-  // Its own short sheet rather than a panel inside the ingredients sheet: there, on
-  // iPhone, the tall sheet resizing for the keyboard took the focus back and the
-  // keyboard closed the moment the field was tapped.
-  const close = () => {
-    if (busy) return;
-    setOpen(false);
-    setResult(null);
-    setError("");
-  };
-  const done = result
-    ? { label: busy ? "מוסיף…" : chosen.length === 1 ? "הוספת מצרך אחד" : `הוספת ${chosen.length} מצרכים`, onClick: save, disabled: busy || !chosen.length }
-    : { label: busy ? "קורא…" : text.trim() ? "חילוץ המצרכים" : "הצעת מצרכים", onClick: run, disabled: busy };
-
-  return (
-    <>
+  if (!open)
+    return (
       <div style={{ marginBottom: "1rem" }}>
         <AiButton block onClick={() => setOpen(true)}>
           מילוי מצרכים עם AI
         </AiButton>
       </div>
-      {open && (
-        <Modal open onClose={close} title={`מצרכים עם AI · ${dish.name}`} done={done}>
-          {!result ? (
-            <div className="nst-fields">
-              <textarea
-                rows={4}
-                maxLength={4000}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                disabled={busy}
-                placeholder={`הדביקו כאן מתכון — או השאירו ריק, ונציע את המצרכים שבדרך כלל יש ב${dish.name}`}
-                style={{ resize: "none", font: "400 17px/1.45 var(--font-body)" }}
-              />
-              {error && (
-                <p className="alert qa-error" role="alert">
-                  <TriangleAlert /> {error}
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="qa-review">
-              <p className="section-sub">
-                {result.suggested ? `הצעה לפי איך שמכינים ${dish.name} בדרך כלל — הורידו את מה שלא מתאים.` : "המצרכים מהמתכון — הורידו את מה שלא צריך."}
-              </p>
-              <div className="nst-group">
-                {result.ingredients.map((x, i) => (
-                  <PickRow
-                    key={i}
-                    kept={picks.kept(`i:${i}`)}
-                    onToggle={() => picks.toggle(`i:${i}`)}
-                    title={`${x.name} · ${fmt(x.quantity)}${x.unit ? ` ${x.unit}` : ""}`}
-                    tags={
-                      <>
-                        <span className="nst-tag">{x.is_spice ? "תבלין" : x.category}</span>
-                        {have.has(x.name.trim()) && <span className="nst-tag">כבר במאכל</span>}
-                      </>
-                    }
-                  />
-                ))}
-              </div>
-              {result.note && <p className="section-sub">{result.note}</p>}
-              <button className="btn btn-sm" style={{ alignSelf: "flex-start" }} onClick={() => setResult(null)} disabled={busy}>
-                עריכת הטקסט
-              </button>
-            </div>
+    );
+  return (
+    <div className="nst-ai-panel" style={{ marginBottom: "1rem" }}>
+      {!result ? (
+        <>
+          <textarea
+            rows={6}
+            maxLength={4000}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            disabled={busy}
+            placeholder={`הדביקו כאן מתכון — או השאירו ריק, ונציע את המצרכים שבדרך כלל יש ב${dish.name}`}
+            style={{ resize: "vertical", font: "400 16px/1.45 var(--font-body)" }}
+          />
+          {error && (
+            <p className="alert qa-error" role="alert">
+              <TriangleAlert /> {error}
+            </p>
           )}
-        </Modal>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <AiButton busy={busy} busyLabel="קורא…" onClick={run}>
+              {text.trim() ? "חילוץ המצרכים" : `הצעת מצרכים ל${dish.name}`}
+            </AiButton>
+            <button className="btn btn-sm" onClick={() => setOpen(false)} disabled={busy}>
+              חזרה
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="section-sub">
+            {result.suggested ? `הצעה לפי איך שמכינים ${dish.name} בדרך כלל — הורידו את מה שלא מתאים.` : "המצרכים מהמתכון — הורידו את מה שלא צריך."}
+          </p>
+          <div className="nst-group">
+            {result.ingredients.map((x, i) => (
+              <PickRow
+                key={i}
+                kept={picks.kept(`i:${i}`)}
+                onToggle={() => picks.toggle(`i:${i}`)}
+                title={`${x.name} · ${fmt(x.quantity)}${x.unit ? ` ${x.unit}` : ""}`}
+                tags={
+                  <>
+                    <span className="nst-tag">{x.is_spice ? "תבלין" : x.category}</span>
+                    {have.has(x.name.trim()) && <span className="nst-tag">כבר במאכל</span>}
+                  </>
+                }
+              />
+            ))}
+          </div>
+          {result.note && <p className="section-sub">{result.note}</p>}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn btn-primary btn-sm" onClick={save} disabled={busy || !chosen.length}>
+              {busy ? "מוסיף…" : chosen.length === 1 ? "הוספת מצרך אחד" : `הוספת ${chosen.length} מצרכים`}
+            </button>
+            <button className="btn btn-sm" onClick={() => setResult(null)} disabled={busy}>
+              חזרה
+            </button>
+          </div>
+        </>
       )}
-    </>
+    </div>
   );
 }
 
