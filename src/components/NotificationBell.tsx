@@ -87,28 +87,28 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute left-0 z-50 mt-2 w-80 max-w-[85vw] overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-100">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-            <span className="font-semibold text-slate-800">התראות</span>
+        <div className="absolute left-0 z-50 mt-2 w-80 max-w-[85vw] overflow-hidden rounded-2xl shadow-xl"
+          style={{ background: "var(--surface)", boxShadow: "var(--shadow-lg), 0 0 0 1px var(--sep)" }}>
+          <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--sep)" }}>
+            <span className="font-semibold" style={{ color: "var(--text-bright)" }}>התראות</span>
             {unread > 0 && (
-              <button onClick={markAllRead} className="flex items-center gap-1 text-xs text-brand-600">
+              <button onClick={markAllRead} className="flex items-center gap-1 text-xs" style={{ color: "var(--accent-ink)" }}>
                 <Check size={14} /> סמן הכל כנקרא
               </button>
             )}
           </div>
           <div className="max-h-96 overflow-y-auto">
-            {items.length === 0 && <p className="px-4 py-8 text-center text-sm text-slate-400">אין התראות</p>}
+            {items.length === 0 && <p className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-faint)" }}>אין התראות</p>}
             {items.map((n) => (
               <button
                 key={n.id}
                 onClick={() => openItem(n)}
-                className={`flex w-full flex-col items-start gap-0.5 border-b border-slate-50 px-4 py-3 text-right hover:bg-slate-50 ${
-                  n.is_read ? "" : "bg-brand-50/50"
-                }`}
+                className="flex w-full flex-col items-start gap-0.5 border-b px-4 py-3 text-right"
+                style={{ borderColor: "var(--sep)", background: n.is_read ? "transparent" : "var(--accent-soft)" }}
               >
-                <span className="text-sm font-medium text-slate-800">{n.title}</span>
-                {n.body && <span className="text-xs text-slate-500">{n.body}</span>}
-                <span className="mt-0.5 text-[11px] text-slate-400">{formatRelative(n.created_at)}</span>
+                <span className="text-sm font-medium" style={{ color: "var(--text-bright)" }}>{n.title}</span>
+                {n.body && <span className="text-xs" style={{ color: "var(--text-2)" }}>{n.body}</span>}
+                <span className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>{formatRelative(n.created_at)}</span>
               </button>
             ))}
           </div>

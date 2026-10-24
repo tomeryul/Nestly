@@ -25,7 +25,14 @@ const EVENT = "nestly:theme";
 export function applyTheme(t: ThemeKey) {
   document.documentElement.dataset.theme = t;
   const bg = THEMES.find((x) => x.key === t)?.bg ?? "#f5f1e6";
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg);
+  // iOS keeps painting the status bar from the theme-color it first read if the
+  // tag is only edited, so swap in a fresh tag for it to pick up.
+  const old = document.querySelector('meta[name="theme-color"]');
+  const meta = document.createElement("meta");
+  meta.name = "theme-color";
+  meta.content = bg;
+  if (old) old.replaceWith(meta);
+  else document.head.appendChild(meta);
   // The theme can change without any navigation (system appearance, Settings),
   // so anything that displays it listens rather than re-reading on route change.
   window.dispatchEvent(new CustomEvent<ThemeKey>(EVENT, { detail: t }));
