@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter, Tag, ShoppingCart, Sparkles, Search, ExternalLink } from "lucide-react";
-import { AiButton } from "../components/AiParts";
+import { AiButton, PickRow } from "../components/AiParts";
 import ListUpdate from "../components/ListUpdate";
+import { toast } from "sonner";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
 import { useAuth } from "../context/AuthContext";
@@ -39,6 +40,8 @@ export default function Shopping() {
   const [query, setQuery] = useState("");
   const [updating, setUpdating] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
+  // The items still to buy when the order began; they stay on screen as they're ticked.
+  const [ordering, setOrdering] = useState<string[] | null>(null);
   const [showNewList, setShowNewList] = useState(false);
   const [grouped, setGrouped] = useState(() => localStorage.getItem("nestly.shopGrouped") === "1");
   const [customCats, setCustomCats] = useState<string[]>(() => readCache<string[]>(homeId && `cats.${homeId}`) ?? []);
@@ -446,9 +449,9 @@ export default function Shopping() {
           <button className="btn btn-sm" onClick={() => setShowRecurring(true)}>
             <Repeat size={15} /> קבועים
           </button>
-          <a className="btn btn-sm" style={{ textDecoration: "none" }} href="https://www.rami-levy.co.il/he" target="_blank" rel="noopener noreferrer" title="הזמנה ברמי לוי אונליין">
-            <ExternalLink size={15} /> רמי לוי
-          </a>
+          <button className="btn btn-sm" onClick={() => setOrdering(items.filter((i) => !i.is_checked).map((i) => i.id))} disabled={!items.some((i) => !i.is_checked)} title="הזמנה ברמי לוי אונליין">
+            <ShoppingCart size={15} /> הזמנה
+          </button>
         </div>
       </div>
 
@@ -639,6 +642,7 @@ export default function Shopping() {
         />
       )}
       {showRecurring && <RecurringModal homeId={homeId!} lists={lists} onClose={() => setShowRecurring(false)} />}
+      {ordering && <OrderModal items={ordering.flatMap((id) => items.filter((i) => i.id === id))} onToggle={toggle} onClose={() => setOrdering(null)} />}
       {pickFor && (
         <Modal open onClose={() => setPickFor(null)} title={`איזה מוצר? · ${pickFor}`}>
           {(priceOptions[pickFor] ?? []).length === 0 ? (
@@ -679,6 +683,49 @@ export default function Shopping() {
         />
       )}
     </section>
+  );
+}
+
+const RAMI_LEVY = "https://www.rami-levy.co.il/he";
+
+/**
+ * Order the list on Rami Levy online, one item at a time: a tap copies the
+ * item's name for the site's search box and ticks it off as ordered (a second
+ * tap brings it back), so nothing is typed twice and nothing is forgotten.
+ */
+function OrderModal({ items, onToggle, onClose }: { items: Item[]; onToggle: (item: Item) => void; onClose: () => void }) {
+  const left = items.filter((i) => !i.is_checked).length;
+  const pick = async (item: Item) => {
+    if (!item.is_checked) {
+      try {
+        await navigator.clipboard.writeText(item.name);
+        toast.success(`"${item.name}" הועתק`, { description: "הדביקו בחיפוש באתר", duration: 2500 });
+      } catch {
+        toast.error("לא הצלחנו להעתיק", { description: item.name });
+      }
+    }
+    onToggle(item);
+  };
+  return (
+    <Modal open onClose={onClose} title={left ? `הזמנה · נשארו ${left}` : "הזמנה · הכל הוזמן"} done={{ label: "סיום", onClick: onClose }}>
+      <a className="btn btn-primary btn-block" style={{ textDecoration: "none", marginBottom: "0.75rem" }} href={RAMI_LEVY} target="_blank" rel="noopener noreferrer">
+        <ExternalLink size={16} /> פתיחת רמי לוי אונליין
+      </a>
+      <p className="section-sub" style={{ marginBottom: "0.75rem" }}>
+        לחיצה על מוצר מעתיקה את השם שלו להדבקה בחיפוש באתר, ומסמנת אותו כהוזמן. לחיצה נוספת מחזירה אותו לרשימה.
+      </p>
+      <div className="nst-group">
+        {items.map((i) => (
+          <PickRow
+            key={i.id}
+            kept={i.is_checked}
+            onToggle={() => pick(i)}
+            title={i.quantity > 1 ? `${i.name} ×${i.quantity}` : i.name}
+            tags={i.is_checked ? <span className="nst-tag">הוזמן</span> : i.category ? <span className="nst-tag">{i.category}</span> : undefined}
+          />
+        ))}
+      </div>
+    </Modal>
   );
 }
 
