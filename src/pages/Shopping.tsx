@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter, Tag, ShoppingCart, Sparkles, Search } from "lucide-react";
+import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter, Tag, ShoppingCart, Sparkles, Search, ExternalLink } from "lucide-react";
 import { AiButton } from "../components/AiParts";
 import ListUpdate from "../components/ListUpdate";
 import { supabase } from "../lib/supabase";
@@ -446,6 +446,9 @@ export default function Shopping() {
           <button className="btn btn-sm" onClick={() => setShowRecurring(true)}>
             <Repeat size={15} /> קבועים
           </button>
+          <a className="btn btn-sm" style={{ textDecoration: "none" }} href="https://www.rami-levy.co.il/he" target="_blank" rel="noopener noreferrer" title="הזמנה ברמי לוי אונליין">
+            <ExternalLink size={15} /> רמי לוי
+          </a>
         </div>
       </div>
 
