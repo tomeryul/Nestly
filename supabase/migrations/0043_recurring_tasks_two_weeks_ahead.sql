@@ -7,7 +7,7 @@
 
 /**
  * Places the occurrences of recurring tasks that fall from from_date to to_date,
- * a day at a time in order (so every-2/4-weeks keeps its rhythm). only limits it
+ * a day at a time in order (so every-2/4-weeks keeps its rhythm). only_id limits it
  * to one recurring task (a new one, from the insert trigger).
  * While an occurrence is still pending on a day already come (carried over,
  * 0035), the next one within the week is not created: the pending one stands
