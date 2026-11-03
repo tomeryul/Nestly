@@ -13,7 +13,7 @@
  * 0035), the next one within the week is not created: the pending one stands
  * for it. Occurrences placed ahead don't count; they haven't come yet.
  */
-create or replace function public.generate_recurring_tasks(from_date date, to_date date, only uuid default null)
+create or replace function public.generate_recurring_tasks(from_date date, to_date date, only_id uuid default null)
 returns void language plpgsql security definer set search_path = public as $$
 declare d date; r record;
 begin
@@ -21,7 +21,7 @@ begin
   while d <= to_date loop
     for r in select * from public.recurring_tasks
       where active and day_of_week = extract(dow from d)::int
-        and (only is null or id = only)
+        and (only_id is null or id = only_id)
         and (last_generated_on is null or (d - last_generated_on) >= interval_weeks * 7) loop
       if not exists (
         select 1 from public.schedule_tasks p
@@ -81,8 +81,7 @@ begin
 end;
 $$;
 
-drop trigger if exists trg_recurring_task_delete on public.recurring_tasks;
-create trigger trg_recurring_task_delete
+create or replace trigger trg_recurring_task_delete
   before delete on public.recurring_tasks
   for each row execute function public.on_recurring_task_delete();
 
