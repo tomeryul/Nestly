@@ -618,6 +618,7 @@ export type Database = {
           home_id: string
           id: string
           is_checked: boolean
+          is_ordered: boolean
           list_id: string
           name: string
           note: string | null
@@ -634,6 +635,7 @@ export type Database = {
           home_id: string
           id?: string
           is_checked?: boolean
+          is_ordered?: boolean
           list_id: string
           name: string
           note?: string | null
@@ -650,6 +652,7 @@ export type Database = {
           home_id?: string
           id?: string
           is_checked?: boolean
+          is_ordered?: boolean
           list_id?: string
           name?: string
           note?: string | null

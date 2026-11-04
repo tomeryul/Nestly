@@ -262,7 +262,7 @@ export default function Shopping() {
     sortTried.current.add(id);
     const row: Item = {
       id, list_id: activeList, home_id: homeId, name: name.trim(), quantity: qty, category: known,
-      source: "manual", is_checked: false, position: items.length, created_by: user?.id ?? null,
+      source: "manual", is_checked: false, is_ordered: false, position: items.length, created_by: user?.id ?? null,
       created_at: new Date().toISOString(), dish_id: null, note: null, unit: null,
     };
     flip();
@@ -280,8 +280,15 @@ export default function Shopping() {
   };
   const toggle = (item: Item) => {
     doneLast.ticked(item.id, item.is_checked);
-    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, is_checked: !i.is_checked } : i)));
-    bgWrite(supabase.from("shopping_items").update({ is_checked: !item.is_checked }).eq("id", item.id), loadItems);
+    // Ticked off means it's here, so it's no longer just ordered.
+    const change = item.is_checked ? { is_checked: false } : { is_checked: true, is_ordered: false };
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, ...change } : i)));
+    bgWrite(supabase.from("shopping_items").update(change).eq("id", item.id), loadItems);
+  };
+  // Ordered, not bought: it stays on the list until the delivery is checked.
+  const toggleOrdered = (item: Item) => {
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, is_ordered: !i.is_ordered } : i)));
+    bgWrite(supabase.from("shopping_items").update({ is_ordered: !item.is_ordered }).eq("id", item.id), loadItems);
   };
   const changeQty = (item: Item, delta: number) => {
     const quantity = Math.max(1, item.quantity + delta);
@@ -392,6 +399,11 @@ export default function Shopping() {
               item.category || "ללא קטגוריה"
             )}
           </span>
+          {item.is_ordered && !item.is_checked && (
+            <span className="nst-tag" style={{ background: "var(--info-soft)", color: "var(--info)" }}>
+              <ShoppingCart /> הוזמן
+            </span>
+          )}
           {item.source === "recipe" && (
             <span className="nst-tag" style={{ background: "var(--cat-3-bg)", color: "var(--cat-3-fg)" }}>
               <ChefHat /> ממתכון
@@ -642,7 +654,7 @@ export default function Shopping() {
         />
       )}
       {showRecurring && <RecurringModal homeId={homeId!} lists={lists} onClose={() => setShowRecurring(false)} />}
-      {ordering && <OrderModal items={ordering.flatMap((id) => items.filter((i) => i.id === id))} onToggle={toggle} onClose={() => setOrdering(null)} />}
+      {ordering && <OrderModal items={ordering.flatMap((id) => items.filter((i) => i.id === id))} onToggle={toggleOrdered} onClose={() => setOrdering(null)} />}
       {pickFor && (
         <Modal open onClose={() => setPickFor(null)} title={`איזה מוצר? · ${pickFor}`}>
           {(priceOptions[pickFor] ?? []).length === 0 ? (
@@ -690,13 +702,14 @@ const RAMI_LEVY = "https://www.rami-levy.co.il/he";
 
 /**
  * Order the list on Rami Levy online, one item at a time: a tap copies the
- * item's name for the site's search box and ticks it off as ordered (a second
- * tap brings it back), so nothing is typed twice and nothing is forgotten.
+ * item's name for the site's search box and marks it ordered (a second tap
+ * takes the mark off). Ordered isn't bought: the item stays on the list, marked,
+ * to be ticked off when the delivery is checked.
  */
 function OrderModal({ items, onToggle, onClose }: { items: Item[]; onToggle: (item: Item) => void; onClose: () => void }) {
-  const left = items.filter((i) => !i.is_checked).length;
+  const left = items.filter((i) => !i.is_ordered).length;
   const pick = async (item: Item) => {
-    if (!item.is_checked) {
+    if (!item.is_ordered) {
       try {
         await navigator.clipboard.writeText(item.name);
         toast.success(`"${item.name}" הועתק`, { description: "הדביקו בחיפוש באתר", duration: 2500 });
@@ -712,16 +725,16 @@ function OrderModal({ items, onToggle, onClose }: { items: Item[]; onToggle: (it
         <ExternalLink size={16} /> פתיחת רמי לוי אונליין
       </a>
       <p className="section-sub" style={{ marginBottom: "0.75rem" }}>
-        לחיצה על מוצר מעתיקה את השם שלו להדבקה בחיפוש באתר, ומסמנת אותו כהוזמן. לחיצה נוספת מחזירה אותו לרשימה.
+        לחיצה על מוצר מעתיקה את השם שלו להדבקה בחיפוש באתר, ומסמנת אותו כהוזמן. הוא נשאר ברשימה עם תג "הוזמן" עד שתסמנו שהגיע.
       </p>
       <div className="nst-group">
         {items.map((i) => (
           <PickRow
             key={i.id}
-            kept={i.is_checked}
+            kept={i.is_ordered}
             onToggle={() => pick(i)}
             title={i.quantity > 1 ? `${i.name} ×${i.quantity}` : i.name}
-            tags={i.is_checked ? <span className="nst-tag">הוזמן</span> : i.category ? <span className="nst-tag">{i.category}</span> : undefined}
+            tags={i.is_ordered ? <span className="nst-tag">הוזמן</span> : i.category ? <span className="nst-tag">{i.category}</span> : undefined}
           />
         ))}
       </div>

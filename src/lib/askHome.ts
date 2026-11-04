@@ -40,7 +40,7 @@ export async function applyAction(a: AskAction, opts: { homeId: string; userId: 
     if (a.table === "shopping_items") {
       const { data: before, error } = await supabase.from("shopping_items").select("is_checked").eq("id", a.id).single();
       if (error) throw error;
-      const { error: e } = await supabase.from("shopping_items").update({ is_checked: true }).eq("id", a.id);
+      const { error: e } = await supabase.from("shopping_items").update({ is_checked: true, is_ordered: false }).eq("id", a.id);
       if (e) throw e;
       return async () => {
         const { error: u } = await supabase.from("shopping_items").update({ is_checked: before.is_checked }).eq("id", a.id);
