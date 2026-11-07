@@ -384,6 +384,10 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .qa-row { width: 100%; border: none; text-align: right; font: inherit; color: inherit; cursor: pointer; }
 .qa-row[aria-pressed="false"] .qa-row-body { opacity: 0.45; }
 .qa-row[aria-pressed="false"] .qa-row-title { text-decoration: line-through; }
+/* In the order sheet the tick means "ordered": what's still to order is the
+   work left, so it reads as normal, not as something dropped. */
+.order-list .qa-row[aria-pressed="false"] .qa-row-body { opacity: 1; }
+.order-list .qa-row[aria-pressed="false"] .qa-row-title { text-decoration: none; }
 .qa-row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; transition: opacity 160ms var(--ease-out); }
 .qa-row-title { font: 400 17px var(--font-body); color: var(--text-bright); overflow-wrap: anywhere; }
 .qa-list { margin-inline-start: auto; width: auto; min-height: 30px; padding: 2px 10px; font: 600 var(--t-footnote) var(--font-body); border-radius: var(--r-capsule); }

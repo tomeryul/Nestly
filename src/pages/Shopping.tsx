@@ -727,7 +727,7 @@ function OrderModal({ items, onToggle, onClose }: { items: Item[]; onToggle: (it
       <p className="section-sub" style={{ marginBottom: "0.75rem" }}>
         לחיצה על מוצר מעתיקה את השם שלו להדבקה בחיפוש באתר, ומסמנת אותו כהוזמן. הוא נשאר ברשימה עם תג "הוזמן" עד שתסמנו שהגיע.
       </p>
-      <div className="nst-group">
+      <div className="nst-group order-list">
         {items.map((i) => (
           <PickRow
             key={i.id}
