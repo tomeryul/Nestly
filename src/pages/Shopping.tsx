@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter, Tag, ShoppingCart, Sparkles, Search, ExternalLink } from "lucide-react";
+import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter, Tag, ShoppingCart, Sparkles, Search, ExternalLink, ScanBarcode } from "lucide-react";
 import { AiButton, PickRow } from "../components/AiParts";
 import ListUpdate from "../components/ListUpdate";
+import BarcodeScanner from "../components/BarcodeScanner";
 import { toast } from "sonner";
 import { supabase } from "../lib/supabase";
 import { useHome } from "../context/HomeContext";
@@ -42,6 +43,7 @@ export default function Shopping() {
   const [showRecurring, setShowRecurring] = useState(false);
   // The items still to buy when the order began; they stay on screen as they're ticked.
   const [ordering, setOrdering] = useState<string[] | null>(null);
+  const [scanning, setScanning] = useState(false);
   const [showNewList, setShowNewList] = useState(false);
   const [grouped, setGrouped] = useState(() => localStorage.getItem("nestly.shopGrouped") === "1");
   const [customCats, setCustomCats] = useState<string[]>(() => readCache<string[]>(homeId && `cats.${homeId}`) ?? []);
@@ -479,15 +481,21 @@ export default function Shopping() {
       </div>
 
       <div className="nst-card" style={{ padding: "1rem 1.1rem", display: "flex", flexDirection: "column", gap: 10 }}>
-        <input
-          placeholder="הוספת מצרך…"
-          autoComplete="off"
-          value={typed}
-          onChange={(e) => setName(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setTimeout(() => setFocused(false), 150)}
-          onKeyDown={(e) => e.key === "Enter" && addItem()}
-        />
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            style={{ flex: 1 }}
+            placeholder="הוספת מצרך…"
+            autoComplete="off"
+            value={typed}
+            onChange={(e) => setName(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setTimeout(() => setFocused(false), 150)}
+            onKeyDown={(e) => e.key === "Enter" && addItem()}
+          />
+          <button className="btn" style={{ padding: "0 14px", flex: "none" }} onClick={() => setScanning(true)} aria-label="סריקת ברקוד" title="סריקת ברקוד">
+            <ScanBarcode size={20} />
+          </button>
+        </div>
         {focused && suggestions.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {suggestions.map((s) => {
@@ -650,6 +658,16 @@ export default function Shopping() {
             setShowNewList(false);
             loadLists();
             setActiveList(id);
+          }}
+        />
+      )}
+      {scanning && (
+        <BarcodeScanner
+          onClose={() => setScanning(false)}
+          onFound={(found) => {
+            setScanning(false);
+            setName(found);
+            setQty(1);
           }}
         />
       )}

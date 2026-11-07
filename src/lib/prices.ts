@@ -55,3 +55,10 @@ export async function priceMany(
   const { matches, options } = await call({ action: "match" }, { store: storeId, names });
   return { matches: matches ?? {}, options: options ?? {} };
 }
+
+/** A scanned barcode -> the product's name (and its price at the chosen branch, when it's there). */
+export async function lookupBarcode(code: string): Promise<{ name: string; price?: number; source: string } | null> {
+  const store = getStoreId();
+  const { item } = await call({ action: "barcode", code, ...(store ? { store } : {}) });
+  return item ?? null;
+}

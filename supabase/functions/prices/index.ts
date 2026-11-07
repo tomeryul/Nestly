@@ -8,6 +8,7 @@
  *
  *   GET ?action=stores                     -> [{ id, name }]
  *   GET ?action=search&store=340&q=חלב     -> [{ name, price, unit, manufacturer }]
+ *   GET ?action=barcode&code=729…[&store=340] -> { item: { name, price?, source } | null }
  */
 
 const BASE = "https://kingstore.binaprojects.com";
@@ -192,6 +193,39 @@ function search(index: Index, q: string, limit = 12): Item[] {
   return scored.slice(0, limit).map((s) => s.item);
 }
 
+/** "07290000042442" and "7290000042442" are the same product (UPC-A vs EAN-13). */
+const sameCode = (a: string, b: string) => a.replace(/^0+/, "") === b.replace(/^0+/, "");
+
+/**
+ * A scanned barcode -> the product's name. The chain's catalogue lists each item
+ * under its barcode (ItemCode), so the branch the household prices against
+ * answers first, with its price; any branch will do when none was chosen.
+ * Open Food Facts, a free open product database with some Israeli products,
+ * covers what the branch doesn't stock.
+ */
+async function byBarcode(code: string, storeId: string | null) {
+  try {
+    const store = storeId || (await stores())[0]?.id;
+    if (store) {
+      const hit = (await loadStore(store)).entries.find((e) => e.item.code && sameCode(e.item.code, code));
+      if (hit) return { name: hit.item.name, price: hit.item.price, source: "store" };
+    }
+  } catch (e) {
+    console.error("[prices] barcode store lookup failed", e);
+  }
+  // 20–29 is for codes a store prints itself (weighed goods, its own items): they
+  // mean something only in that store, and Open Food Facts has noise under them.
+  if (code.length === 13 && code[0] === "2") return null;
+  const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,product_name_he,brands`, { headers: { "User-Agent": UA } });
+  if (!res.ok) return null;
+  const p = ((await res.json()) as { status?: number; product?: { product_name?: string; product_name_he?: string; brands?: string } });
+  if (p.status !== 1 || !p.product) return null;
+  const name = (p.product.product_name_he || p.product.product_name || "").trim();
+  const brand = (p.product.brands ?? "").split(",")[0].trim();
+  if (!name) return null;
+  return { name: brand && !name.includes(brand) ? `${name} ${brand}` : name, source: "openfoodfacts" };
+}
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
@@ -201,6 +235,11 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const action = url.searchParams.get("action") ?? "search";
     if (action === "stores") return json({ stores: await stores() });
+    if (action === "barcode") {
+      const code = (url.searchParams.get("code") ?? "").replace(/\D/g, "");
+      if (code.length < 6 || code.length > 14) return json({ error: "bad code" }, 400);
+      return json({ item: await byBarcode(code, url.searchParams.get("store")) });
+    }
 
     // Batch: price a whole shopping list in ONE request (the file is loaded once).
     if (action === "match") {
