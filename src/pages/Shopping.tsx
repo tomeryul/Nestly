@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter, Tag, ShoppingCart, Sparkles, Search, ExternalLink, ScanBarcode } from "lucide-react";
+import { Plus, Minus, Repeat, ChefHat, Check, ListPlus, X, Eraser, ShoppingBasket, Trash2, ListFilter, Tag, ShoppingCart, Sparkles, Search, ExternalLink, ScanBarcode, Copy } from "lucide-react";
 import { AiButton, PickRow } from "../components/AiParts";
 import ListUpdate from "../components/ListUpdate";
 import BarcodeScanner from "../components/BarcodeScanner";
@@ -737,11 +737,28 @@ function OrderModal({ items, onToggle, onClose }: { items: Item[]; onToggle: (it
     }
     onToggle(item);
   };
+  // The whole list as text, one item a line, to keep in view (or paste) while
+  // ordering. What's already marked ordered is left out, unless that's everything.
+  const copyAll = async () => {
+    const rows = left ? items.filter((i) => !i.is_ordered) : items;
+    const text = rows.map((i) => (i.quantity > 1 ? `${i.name} ×${i.quantity}` : i.name)).join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(rows.length === 1 ? "מוצר אחד הועתק" : `${rows.length} מוצרים הועתקו`, { description: "הרשימה בלוח, מוצר בכל שורה", duration: 2500 });
+    } catch {
+      toast.error("לא הצלחנו להעתיק את הרשימה");
+    }
+  };
   return (
     <Modal open onClose={onClose} title={left ? `הזמנה · נשארו ${left}` : "הזמנה · הכל הוזמן"} done={{ label: "סיום", onClick: onClose }}>
-      <a className="btn btn-primary btn-block" style={{ textDecoration: "none", marginBottom: "0.75rem" }} href={RAMI_LEVY} target="_blank" rel="noopener noreferrer">
-        <ExternalLink size={16} /> פתיחת רמי לוי אונליין
-      </a>
+      <div style={{ display: "flex", gap: 8, marginBottom: "0.75rem" }}>
+        <button className="btn" style={{ flex: "none" }} onClick={copyAll} disabled={!items.length}>
+          <Copy size={16} /> העתקת הרשימה
+        </button>
+        <a className="btn btn-primary" style={{ textDecoration: "none", flex: 1 }} href={RAMI_LEVY} target="_blank" rel="noopener noreferrer">
+          <ExternalLink size={16} /> פתיחת רמי לוי
+        </a>
+      </div>
       <p className="section-sub" style={{ marginBottom: "0.75rem" }}>
         לחיצה על מוצר מעתיקה את השם שלו להדבקה בחיפוש באתר, ומסמנת אותו כהוזמן. הוא נשאר ברשימה עם תג "הוזמן" עד שתסמנו שהגיע.
       </p>
